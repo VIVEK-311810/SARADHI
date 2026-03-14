@@ -1173,6 +1173,48 @@ export class DemoWebSocket {
             // ── reveal-answers for poll 2 at 5+15+5+15 = 40s ──
             this._schedule(DEMO_POLLS[1].time_limit * 1000, () => {
               this._emit({ type: 'reveal-answers', sessionId: DEMO_SESSION_ID, pollId: DEMO_POLLS[1].id });
+
+              // ── Knowledge Cards demo — starts 6s after poll 2 reveal ──
+
+              // Step 1: Distribute cards (46s total)
+              this._schedule(6000, () => {
+                this._emit({
+                  type: 'cards-distribute',
+                  card: DEMO_KNOWLEDGE_CARDS.studentCard,
+                });
+
+                // Step 2: Activate question — it's the demo student's turn! (54s total)
+                this._schedule(8000, () => {
+                  this._emit({
+                    type: 'card-activate-question',
+                    pairId: DEMO_KNOWLEDGE_CARDS.activeState.pairId,
+                    questionHolderId: DEMO_KNOWLEDGE_CARDS.activeState.questionHolderId,
+                  });
+
+                  // Step 3: Reveal answer holder (64s total)
+                  this._schedule(10000, () => {
+                    this._emit({
+                      type: 'card-reveal-answer',
+                      pairId: DEMO_KNOWLEDGE_CARDS.activeState.pairId,
+                      answerHolderId: DEMO_KNOWLEDGE_CARDS.activeState.answerHolderId,
+                      questionHolderId: DEMO_KNOWLEDGE_CARDS.activeState.questionHolderId,
+                    });
+
+                    // Step 4: Complete the pair, open voting (72s total)
+                    this._schedule(8000, () => {
+                      this._emit({
+                        type: 'cards-round-complete',
+                        voteSummary: { up: 7, down: 2 },
+                      });
+
+                      // Step 5: End the activity (82s total)
+                      this._schedule(10000, () => {
+                        this._emit({ type: 'cards-activity-end' });
+                      });
+                    });
+                  });
+                });
+              });
             });
           });
         });
