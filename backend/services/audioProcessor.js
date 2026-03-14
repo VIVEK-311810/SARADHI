@@ -5,6 +5,8 @@ const pool = require('../db');
 
 // Configuration
 const GPU_TRANSCRIPTION_URL = process.env.GPU_TRANSCRIPTION_URL || 'http://localhost:5000';
+// Skip GPU when the URL is still the default (localhost) — avoids pointless ECONNREFUSED on Render
+const GPU_ENABLED = !!(process.env.GPU_TRANSCRIPTION_URL && !process.env.GPU_TRANSCRIPTION_URL.includes('localhost'));
 const TRANSCRIPT_WEBHOOK_URL = process.env.TRANSCRIPT_WEBHOOK_URL;
 const FINAL_NOTES_WEBHOOK_URL = process.env.FINAL_NOTES_WEBHOOK_URL;
 const SESSION_START_WEBHOOK_URL = process.env.SESSION_START_WEBHOOK_URL;
@@ -67,7 +69,12 @@ async function transcribeWithGroq(audioBuffer, filename, mimetype) {
  * @returns {Promise<Object>} Transcription result
  */
 async function forwardToGPUServer(audioBuffer, sessionId, filename, mimetype) {
-  // ── Primary: GPU server ────────────────────────────────────────────────
+  // ── Primary: GPU server (only when configured) ─────────────────────────
+  if (!GPU_ENABLED) {
+    console.log(`[AudioProcessor] GPU not configured — using Groq directly for session: ${sessionId}`);
+    return transcribeWithGroq(audioBuffer, filename, mimetype);
+  }
+
   try {
     console.log(`[AudioProcessor] Forwarding audio to GPU server for session: ${sessionId}`);
 

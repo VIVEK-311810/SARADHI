@@ -1435,4 +1435,16 @@ function gracefulShutdown(signal) {
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
+// Log unhandled errors before Node.js 15+ crashes the process
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled promise rejection — this crashed the process', {
+    reason: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined
+  });
+});
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught exception — process will exit', { error: err.message, stack: err.stack });
+  process.exit(1);
+});
+
 module.exports = { app, server, wss };
