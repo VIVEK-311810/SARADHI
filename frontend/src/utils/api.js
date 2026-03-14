@@ -253,6 +253,17 @@ export const pollAPI = {
 
 // Resource API functions
 export const resourceAPI = {
+  // Upload file resource (teacher only) — sends multipart/form-data
+  uploadFile: (sessionId, _userId, formData) => {
+    const token = localStorage.getItem('authToken');
+    formData.append('session_id', sessionId);
+    return fetch(`${API_BASE_URL}/resources/upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    }).then(r => r.json());
+  },
+
   // Add URL resource (teacher only)
   addUrl: (sessionId, urlData) =>
     apiRequest('/resources/add-url', {
