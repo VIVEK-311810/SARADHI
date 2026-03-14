@@ -147,11 +147,11 @@ router.post('/generate', authenticate, authorize('teacher'), async (req, res) =>
     const pairCount = Math.min(Math.max(parseInt(count) || 10, 3), 20);
     const pairs = await generateQAPairs(sessionCode, pairCount, topic);
 
-    // Create round in draft state
+    // Create round in draft state — store the 6-char session code so distribute can join session_participants
     const roundResult = await pool.query(`
       INSERT INTO knowledge_card_rounds (session_id, teacher_id, status, total_pairs, topic)
       VALUES ($1, $2, 'draft', $3, $4) RETURNING *
-    `, [sessionId, req.user.id, pairs.length, topic || null]);
+    `, [sessionCode, req.user.id, pairs.length, topic || null]);
     const round = roundResult.rows[0];
 
     // Insert pairs
@@ -284,10 +284,17 @@ router.post('/rounds/:roundId/distribute', authenticate, authorize('teacher'), a
     );
     if (pairsResult.rows.length < 2) return res.status(400).json({ error: 'Need at least 2 pairs to distribute' });
 
+    // Resolve the 6-char session code — session_participants uses session_id VARCHAR, not numeric id
+    const sessionCodeRow = await pool.query(
+      'SELECT session_id FROM sessions WHERE id = $1',
+      [round.session_id]
+    );
+    const sessionCode = sessionCodeRow.rows[0]?.session_id || round.session_id;
+
     // Get online students from session_participants
     const studentsResult = await pool.query(
       'SELECT student_id FROM session_participants WHERE session_id = $1 AND is_active = true',
-      [round.session_id]
+      [sessionCode]
     );
     if (studentsResult.rows.length < 2) {
       return res.status(400).json({ error: 'Need at least 2 online students to distribute cards' });
