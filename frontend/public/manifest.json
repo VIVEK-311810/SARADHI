@@ -1,0 +1,15 @@
+{
+  "short_name": "SARADHI",
+  "name": "SARADHI AI — Interactive Learning",
+  "icons": [
+    {
+      "src": "saradhi_ai_logo_final.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#6d28d9",
+  "background_color": "#ffffff"
+}
