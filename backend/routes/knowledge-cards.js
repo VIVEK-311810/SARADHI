@@ -4,6 +4,7 @@ const pool = require('../db');
 const logger = require('../logger');
 const { authenticate, authorize } = require('../middleware/auth');
 const vectorStore = require('../services/vectorStore');
+const embeddingService = require('../services/embeddingService');
 const mistralClient = require('../services/mistralClient');
 const { awardXP } = require('./gamification');
 
@@ -11,8 +12,9 @@ const { awardXP } = require('./gamification');
 
 async function generateQAPairs(sessionId, count = 10, topic = '') {
   // Retrieve relevant chunks from Pinecone for this session
-  const query = topic || 'key concepts and definitions from the session material';
-  const chunks = await vectorStore.searchSimilar(query, sessionId, Math.min(count * 2, 20));
+  const queryText = topic || 'key concepts and definitions from the session material';
+  const queryEmbedding = await embeddingService.generateEmbedding(queryText);
+  const chunks = await vectorStore.searchSimilar(queryEmbedding, sessionId, Math.min(count * 2, 20));
 
   if (!chunks || chunks.length === 0) {
     throw new Error('No session material found to generate cards from. Please upload resources first.');
