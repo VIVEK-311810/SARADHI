@@ -1105,10 +1105,24 @@ app.get('/api/health', async (req, res) => {
   res.status(dbStatus === 'ok' ? 200 : 503).json(health);
 });
 
-// Global error handler
+// Global error handler — must set CORS headers before responding so browser
+// doesn't treat the error response as a CORS failure (hiding the real error)
 app.use((err, req, res, next) => {
+  const origin = req.headers.origin;
+  const allowed = [
+    process.env.FRONTEND_URL,
+    'https://sas-edu-ai-f.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:3001',
+  ].filter(Boolean);
+  if (origin && allowed.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+
+  const status = err.status || err.statusCode || 500;
   logger.error('Unhandled error', { error: err.message, stack: err.stack, path: req.path });
-  res.status(500).json({ error: 'Internal server error' });
+  res.status(status).json({ error: err.message || 'Internal server error' });
 });
 
 // 404 handler
