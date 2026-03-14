@@ -105,7 +105,7 @@ router.post('/audio-chunk', authenticate, authorize('teacher'), upload.single('a
     res.json({ success: true, transcript, detected_language: detectedLanguage, session_id });
   } catch (error) {
     logger.error('Error processing audio chunk', { error: error.message });
-    res.status(500).json({ error: 'Failed to process audio chunk' });
+    res.status(500).json({ error: 'Failed to process audio chunk', details: error.message });
   }
 });
 

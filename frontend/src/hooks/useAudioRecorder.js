@@ -117,7 +117,7 @@ const useAudioRecorder = (initialSessionId = '') => {
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        console.error('[useAudioRecorder] Chunk upload error:', err);
+        console.error('[useAudioRecorder] Chunk upload error:', err.details || err.error || err);
         return;
       }
 
