@@ -62,6 +62,7 @@ const EnhancedSessionManagement = () => {
   // Live participant count (from WebSocket)
   const [onlineCount, setOnlineCount] = useState(0);
   const [presentCount, setPresentCount] = useState(0);
+  const [stuckCount, setStuckCount] = useState(0);
 
   // Attendance state
   const [attendanceWindowOpen, setAttendanceWindowOpen] = useState(false);
@@ -150,6 +151,9 @@ const EnhancedSessionManagement = () => {
           case 'participant-count-updated':
             fetchParticipants();
             setOnlineCount(data.count || 0);
+            break;
+          case 'stuck-update':
+            setStuckCount(data.count || 0);
             break;
           case 'attendance-count-updated':
             setAttendanceCounts(data.counts || { present: 0, late: 0, absent: 0 });
@@ -794,6 +798,21 @@ const EnhancedSessionManagement = () => {
                     <span className="text-gray-300 dark:text-gray-600">|</span>
                     <span className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
                       <span className="font-bold text-blue-600 dark:text-blue-400">{presentCount}</span> marked present
+                    </span>
+                  </>
+                )}
+                {stuckCount > 0 && (
+                  <>
+                    <span className="text-gray-300 dark:text-gray-600">|</span>
+                    <span className="flex items-center gap-1.5 text-sm sm:text-base">
+                      <span className="font-bold text-orange-600 dark:text-orange-400">✋ {stuckCount}</span>
+                      <span className="text-gray-600 dark:text-gray-400">student{stuckCount !== 1 ? 's' : ''} stuck</span>
+                      <button
+                        onClick={() => wsRef.current?.send(JSON.stringify({ type: 'stuck-reset', sessionId }))}
+                        className="text-xs text-orange-600 dark:text-orange-400 border border-orange-300 dark:border-orange-600 rounded px-1.5 py-0.5 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                      >
+                        Clear
+                      </button>
                     </span>
                   </>
                 )}

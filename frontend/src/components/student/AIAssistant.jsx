@@ -282,15 +282,22 @@ const AIAssistant = () => {
                 AI Study Assistant
               </h3>
               <p style={{ color: colors.textMuted, fontSize: '14px', maxWidth: '400px', margin: '0 auto 24px' }}>
-                Ask questions about your course materials, get explanations, generate quizzes, or summarize resources.
+                {selectedResource
+                  ? `Asking about: ${selectedResource.title || selectedResource.file_name}`
+                  : 'Ask questions about your course materials, get explanations, generate quizzes, or summarize resources.'}
               </p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
-                {[
+                {(selectedResource ? [
+                  `Summarize "${selectedResource.title || selectedResource.file_name}"`,
+                  'What are the key concepts?',
+                  'Quiz me on this document',
+                  'What are the most important points?',
+                ] : [
                   'What topics are covered?',
                   'List all resources',
                   'Explain the main concepts',
                   'Generate a practice quiz',
-                ].map((s, i) => (
+                ]).map((s, i) => (
                   <button
                     key={i}
                     onClick={() => handleSuggestionClick(s)}
@@ -324,6 +331,7 @@ const AIAssistant = () => {
               doubtedMessages={doubtedMessages}
               onDoubt={handleDoubt}
               onSuggestionClick={handleSuggestionClick}
+              onQuickAction={(text, mode) => sendMessage(text, mode, selectedResource?.id || null)}
             />
           ))}
 
@@ -554,8 +562,17 @@ const AIAssistant = () => {
 
 // ─── Message Bubble Component ───────────────────────────────────────────────
 
-function MessageBubble({ msg, colors, darkMode, currentStatus, statusMessages, confidenceColors, doubtedMessages, onDoubt, onSuggestionClick }) {
+function MessageBubble({ msg, colors, darkMode, currentStatus, statusMessages, confidenceColors, doubtedMessages, onDoubt, onSuggestionClick, onQuickAction }) {
   const isUser = msg.role === 'user';
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopy = () => {
+    if (!msg.content) return;
+    navigator.clipboard.writeText(msg.content).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   return (
     <div style={{
@@ -654,15 +671,66 @@ function MessageBubble({ msg, colors, darkMode, currentStatus, statusMessages, c
           </div>
         )}
 
-        {/* Doubt button */}
-        {!isUser && !msg.isStreaming && msg.id && !msg.id.startsWith('temp-') && !msg.id.startsWith('stream-') && (
-          <div style={{ marginTop: '8px' }}>
-            {!doubtedMessages.has(msg.id) ? (
+        {/* Copy + Doubt row */}
+        {!isUser && !msg.isStreaming && msg.content && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
+            {/* Copy button */}
+            <button
+              onClick={handleCopy}
+              title="Copy answer"
+              style={{
+                padding: '4px 10px',
+                backgroundColor: 'transparent',
+                border: `1px solid ${colors.border}`,
+                borderRadius: '12px',
+                color: copied ? '#22c55e' : colors.textMuted,
+                cursor: 'pointer',
+                fontSize: '11px',
+              }}
+            >
+              {copied ? '✓ Copied' : '⎘ Copy'}
+            </button>
+
+            {/* Doubt button */}
+            {msg.id && !msg.id.startsWith('temp-') && !msg.id.startsWith('stream-') && (
+              !doubtedMessages.has(msg.id) ? (
+                <button
+                  onClick={() => onDoubt(msg.id)}
+                  style={{
+                    padding: '4px 10px',
+                    backgroundColor: 'transparent',
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '12px',
+                    color: colors.textMuted,
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                  }}
+                >
+                  Still confused?
+                </button>
+              ) : (
+                <span style={{ fontSize: '11px', color: '#f59e0b' }}>
+                  Marked as doubt ✓
+                </span>
+              )
+            )}
+          </div>
+        )}
+
+        {/* Quick follow-up actions */}
+        {!isUser && !msg.isStreaming && msg.content && !msg.metadata?.questions && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+            {[
+              { label: 'Explain simpler', text: 'Can you explain that more simply?', mode: 'explain' },
+              { label: 'Give an example', text: 'Can you give a concrete example of that?', mode: 'answer' },
+              { label: 'Quiz me on this', text: 'Quiz me on what you just explained', mode: 'quiz' },
+            ].map((action) => (
               <button
-                onClick={() => onDoubt(msg.id)}
+                key={action.label}
+                onClick={() => onQuickAction(action.text, action.mode)}
                 style={{
                   padding: '4px 10px',
-                  backgroundColor: 'transparent',
+                  backgroundColor: darkMode ? '#1e293b' : '#f8fafc',
                   border: `1px solid ${colors.border}`,
                   borderRadius: '12px',
                   color: colors.textMuted,
@@ -670,19 +738,15 @@ function MessageBubble({ msg, colors, darkMode, currentStatus, statusMessages, c
                   fontSize: '11px',
                 }}
               >
-                Still confused?
+                {action.label}
               </button>
-            ) : (
-              <span style={{ fontSize: '11px', color: '#f59e0b' }}>
-                Marked as doubt - your teacher will see this
-              </span>
-            )}
+            ))}
           </div>
         )}
 
-        {/* Follow-up suggestions */}
+        {/* Follow-up suggestions from AI */}
         {!isUser && !msg.isStreaming && msg.metadata?.suggestedFollowups?.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '10px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
             {msg.metadata.suggestedFollowups.map((s, i) => (
               <button
                 key={i}

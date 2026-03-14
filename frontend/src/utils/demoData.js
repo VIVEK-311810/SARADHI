@@ -1073,6 +1073,21 @@ export const handleDemoRequest = (endpoint, options = {}) => {
     return Promise.resolve({ tickets: [], replies: [] });
   }
 
+  // Weak topics
+  if (ep.includes('/STUDENTS/') && ep.includes('/WEAK-TOPICS'))
+    return Promise.resolve({
+      weakTopics: [
+        { course: 'CS201', wrongCount: 4, questions: [
+          { question: 'What is the time complexity of binary search?', yourAnswer: 'O(n)', correctAnswer: 'O(log n)', sessionTitle: 'Data Structures & Algorithms' },
+          { question: 'Which traversal visits root first?', yourAnswer: 'Inorder', correctAnswer: 'Preorder', sessionTitle: 'Trees & Graphs' },
+        ]},
+        { course: 'CS301', wrongCount: 2, questions: [
+          { question: 'What does LIFO stand for?', yourAnswer: 'Last In First Out... wait, no', correctAnswer: 'Last In, First Out', sessionTitle: 'Stack & Queue' },
+        ]},
+      ],
+      totalWrong: 6,
+    });
+
   // Knowledge Cards
   if (ep.includes('/KNOWLEDGE-CARDS')) {
     // GET /knowledge-cards/session/:sessionId

@@ -27,6 +27,7 @@ const EnhancedStudentDashboard = () => {
     level: { level: 1, title: 'Newcomer', currentXP: 0, nextLevelXP: 100, xpToNextLevel: 100 },
     badges: []
   });
+  const [weakTopics, setWeakTopics] = useState([]);
 
   const currentUser = safeParseUser();
   const dashboardWsRef = useRef(null);
@@ -115,6 +116,11 @@ const EnhancedStudentDashboard = () => {
         averageScore: data.stats.average_score,
         activeSessions: data.stats.active_sessions
       });
+
+      // Fetch weak topics (non-critical)
+      apiRequest(`/students/${studentId}/weak-topics`)
+        .then(d => setWeakTopics(d.weakTopics || []))
+        .catch(() => {});
 
       try {
         if (isDemoMode()) {
@@ -337,6 +343,40 @@ const EnhancedStudentDashboard = () => {
           </div>
         );
       })()}
+
+      {/* Weak Topics Panel */}
+      {weakTopics.length > 0 && (
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-card border border-orange-200 dark:border-orange-800/60">
+          <div className="p-4 sm:p-6 border-b border-orange-100 dark:border-orange-800/40 flex items-center gap-3">
+            <span className="text-xl">⚠️</span>
+            <div>
+              <h2 className="text-lg font-bold font-display text-slate-900 dark:text-white">Needs Revision</h2>
+              <p className="text-slate-500 dark:text-slate-400 text-sm">Topics where you've answered incorrectly</p>
+            </div>
+          </div>
+          <div className="p-4 sm:p-6 space-y-4">
+            {weakTopics.map((topic, i) => (
+              <div key={i} className="rounded-xl border border-orange-100 dark:border-orange-800/40 bg-orange-50 dark:bg-orange-900/10 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm">{topic.course}</span>
+                  <span className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 px-2 py-0.5 rounded-full font-medium">
+                    {topic.wrongCount} wrong
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {topic.questions.map((q, j) => (
+                    <div key={j} className="text-xs text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 rounded-lg p-2.5 border border-orange-100 dark:border-orange-800/30">
+                      <p className="font-medium text-slate-700 dark:text-slate-300 mb-1">{q.question}</p>
+                      <p className="text-red-500 dark:text-red-400">Your answer: {q.yourAnswer}</p>
+                      <p className="text-green-600 dark:text-green-400">Correct: {q.correctAnswer}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Your Sessions */}
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-card border border-slate-200/80 dark:border-slate-700/80">

@@ -66,6 +66,9 @@ const EnhancedStudentSession = () => {
   // Session summary overlay
   const [sessionSummary, setSessionSummary] = useState(null);
 
+  // "I'm stuck" state
+  const [stuckSent, setStuckSent] = useState(false);
+
   // Doubt drawer state
   const [doubtDrawerOpen, setDoubtDrawerOpen] = useState(false);
   const [doubtTitle, setDoubtTitle] = useState('');
@@ -411,6 +414,15 @@ const EnhancedStudentSession = () => {
           setCardActivityActive(false);
           setKnowledgeCard(null);
           setCardActiveState(null);
+          break;
+
+        // ── Stuck ────────────────────────────────────────────────────────
+        case 'stuck-ack':
+          // server confirmed; keep button in "sent" state
+          break;
+        case 'stuck-update':
+          // Teacher reset the count — allow student to signal again
+          if (data.count === 0) setStuckSent(false);
           break;
 
         // ── Leaderboard ──────────────────────────────────────────────────
@@ -894,6 +906,25 @@ const EnhancedStudentSession = () => {
         </div>
       </div>
     </div>
+
+    {/* Floating FABs — bottom-right stack */}
+    {/* "I'm Stuck" button — above the doubt FAB */}
+    <button
+      onClick={() => {
+        if (stuckSent || !ws) return;
+        ws.send(JSON.stringify({ type: 'student-stuck', sessionId }));
+        setStuckSent(true);
+      }}
+      title={stuckSent ? "Signal sent to teacher" : "Signal teacher you're confused"}
+      className={`fixed bottom-24 right-6 z-40 flex items-center gap-2 px-4 py-2.5 rounded-full shadow-xl text-sm font-semibold transition-all
+        ${stuckSent
+          ? 'bg-orange-100 text-orange-700 border border-orange-300 cursor-default'
+          : 'bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white hover:scale-105'
+        }`}
+    >
+      <span className="text-base">✋</span>
+      {stuckSent ? "Signal sent!" : "I'm stuck"}
+    </button>
 
     {/* Floating Doubt FAB — always visible bottom-right */}
     <button

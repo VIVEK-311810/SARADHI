@@ -112,6 +112,29 @@ wss.on('connection', (ws, req) => {
         case 'close-attendance':
           handleCloseAttendance(ws, data);
           break;
+        case 'student-stuck': {
+          // Student signals they're confused — track count per session, notify teacher
+          if (ws.sessionId && ws.studentId) {
+            const sid = String(ws.sessionId).toUpperCase();
+            if (!global.stuckCounts) global.stuckCounts = new Map();
+            if (!global.stuckCounts.has(sid)) global.stuckCounts.set(sid, new Set());
+            global.stuckCounts.get(sid).add(ws.studentId);
+            const count = global.stuckCounts.get(sid).size;
+            broadcastToSession(sid, { type: 'stuck-update', count });
+            // Acknowledge back to the student
+            ws.send(JSON.stringify({ type: 'stuck-ack' }));
+          }
+          break;
+        }
+        case 'stuck-reset': {
+          // Teacher resets stuck count (e.g. after addressing)
+          if (ws.role === 'teacher' && ws.sessionId) {
+            const sid = String(ws.sessionId).toUpperCase();
+            if (global.stuckCounts) global.stuckCounts.delete(sid);
+            broadcastToSession(sid, { type: 'stuck-update', count: 0 });
+          }
+          break;
+        }
         case 'toggle-leaderboard':
           if (ws.role === 'teacher' && data.sessionId) {
             const normalizedSid = String(data.sessionId).toUpperCase();

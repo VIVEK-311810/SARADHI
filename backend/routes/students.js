@@ -414,4 +414,57 @@ router.get('/:studentId/dashboard-summary', authenticate, async (req, res) => {
   }
 });
 
+// GET /api/students/:studentId/weak-topics
+// Returns topics where the student consistently answers wrong
+router.get('/:studentId/weak-topics', authenticate, async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    if (!authorizeStudentAccess(req, res, studentId)) return;
+
+    const result = await pool.query(`
+      SELECT
+        p.question,
+        p.options,
+        p.correct_answer,
+        pr.selected_option,
+        s.title as session_title,
+        s.course_name,
+        pr.responded_at
+      FROM poll_responses pr
+      JOIN polls p ON pr.poll_id = p.id
+      JOIN sessions s ON p.session_id = s.id
+      WHERE pr.student_id = $1
+        AND pr.is_correct = false
+      ORDER BY pr.responded_at DESC
+      LIMIT 20
+    `, [studentId]);
+
+    // Group by course to surface patterns
+    const byCourse = {};
+    for (const row of result.rows) {
+      const key = row.course_name || row.session_title || 'General';
+      if (!byCourse[key]) byCourse[key] = { course: key, wrongCount: 0, questions: [] };
+      byCourse[key].wrongCount++;
+      if (byCourse[key].questions.length < 3) {
+        byCourse[key].questions.push({
+          question: row.question,
+          yourAnswer: row.options?.[row.selected_option] || 'N/A',
+          correctAnswer: row.options?.[row.correct_answer] || 'N/A',
+          sessionTitle: row.session_title,
+          respondedAt: row.responded_at,
+        });
+      }
+    }
+
+    const weakTopics = Object.values(byCourse)
+      .sort((a, b) => b.wrongCount - a.wrongCount)
+      .slice(0, 5);
+
+    res.json({ weakTopics, totalWrong: result.rows.length });
+  } catch (error) {
+    logger.error('Error fetching weak topics', { error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;
