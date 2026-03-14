@@ -140,8 +140,12 @@ router.post('/generate', authenticate, authorize('teacher'), async (req, res) =>
     const owns = await verifyTeacherOwnsSession(req.user.id, sessionId);
     if (!owns) return res.status(403).json({ error: 'Access denied: not your session' });
 
+    // Resolve the 6-char session code (used as Pinecone namespace) from the numeric DB id
+    const sessionRow = await pool.query('SELECT session_id FROM sessions WHERE id = $1', [sessionId]);
+    const sessionCode = sessionRow.rows[0]?.session_id || sessionId;
+
     const pairCount = Math.min(Math.max(parseInt(count) || 10, 3), 20);
-    const pairs = await generateQAPairs(sessionId, pairCount, topic);
+    const pairs = await generateQAPairs(sessionCode, pairCount, topic);
 
     // Create round in draft state
     const roundResult = await pool.query(`
