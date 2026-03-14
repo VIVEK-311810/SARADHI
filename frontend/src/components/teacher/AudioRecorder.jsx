@@ -203,8 +203,8 @@ const AudioRecorder = ({ audioRecorder, sessionId: propSessionId }) => {
       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 sm:p-4">
         <h4 className="font-semibold text-blue-900 dark:text-blue-300 mb-2 text-sm sm:text-base">ℹ️ How it works:</h4>
         <ul className="text-xs sm:text-sm text-blue-800 dark:text-blue-300 space-y-1">
-          <li>• Audio recorded in 5s chunks, transcribed by GPU</li>
-          <li>• Transcripts sent every {segmentInterval} min</li>
+          <li>• Audio captured as compressed WebM every 15 seconds</li>
+          <li>• Transcribed by Whisper (GPU or Groq fallback)</li>
           <li>• "Notes" sends complete transcript anytime</li>
           <li>• Manual notes sent immediately</li>
         </ul>
