@@ -9,12 +9,57 @@ const TRANSCRIPT_WEBHOOK_URL = process.env.TRANSCRIPT_WEBHOOK_URL;
 const FINAL_NOTES_WEBHOOK_URL = process.env.FINAL_NOTES_WEBHOOK_URL;
 const SESSION_START_WEBHOOK_URL = process.env.SESSION_START_WEBHOOK_URL;
 
+// Groq fallback configuration
+const GROQ_API_KEY   = process.env.GROQ_API_KEY;
+const GROQ_API_URL   = 'https://api.groq.com/openai/v1/audio/transcriptions';
+const GROQ_MODEL     = 'whisper-large-v3';
+const GPU_TIMEOUT_MS = 30000;
+const GROQ_TIMEOUT_MS = 30000;
+
 // Store active session timers and metadata
 const sessionTimers = new Map();
 const activeSessions = new Map(); // Store { session_id: database_id }
 
 /**
- * Forward audio chunk to GPU transcription server
+ * Transcribe audio using Groq's Whisper API (fallback provider)
+ * @param {Buffer} audioBuffer - Audio file buffer
+ * @param {string} filename - Original filename with extension
+ * @param {string} mimetype - Audio MIME type
+ * @returns {Promise<Object>} Transcription result normalised to { transcript, provider }
+ */
+async function transcribeWithGroq(audioBuffer, filename, mimetype) {
+  if (!GROQ_API_KEY) throw new Error('GROQ_API_KEY not configured');
+
+  const formData = new FormData();
+  formData.append('file', audioBuffer, {
+    filename: filename || 'audio.webm',
+    contentType: mimetype || 'audio/webm'
+  });
+  formData.append('model', GROQ_MODEL);
+  formData.append('language', 'en');
+  formData.append('response_format', 'json');
+
+  const response = await fetch(GROQ_API_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${GROQ_API_KEY}`,
+      ...formData.getHeaders()
+    },
+    body: formData,
+    timeout: GROQ_TIMEOUT_MS
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Groq API error (${response.status}): ${errText}`);
+  }
+
+  const data = await response.json();
+  return { transcript: data.text, provider: 'groq' };
+}
+
+/**
+ * Forward audio chunk to GPU transcription server, with Groq as automatic fallback
  * @param {Buffer} audioBuffer - Audio file buffer
  * @param {string} sessionId - Session identifier
  * @param {string} filename - Original filename with extension
@@ -22,6 +67,7 @@ const activeSessions = new Map(); // Store { session_id: database_id }
  * @returns {Promise<Object>} Transcription result
  */
 async function forwardToGPUServer(audioBuffer, sessionId, filename, mimetype) {
+  // ── Primary: GPU server ────────────────────────────────────────────────
   try {
     console.log(`[AudioProcessor] Forwarding audio to GPU server for session: ${sessionId}`);
 
@@ -31,13 +77,13 @@ async function forwardToGPUServer(audioBuffer, sessionId, filename, mimetype) {
       contentType: mimetype || 'audio/webm'
     });
     formData.append('session_id', sessionId);
-    formData.append('language', 'en'); // Default to English, can be made configurable
+    formData.append('language', 'en');
 
     const response = await fetch(`${GPU_TRANSCRIPTION_URL}/transcribe`, {
       method: 'POST',
       body: formData,
       headers: formData.getHeaders(),
-      timeout: 30000 // 30 second timeout
+      timeout: GPU_TIMEOUT_MS
     });
 
     if (!response.ok) {
@@ -46,12 +92,21 @@ async function forwardToGPUServer(audioBuffer, sessionId, filename, mimetype) {
     }
 
     const result = await response.json();
-    console.log(`[AudioProcessor] Transcription received: ${result.transcript?.substring(0, 50)}...`);
+    console.log(`[AudioProcessor] ✓ GPU transcript received: ${result.transcript?.substring(0, 50)}...`);
+    return { ...result, provider: 'gpu' };
 
-    return result;
-  } catch (error) {
-    console.error(`[AudioProcessor] Error forwarding to GPU server:`, error.message);
-    throw error;
+  } catch (gpuError) {
+    // ── Fallback: Groq Whisper ─────────────────────────────────────────
+    console.warn(`[AudioProcessor] GPU server failed (${gpuError.message}), falling back to Groq...`);
+
+    try {
+      const result = await transcribeWithGroq(audioBuffer, filename, mimetype);
+      console.log(`[AudioProcessor] ✓ Groq transcript received: ${result.transcript?.substring(0, 50)}...`);
+      return result;
+    } catch (groqError) {
+      console.error(`[AudioProcessor] Groq fallback also failed: ${groqError.message}`);
+      throw new Error(`All transcription providers failed. GPU: ${gpuError.message} | Groq: ${groqError.message}`);
+    }
   }
 }
 
