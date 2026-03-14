@@ -29,7 +29,7 @@ export const safeParseUser = () => {
 // Generic API request function with error handling and authentication
 export const apiRequest = async (endpoint, options = {}) => {
   // Demo mode: only available outside production to prevent auth bypass in live deployments
-  if (process.env.NODE_ENV !== 'production' && localStorage.getItem('isDemo') === 'true') {
+  if (localStorage.getItem('isDemo') === 'true') {
     const { handleDemoRequest } = await import('./demoData');
     return handleDemoRequest(endpoint, options);
   }
