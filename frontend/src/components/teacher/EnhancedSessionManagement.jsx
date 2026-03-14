@@ -11,6 +11,7 @@ import LoadingSpinner from '../shared/LoadingSpinner';
 import GeneratedMCQs from './GeneratedMCQs';
 import DoubtsDashboard from './DoubtsDashboard';
 import AudioRecorder from './AudioRecorder';
+import KnowledgeCards from './KnowledgeCards';
 import useAudioRecorder from '../../hooks/useAudioRecorder';
 
 // WebSocket URL configuration
@@ -39,7 +40,8 @@ const EnhancedSessionManagement = () => {
     options: ['', '', '', ''],
     correctAnswer: 0,
     justification: '',
-    timeLimit: 60
+    timeLimit: 60,
+    difficulty: 1
   });
   const [editingMCQ, setEditingMCQ] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -387,12 +389,13 @@ const EnhancedSessionManagement = () => {
         options: newPoll.options.filter(opt => opt.trim() !== ''),
         correct_answer: newPoll.correctAnswer,
         justification: newPoll.justification,
-        time_limit: newPoll.timeLimit
+        time_limit: newPoll.timeLimit,
+        difficulty: newPoll.difficulty || 1
       };
 
       const data = await pollAPI.createPoll(pollData);
 
-      setNewPoll({ question: '', options: ['', '', '', ''], correctAnswer: 0, justification: '', timeLimit: 60 });
+      setNewPoll({ question: '', options: ['', '', '', ''], correctAnswer: 0, justification: '', timeLimit: 60, difficulty: 1 });
       toast.success('Poll created!');
       await activatePoll(data);
       fetchPolls();
@@ -648,7 +651,9 @@ const EnhancedSessionManagement = () => {
               { id: 'participants', name: 'People', icon: '👥' },
               { id: 'analytics', name: 'Analytics', icon: '📈' },
               { id: 'existing-polls', name: 'Past Polls', icon: '📑' },
-              { id: 'ai-doubts', name: 'AI Doubts', icon: '❓' }
+              { id: 'ai-doubts', name: 'AI Doubts', icon: '❓' },
+              { id: 'knowledge-cards', name: 'Cards', icon: '🃏' },
+              { id: 'gamification', name: 'Gamify', icon: '🏆' }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -853,18 +858,40 @@ const EnhancedSessionManagement = () => {
                         placeholder="Explain why this is the correct answer..."
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Time Limit (seconds)
-                      </label>
-                      <input
-                        type="number"
-                        value={newPoll.timeLimit}
-                        onChange={(e) => setNewPoll({ ...newPoll, timeLimit: parseInt(e.target.value) })}
-                        className="w-full p-2.5 sm:p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base bg-white dark:bg-gray-700 dark:text-white"
-                        min="10"
-                        max="300"
-                      />
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Time Limit (seconds)
+                        </label>
+                        <input
+                          type="number"
+                          value={newPoll.timeLimit}
+                          onChange={(e) => setNewPoll({ ...newPoll, timeLimit: parseInt(e.target.value) })}
+                          className="w-full p-2.5 sm:p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base bg-white dark:bg-gray-700 dark:text-white"
+                          min="10"
+                          max="300"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Difficulty
+                        </label>
+                        <div className="flex gap-2">
+                          {[{ v: 1, label: 'Easy', color: 'bg-green-100 text-green-700 border-green-300' },
+                            { v: 2, label: 'Medium', color: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
+                            { v: 3, label: 'Hard', color: 'bg-red-100 text-red-700 border-red-300' }].map(d => (
+                            <button
+                              key={d.v}
+                              type="button"
+                              onClick={() => setNewPoll({ ...newPoll, difficulty: d.v })}
+                              className={`flex-1 py-1.5 text-xs font-medium rounded-lg border-2 transition-all
+                                ${newPoll.difficulty === d.v ? `${d.color} border-current` : 'border-gray-200 text-gray-400 dark:border-gray-600'}`}
+                            >
+                              {d.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -1181,6 +1208,22 @@ const EnhancedSessionManagement = () => {
           {activeTab === 'ai-doubts' && (
             <DoubtsDashboard sessionId={sessionId} />
           )}
+
+          {/* Knowledge Cards Tab */}
+          {activeTab === 'knowledge-cards' && (
+            <KnowledgeCards
+              sessionId={session?.id || sessionId}
+              onlineCount={onlineCount}
+            />
+          )}
+
+          {/* Gamification Recap Tab */}
+          {activeTab === 'gamification' && (
+            <GamificationRecap
+              sessionId={session?.id || sessionId}
+              wsRef={wsRef}
+            />
+          )}
         </div>
       </div>
 
@@ -1278,6 +1321,104 @@ const EnhancedSessionManagement = () => {
                 Update MCQ
               </button>
             </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Gamification Recap Panel ───────────────────────────────────────────────
+const GamificationRecap = ({ sessionId, wsRef }) => {
+  const [recap, setRecap] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [leaderboardVisible, setLeaderboardVisible] = useState(false);
+
+  useEffect(() => {
+    apiRequest(`/gamification/teacher/session/${sessionId}/recap`)
+      .then(data => { if (data.success) setRecap(data.data); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [sessionId]);
+
+  const toggleLeaderboard = () => {
+    const newVisible = !leaderboardVisible;
+    setLeaderboardVisible(newVisible);
+    if (wsRef?.current && wsRef.current.readyState === 1) {
+      wsRef.current.send(JSON.stringify({ type: 'toggle-leaderboard', visible: newVisible }));
+    }
+  };
+
+  if (loading) {
+    return <div className="py-8 text-center text-gray-400 text-sm">Loading gamification data...</div>;
+  }
+
+  if (!recap) {
+    return <div className="py-8 text-center text-gray-400 text-sm">No gamification data yet. Create polls to start tracking.</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Controls */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">&#127942; Session Gamification</h3>
+        <button
+          onClick={toggleLeaderboard}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors
+            ${leaderboardVisible
+              ? 'bg-blue-600 text-white border-blue-600'
+              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600'}`}
+        >
+          {leaderboardVisible ? '&#128065; Leaderboard Visible' : '&#128100; Show Leaderboard to Students'}
+        </button>
+      </div>
+
+      {/* Class Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Participants', value: recap.totalParticipants, color: 'bg-blue-50 text-blue-700' },
+          { label: 'Avg Accuracy', value: `${recap.classAvgAccuracy}%`, color: 'bg-green-50 text-green-700' },
+          { label: 'Engagement', value: `${recap.engagementRate}%`, color: 'bg-purple-50 text-purple-700' },
+          { label: 'Total Polls', value: recap.totalPolls, color: 'bg-orange-50 text-orange-700' }
+        ].map(s => (
+          <div key={s.label} className={`rounded-xl p-3 text-center ${s.color} dark:bg-opacity-20`}>
+            <p className="text-xl font-bold">{s.value}</p>
+            <p className="text-xs font-medium mt-0.5">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Top 5 */}
+      {recap.top5 && recap.top5.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+            <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Top Students</h4>
+          </div>
+          <div className="divide-y divide-gray-100 dark:divide-gray-700">
+            {recap.top5.map(s => (
+              <div key={s.studentId} className="flex items-center px-4 py-2.5 gap-3">
+                <span className="w-6 text-center font-bold text-gray-400 text-sm">#{s.rank}</span>
+                <span className="flex-1 text-sm font-medium text-gray-800 dark:text-gray-200">{s.studentName}</span>
+                <span className="text-xs text-gray-500">{s.correctAnswers}/{s.totalAnswers} correct</span>
+                <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{s.points} pts</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Needs Attention */}
+      {recap.needsAttention && recap.needsAttention.length > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl p-4">
+          <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2">&#9888; Needs Attention</h4>
+          <div className="space-y-1">
+            {recap.needsAttention.map(s => (
+              <div key={s.studentId} className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+                <span>&#8226;</span>
+                <span className="font-medium">{s.studentName}</span>
+                <span>— {s.accuracy}% accuracy, {s.answered} polls answered</span>
+              </div>
+            ))}
           </div>
         </div>
       )}

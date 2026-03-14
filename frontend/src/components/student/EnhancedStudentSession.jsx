@@ -5,6 +5,7 @@ import LoadingSpinner from '../shared/LoadingSpinner';
 import { apiRequest, studentAPI, safeParseUser } from '../../utils/api';
 import { Badge } from '../ui/badge';
 import { isDemoMode, DemoWebSocket } from '../../utils/demoData';
+import KnowledgeCard from './KnowledgeCard';
 
 // WebSocket URL configuration
 const WS_BASE_URL = process.env.REACT_APP_API_URL ?
@@ -52,6 +53,18 @@ const EnhancedStudentSession = () => {
   const [attendanceMarked, setAttendanceMarked] = useState(false);
   const [attendanceStatus, setAttendanceStatus] = useState(null); // null | 'present' | 'late'
   const [classEndedNotice, setClassEndedNotice] = useState(false);
+
+  // Knowledge Cards state
+  const [knowledgeCard, setKnowledgeCard] = useState(null);       // { questions, answers }
+  const [cardActivityActive, setCardActivityActive] = useState(false);
+  const [cardActiveState, setCardActiveState] = useState(null);   // { type, pairId, questionHolderId, answerHolderId }
+
+  // Live leaderboard state
+  const [liveLeaderboard, setLiveLeaderboard] = useState(null);
+  const [leaderboardVisible, setLeaderboardVisible] = useState(false);
+
+  // Session summary overlay
+  const [sessionSummary, setSessionSummary] = useState(null);
 
   // Doubt drawer state
   const [doubtDrawerOpen, setDoubtDrawerOpen] = useState(false);
@@ -373,6 +386,41 @@ const EnhancedStudentSession = () => {
         case 'attendance-late-join':
           setAttendanceStatus('late');
           break;
+
+        // ── Knowledge Cards ──────────────────────────────────────────────
+        case 'cards-distribute':
+          if (data.card) {
+            setKnowledgeCard(data.card);
+            setCardActivityActive(true);
+            setCardActiveState(null);
+          }
+          break;
+        case 'card-activate-question':
+          setCardActiveState({ type: 'question', pairId: data.pairId, questionHolderId: data.questionHolderId });
+          break;
+        case 'card-reveal-answer':
+          setCardActiveState({ type: 'answer', pairId: data.pairId, answerHolderId: data.answerHolderId, questionHolderId: cardActiveState?.questionHolderId });
+          break;
+        case 'card-vote-result':
+          // vote results update silently (shown in card)
+          break;
+        case 'cards-round-complete':
+          setCardActiveState(prev => prev ? { ...prev, type: 'complete' } : null);
+          break;
+        case 'cards-activity-end':
+          setCardActivityActive(false);
+          setKnowledgeCard(null);
+          setCardActiveState(null);
+          break;
+
+        // ── Leaderboard ──────────────────────────────────────────────────
+        case 'leaderboard-update':
+          setLiveLeaderboard(data.leaderboard);
+          break;
+        case 'leaderboard-visibility':
+          setLeaderboardVisible(!!data.visible);
+          break;
+
         default:
           break;
       }
@@ -573,8 +621,51 @@ const EnhancedStudentSession = () => {
     );
   }
 
+  const currentUser = safeParseUser();
+
+  const handleCardVote = async (pairId, vote) => {
+    try {
+      await apiRequest('/knowledge-cards/vote', { method: 'POST', body: { pairId, vote } });
+    } catch (err) {
+      console.error('Vote error:', err);
+    }
+  };
+
   return (
     <>
+    {/* Knowledge Card Overlay — z-60, above everything */}
+    {cardActivityActive && knowledgeCard && (
+      <KnowledgeCard
+        card={knowledgeCard}
+        activeState={cardActiveState}
+        currentUserId={currentUser?.id}
+        onVote={handleCardVote}
+        onClose={() => setCardActivityActive(false)}
+      />
+    )}
+
+    {/* Live Leaderboard Panel — shown when teacher enables it */}
+    {leaderboardVisible && liveLeaderboard && liveLeaderboard.length > 0 && (
+      <div className="fixed top-4 right-4 z-50 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-3 py-2 flex items-center gap-2">
+          <span>&#127942;</span>
+          <span className="text-sm font-semibold">Live Rankings</span>
+        </div>
+        <div className="p-2 space-y-1">
+          {liveLeaderboard.slice(0, 5).map((entry, i) => (
+            <div key={entry.studentId} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs
+              ${String(entry.studentId) === String(currentUser?.id) ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
+              <span className="w-5 font-bold text-gray-500">#{entry.rank}</span>
+              <span className="flex-1 truncate text-gray-800 dark:text-gray-200 font-medium">
+                {String(entry.studentId) === String(currentUser?.id) ? 'You' : entry.studentName}
+              </span>
+              <span className="font-bold text-blue-600 dark:text-blue-400">{entry.points}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+
     <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 p-3 sm:p-4">
       {/* Session Header */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-4 sm:p-6">

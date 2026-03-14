@@ -20,7 +20,7 @@ async function getNumericSessionId(stringSessionId) {
 // POST / — Create a new poll (teacher only)
 router.post('/', authenticate, authorize('teacher'), async (req, res) => {
   try {
-    const { session_id, question, options, correct_answer, justification, time_limit } = req.body;
+    const { session_id, question, options, correct_answer, justification, time_limit, difficulty } = req.body;
 
     if (!session_id || !question || !options || !Array.isArray(options) || options.length < 2) {
       return res.status(400).json({ error: 'Missing required fields or invalid options' });
@@ -50,9 +50,10 @@ router.post('/', authenticate, authorize('teacher'), async (req, res) => {
       return res.status(403).json({ error: 'Access denied: you do not own this session' });
     }
 
+    const pollDifficulty = [1, 2, 3].includes(parseInt(difficulty)) ? parseInt(difficulty) : 1;
     const result = await pool.query(
-      'INSERT INTO polls (session_id, question, options, correct_answer, justification, time_limit, is_active) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [numericSessionId, question, JSON.stringify(options), correct_answer, justification, limit, false]
+      'INSERT INTO polls (session_id, question, options, correct_answer, justification, time_limit, is_active, difficulty) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+      [numericSessionId, question, JSON.stringify(options), correct_answer, justification, limit, false, pollDifficulty]
     );
 
     res.status(201).json(result.rows[0]);
@@ -238,15 +239,13 @@ router.post('/:pollId/respond', authenticate, authorize('student'), async (req, 
       .catch(err => logger.warn('Failed to broadcast response count update', { error: err.message }));
 
     // Award gamification points (fire-and-forget — does not block response)
-    if (isCorrect !== null) {
-      calculatePoints({
-        studentId: student_id,
-        pollId: parseInt(pollId),
-        sessionId: poll.session_id,
-        isCorrect,
-        responseTime: response_time || 0
-      }).catch(err => logger.error('Gamification error', { error: err.message }));
-    }
+    calculatePoints({
+      studentId: student_id,
+      pollId: parseInt(pollId),
+      sessionId: poll.session_id,
+      isCorrect: isCorrect !== null ? isCorrect : false,
+      difficulty: poll.difficulty || 1
+    }).catch(err => logger.error('Gamification error', { error: err.message }));
 
     res.status(201).json({ message: 'Response submitted successfully', data: result.rows[0] });
   } catch (error) {
@@ -430,7 +429,7 @@ router.delete('/:pollId', authenticate, authorize('teacher'), async (req, res) =
 router.put('/:pollId', authenticate, authorize('teacher'), async (req, res) => {
   try {
     const { pollId } = req.params;
-    const { question, options, correct_answer, justification, time_limit } = req.body;
+    const { question, options, correct_answer, justification, time_limit, difficulty } = req.body;
 
     // Input validation
     if (!question || !question.trim() || question.length > 1000) {
@@ -460,9 +459,12 @@ router.put('/:pollId', authenticate, authorize('teacher'), async (req, res) => {
       return res.status(400).json({ error: 'Can only edit inactive polls' });
     }
 
+    const updatedDifficulty = [1, 2, 3].includes(parseInt(difficulty)) ? parseInt(difficulty) : undefined;
     const result = await pool.query(
-      'UPDATE polls SET question = $1, options = $2, correct_answer = $3, justification = $4, time_limit = $5, updated_at = CURRENT_TIMESTAMP WHERE id = $6 RETURNING *',
-      [question, JSON.stringify(options), correct_answer, justification, time_limit, pollId]
+      `UPDATE polls SET question = $1, options = $2, correct_answer = $3, justification = $4,
+        time_limit = $5, difficulty = COALESCE($7, difficulty), updated_at = CURRENT_TIMESTAMP
+       WHERE id = $6 RETURNING *`,
+      [question, JSON.stringify(options), correct_answer, justification, time_limit, pollId, updatedDifficulty || null]
     );
 
     res.json(result.rows[0]);

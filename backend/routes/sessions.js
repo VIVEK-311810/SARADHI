@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../db');
 const logger = require('../logger');
 const { authenticate, authorize } = require('../middleware/auth');
+const { awardSessionCompletionPoints, processSessionEndXP, generateSessionSummaries } = require('./gamification');
 
 // Helper: resolve string session_id → numeric id
 async function getNumericSessionId(stringSessionId) {
@@ -293,6 +294,16 @@ router.delete('/:sessionId', authenticate, authorize('teacher'), async (req, res
     if (result.rows.length === 0) {
       return res.status(403).json({ error: 'Access denied: you do not own this session' });
     }
+
+    // Gamification session-end processing (non-blocking — session already deleted so use pre-capture ID)
+    // Note: because session_points use ON DELETE SET NULL, points records persist
+    awardSessionCompletionPoints(numericSessionId).catch(err =>
+      logger.error('Session completion points error on delete', { error: err.message })
+    );
+    processSessionEndXP(numericSessionId).catch(err =>
+      logger.error('Session end XP error on delete', { error: err.message })
+    );
+
     res.status(200).json({ message: 'Session deleted successfully' });
   } catch (error) {
     logger.error('Error deleting session', { error: error.message });

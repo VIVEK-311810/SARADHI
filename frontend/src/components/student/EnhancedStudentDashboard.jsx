@@ -21,9 +21,10 @@ const EnhancedStudentDashboard = () => {
   });
   const [gamificationStats, setGamificationStats] = useState({
     totalPoints: 0,
+    totalXP: 0,
     rank: 1,
     totalStudents: 1,
-    currentStreak: 0,
+    level: { level: 1, title: 'Newcomer', currentXP: 0, nextLevelXP: 100, xpToNextLevel: 100 },
     badges: []
   });
 
@@ -119,9 +120,17 @@ const EnhancedStudentDashboard = () => {
         if (isDemoMode()) {
           setGamificationStats(DEMO_GAMIFICATION);
         } else {
-          const gamificationData = await apiRequest(`/gamification/student/${studentId}/stats`);
+          const [gamificationData, xpData] = await Promise.all([
+            apiRequest(`/gamification/student/${studentId}/stats`),
+            apiRequest(`/gamification/student/${studentId}/xp`)
+          ]);
           if (gamificationData.success) {
-            setGamificationStats(gamificationData.data);
+            const stats = gamificationData.data;
+            if (xpData.success) {
+              stats.totalXP = xpData.data.totalXP;
+              stats.level = xpData.data.level;
+            }
+            setGamificationStats(stats);
           }
         }
       } catch (gamErr) {
@@ -256,19 +265,37 @@ const EnhancedStudentDashboard = () => {
       {/* Gamification Card */}
       <div className="bg-gradient-to-r from-saradhi-600 to-saradhi-800 rounded-xl shadow-lg p-4 sm:p-6 text-white">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="grid grid-cols-3 gap-4 sm:flex sm:items-center sm:gap-6">
-            <div className="text-center">
-              <p className="text-2xl sm:text-4xl font-bold font-display">{gamificationStats.totalPoints}</p>
-              <p className="text-xs sm:text-sm text-saradhi-200">Points</p>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs font-medium bg-white/20 px-2 py-0.5 rounded-full">
+                Lv{gamificationStats.level?.level} {gamificationStats.level?.title}
+              </span>
             </div>
-            <div className="text-center">
-              <p className="text-2xl sm:text-4xl font-bold font-display">#{gamificationStats.rank}</p>
-              <p className="text-xs sm:text-sm text-saradhi-200">Rank</p>
+            <div className="grid grid-cols-3 gap-4 sm:flex sm:items-center sm:gap-6 mb-3">
+              <div className="text-center">
+                <p className="text-2xl sm:text-4xl font-bold font-display">{gamificationStats.totalXP || 0}</p>
+                <p className="text-xs sm:text-sm text-saradhi-200">Total XP</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl sm:text-4xl font-bold font-display">#{gamificationStats.rank}</p>
+                <p className="text-xs sm:text-sm text-saradhi-200">Rank</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl sm:text-4xl font-bold font-display">{gamificationStats.totalPoints || 0}</p>
+                <p className="text-xs sm:text-sm text-saradhi-200">Points</p>
+              </div>
             </div>
-            <div className="text-center">
-              <p className="text-2xl sm:text-4xl font-bold font-display">{gamificationStats.currentStreak}</p>
-              <p className="text-xs sm:text-sm text-saradhi-200">Streak</p>
-            </div>
+            {gamificationStats.level?.nextLevelXP && (
+              <div className="w-full max-w-xs">
+                <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-white rounded-full"
+                    style={{ width: `${Math.min(100, Math.round(((gamificationStats.totalXP || 0) / gamificationStats.level.nextLevelXP) * 100))}%` }}
+                  />
+                </div>
+                <p className="text-xs text-saradhi-200 mt-0.5">{gamificationStats.level.xpToNextLevel} XP to next level</p>
+              </div>
+            )}
           </div>
           <button
             onClick={() => navigate('/student/leaderboard')}

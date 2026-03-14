@@ -112,6 +112,20 @@ wss.on('connection', (ws, req) => {
         case 'close-attendance':
           handleCloseAttendance(ws, data);
           break;
+        case 'toggle-leaderboard':
+          if (ws.role === 'teacher' && data.sessionId) {
+            const normalizedSid = String(data.sessionId).toUpperCase();
+            const visible = !!data.visible;
+            pool.query(
+              'UPDATE sessions SET leaderboard_visible = $1 WHERE session_id = $2',
+              [visible, normalizedSid]
+            ).catch(err => logger.error('toggle-leaderboard DB error', { error: err.message }));
+            broadcastToSession(normalizedSid, {
+              type: 'leaderboard-visibility',
+              visible
+            });
+          }
+          break;
         default:
           logger.debug('Unknown WebSocket message type', { type: data.type });
           break;
@@ -331,6 +345,22 @@ async function triggerAnswerRevealFromTimer(sessionId, pollId) {
     logger.info('Answer reveal broadcast (timer expiry)', { pollId, sessionId: normalizedSessionId });
 
     await pool.query('UPDATE polls SET is_active = FALSE WHERE id = $1', [pollId]);
+
+    // Broadcast updated session leaderboard after poll closes
+    try {
+      const { getSessionLeaderboard } = require('./routes/gamification');
+      const sessionDbResult = await pool.query('SELECT id FROM sessions WHERE session_id = $1', [normalizedSessionId]);
+      if (sessionDbResult.rows.length > 0) {
+        const dbSessionId = sessionDbResult.rows[0].id;
+        const leaderboard = await getSessionLeaderboard(dbSessionId, 50);
+        broadcastToSession(normalizedSessionId, {
+          type: 'leaderboard-update',
+          leaderboard
+        });
+      }
+    } catch (lbErr) {
+      logger.warn('Failed to broadcast leaderboard update', { error: lbErr.message });
+    }
   } catch (error) {
     logger.error('Error triggering timer-based answer reveal', { error: error.message, pollId, sessionId });
   }
@@ -403,6 +433,7 @@ async function broadcastToDashboardsForSession(sessionIdStr, message) {
 global.broadcastToDashboardsForSession = broadcastToDashboardsForSession;
 
 global.broadcastToSession = broadcastToSession;
+global.sessionConnections = sessionConnections;
 
 /**
  * Broadcast poll-related messages only to attendance-eligible students.
@@ -710,6 +741,7 @@ const exportRouter = require('./routes/export');
 const gamificationRouter = require('./routes/gamification');
 const communityRouter = require('./routes/community');
 const aiAssistantRouter = require('./routes/ai-assistant');
+const knowledgeCardsRouter = require('./routes/knowledge-cards');
 
 // Mount routes
 app.use('/auth', authRouter);
@@ -725,6 +757,7 @@ app.use('/api/export', exportRouter);
 app.use('/api/gamification', gamificationRouter);
 app.use('/api/community', communityRouter);
 app.use('/api/ai-assistant', aiAssistantRouter);
+app.use('/api/knowledge-cards', knowledgeCardsRouter);
 
 // Attendance REST endpoint — get attendance list and counts for a session
 app.get('/api/sessions/:sessionId/attendance', authenticate, async (req, res) => {

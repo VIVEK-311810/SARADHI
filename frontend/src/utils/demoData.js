@@ -155,24 +155,104 @@ export const DEMO_GAMIFICATION = {
   rank: 3,
   totalStudents: 45,
   currentStreak: 5,
+  totalXP: 420,
+  level: {
+    level: 3,
+    title: 'Consistent',
+    currentXP: 420,
+    nextLevelXP: 600,
+    xpToNextLevel: 180,
+  },
   badges: [
-    { id: 'streak_5', name: 'Streak Champion', badge_type: 'streak_5', earned_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString() },
-    { id: 'first_responder', name: 'First Responder', badge_type: 'first_responder', earned_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() },
+    { id: 'streak_5', name: 'Streak Champion', badge_type: 'streak_5', badge_tier: 'silver', badge_category: 'streak', earned_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString() },
+    { id: 'accuracy_bronze', name: 'Sharp Shooter', badge_type: 'accuracy_bronze', badge_tier: 'bronze', badge_category: 'accuracy', earned_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() },
+    { id: 'participation_bronze', name: 'Active Learner', badge_type: 'participation_bronze', badge_tier: 'bronze', badge_category: 'participation', earned_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString() },
   ],
 };
 
+export const DEMO_GAMIFICATION_XP = {
+  totalXP: 420,
+  level: {
+    level: 3,
+    title: 'Consistent',
+    currentXP: 420,
+    nextLevelXP: 600,
+    xpToNextLevel: 180,
+  },
+  history: [
+    { xp_type: 'session_participation', xp_amount: 20, earned_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() },
+    { xp_type: 'poll_correct', xp_amount: 10, earned_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+    { xp_type: 'poll_correct', xp_amount: 10, earned_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString() },
+    { xp_type: 'knowledge_card', xp_amount: 15, earned_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString() },
+    { xp_type: 'session_participation', xp_amount: 20, earned_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString() },
+  ],
+};
+
+export const DEMO_SESSION_SUMMARY = {
+  rank: 2,
+  totalStudents: 12,
+  accuracy: 83,
+  pointsEarned: 67,
+  xpGained: 45,
+  badgesEarned: ['accuracy_bronze'],
+  sessionTitle: 'Data Structures & Algorithms',
+  pollsAnswered: 5,
+  pollsCorrect: 4,
+  streakMax: 3,
+};
+
 export const DEMO_LEADERBOARD = [
-  { rank: 1, studentId: 1001, studentName: 'Priya Sundaram', totalPoints: 220, points: 220, correctAnswers: 19, totalAnswers: 22, currentStreak: 4, maxStreak: 6, sessionsParticipated: 5, avgAccuracy: 86 },
-  { rank: 2, studentId: 1002, studentName: 'Arun Krishnan', totalPoints: 185, points: 185, correctAnswers: 16, totalAnswers: 20, currentStreak: 2, maxStreak: 5, sessionsParticipated: 5, avgAccuracy: 80 },
-  { rank: 3, studentId: 9999, studentName: 'Demo Student', totalPoints: 150, points: 150, correctAnswers: 14, totalAnswers: 18, currentStreak: 5, maxStreak: 5, sessionsParticipated: 5, avgAccuracy: 78 },
-  { rank: 4, studentId: 1003, studentName: 'Karthik Rajan', totalPoints: 140, points: 140, correctAnswers: 13, totalAnswers: 18, currentStreak: 1, maxStreak: 3, sessionsParticipated: 4, avgAccuracy: 72 },
-  { rank: 5, studentId: 1004, studentName: 'Divya Menon', totalPoints: 120, points: 120, correctAnswers: 11, totalAnswers: 16, currentStreak: 0, maxStreak: 3, sessionsParticipated: 4, avgAccuracy: 69 },
-  { rank: 6, studentId: 1005, studentName: 'Vijay Anand', totalPoints: 105, points: 105, correctAnswers: 10, totalAnswers: 15, currentStreak: 2, maxStreak: 2, sessionsParticipated: 3, avgAccuracy: 67 },
-  { rank: 7, studentId: 1006, studentName: 'Sowmya Nair', totalPoints: 90, points: 90, correctAnswers: 8, totalAnswers: 14, currentStreak: 0, maxStreak: 2, sessionsParticipated: 3, avgAccuracy: 57 },
-  { rank: 8, studentId: 1007, studentName: 'Surya Prakash', totalPoints: 75, points: 75, correctAnswers: 7, totalAnswers: 13, currentStreak: 1, maxStreak: 2, sessionsParticipated: 3, avgAccuracy: 54 },
-  { rank: 9, studentId: 1008, studentName: 'Lakshmi Rao', totalPoints: 60, points: 60, correctAnswers: 5, totalAnswers: 11, currentStreak: 0, maxStreak: 1, sessionsParticipated: 2, avgAccuracy: 45 },
-  { rank: 10, studentId: 1009, studentName: 'Venkat Subbu', totalPoints: 45, points: 45, correctAnswers: 4, totalAnswers: 10, currentStreak: 0, maxStreak: 1, sessionsParticipated: 2, avgAccuracy: 40 },
+  { rank: 1, studentId: 1001, studentName: 'Priya Sundaram', totalPoints: 220, points: 220, correctAnswers: 19, totalAnswers: 22, currentStreak: 4, maxStreak: 6, sessionsParticipated: 5, avgAccuracy: 86, totalXP: 680, level: { level: 4, title: 'Dedicated' } },
+  { rank: 2, studentId: 1002, studentName: 'Arun Krishnan', totalPoints: 185, points: 185, correctAnswers: 16, totalAnswers: 20, currentStreak: 2, maxStreak: 5, sessionsParticipated: 5, avgAccuracy: 80, totalXP: 530, level: { level: 3, title: 'Consistent' } },
+  { rank: 3, studentId: 9999, studentName: 'Demo Student', totalPoints: 150, points: 150, correctAnswers: 14, totalAnswers: 18, currentStreak: 5, maxStreak: 5, sessionsParticipated: 5, avgAccuracy: 78, totalXP: 420, level: { level: 3, title: 'Consistent' } },
+  { rank: 4, studentId: 1003, studentName: 'Karthik Rajan', totalPoints: 140, points: 140, correctAnswers: 13, totalAnswers: 18, currentStreak: 1, maxStreak: 3, sessionsParticipated: 4, avgAccuracy: 72, totalXP: 360, level: { level: 3, title: 'Consistent' } },
+  { rank: 5, studentId: 1004, studentName: 'Divya Menon', totalPoints: 120, points: 120, correctAnswers: 11, totalAnswers: 16, currentStreak: 0, maxStreak: 3, sessionsParticipated: 4, avgAccuracy: 69, totalXP: 280, level: { level: 2, title: 'Active Learner' } },
+  { rank: 6, studentId: 1005, studentName: 'Vijay Anand', totalPoints: 105, points: 105, correctAnswers: 10, totalAnswers: 15, currentStreak: 2, maxStreak: 2, sessionsParticipated: 3, avgAccuracy: 67, totalXP: 230, level: { level: 2, title: 'Active Learner' } },
+  { rank: 7, studentId: 1006, studentName: 'Sowmya Nair', totalPoints: 90, points: 90, correctAnswers: 8, totalAnswers: 14, currentStreak: 0, maxStreak: 2, sessionsParticipated: 3, avgAccuracy: 57, totalXP: 180, level: { level: 2, title: 'Active Learner' } },
+  { rank: 8, studentId: 1007, studentName: 'Surya Prakash', totalPoints: 75, points: 75, correctAnswers: 7, totalAnswers: 13, currentStreak: 1, maxStreak: 2, sessionsParticipated: 3, avgAccuracy: 54, totalXP: 140, level: { level: 2, title: 'Active Learner' } },
+  { rank: 9, studentId: 1008, studentName: 'Lakshmi Rao', totalPoints: 60, points: 60, correctAnswers: 5, totalAnswers: 11, currentStreak: 0, maxStreak: 1, sessionsParticipated: 2, avgAccuracy: 45, totalXP: 90, level: { level: 1, title: 'Newcomer' } },
+  { rank: 10, studentId: 1009, studentName: 'Venkat Subbu', totalPoints: 45, points: 45, correctAnswers: 4, totalAnswers: 10, currentStreak: 0, maxStreak: 1, sessionsParticipated: 2, avgAccuracy: 40, totalXP: 60, level: { level: 1, title: 'Newcomer' } },
 ];
+
+export const DEMO_SESSION_LEADERBOARD = [
+  { rank: 1, studentId: 1001, studentName: 'Priya Sundaram', sessionPoints: 67, correctAnswers: 5, totalAnswers: 6, currentStreak: 3, maxStreak: 3, avgAccuracy: 83, totalXP: 680, level: { level: 4, title: 'Dedicated' } },
+  { rank: 2, studentId: 9999, studentName: 'Demo Student', sessionPoints: 55, correctAnswers: 4, totalAnswers: 6, currentStreak: 2, maxStreak: 3, avgAccuracy: 67, totalXP: 420, level: { level: 3, title: 'Consistent' } },
+  { rank: 3, studentId: 1002, studentName: 'Arun Krishnan', sessionPoints: 48, correctAnswers: 4, totalAnswers: 6, currentStreak: 1, maxStreak: 2, avgAccuracy: 67, totalXP: 530, level: { level: 3, title: 'Consistent' } },
+  { rank: 4, studentId: 1003, studentName: 'Karthik Rajan', sessionPoints: 39, correctAnswers: 3, totalAnswers: 5, currentStreak: 0, maxStreak: 2, avgAccuracy: 60, totalXP: 360, level: { level: 3, title: 'Consistent' } },
+  { rank: 5, studentId: 1004, studentName: 'Divya Menon', sessionPoints: 30, correctAnswers: 2, totalAnswers: 5, currentStreak: 0, maxStreak: 1, avgAccuracy: 40, totalXP: 280, level: { level: 2, title: 'Active Learner' } },
+];
+
+export const DEMO_KNOWLEDGE_CARDS = {
+  round: {
+    id: 1,
+    session_id: 1,
+    status: 'active',
+    total_pairs: 5,
+    created_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+  },
+  pairs: [
+    { id: 101, question_text: 'What is the time complexity of inserting into a max-heap?', answer_text: 'O(log n) — the element bubbles up from the leaf, traversing at most the height of the tree.', difficulty: 2, status: 'completed', question_holder_id: 1001, answer_holder_id: 1002, order_index: 0 },
+    { id: 102, question_text: 'What data structure would you use to implement a browser\'s back button?', answer_text: 'A Stack — each visited page is pushed; the back button pops the top page off the stack.', difficulty: 1, status: 'active', question_holder_id: 9999, answer_holder_id: 1003, order_index: 1 },
+    { id: 103, question_text: 'What is the difference between BFS and DFS traversal?', answer_text: 'BFS uses a Queue and explores level by level; DFS uses a Stack (or recursion) and explores as deep as possible before backtracking.', difficulty: 2, status: 'pending', question_holder_id: 1004, answer_holder_id: 9999, order_index: 2 },
+    { id: 104, question_text: 'When would you choose a linked list over an array?', answer_text: 'When you need O(1) insertions/deletions at the head or middle and don\'t require random access by index.', difficulty: 1, status: 'pending', question_holder_id: 1002, answer_holder_id: 1001, order_index: 3 },
+    { id: 105, question_text: 'What is a balanced BST and why does balance matter?', answer_text: 'A balanced BST keeps height at O(log n). Without balance, worst-case search degrades to O(n) (e.g., a sorted insertion into a plain BST creates a linked list).', difficulty: 3, status: 'pending', question_holder_id: 1003, answer_holder_id: 1004, order_index: 4 },
+  ],
+  // What the demo student (9999) holds:
+  studentCard: {
+    questions: [
+      { pairId: 102, questionText: 'What data structure would you use to implement a browser\'s back button?', difficulty: 1, orderIndex: 1 },
+    ],
+    answers: [
+      { pairId: 103, answerText: 'BFS uses a Queue and explores level by level; DFS uses a Stack (or recursion) and explores as deep as possible before backtracking.', difficulty: 2 },
+    ],
+  },
+  activeState: {
+    type: 'question',
+    pairId: 102,
+    questionHolderId: 9999,
+    answerHolderId: 1003,
+  },
+};
 
 const now = new Date();
 export const DEMO_AI_CHAT = [
@@ -841,7 +921,45 @@ export const handleDemoRequest = (endpoint, options = {}) => {
   // Resource tracking — silent success
   if (ep.includes('/RESOURCES/') && ep.includes('/TRACK')) return Promise.resolve({ success: true });
 
-  // Gamification
+  // Gamification — stats
+  if (ep.includes('/GAMIFICATION/STUDENT/9999/STATS') || ep.includes('/GAMIFICATION/STUDENT/STATS'))
+    return Promise.resolve({ success: true, data: { ...DEMO_GAMIFICATION, ...DEMO_GAMIFICATION_XP } });
+
+  // Gamification — XP endpoint
+  if (ep.includes('/GAMIFICATION/STUDENT/9999/XP') || ep.match(/\/GAMIFICATION\/STUDENT\/\d+\/XP/))
+    return Promise.resolve({ success: true, data: DEMO_GAMIFICATION_XP });
+
+  // Gamification — session summary
+  if (ep.includes('/GAMIFICATION/SESSION/') && ep.includes('/SUMMARY'))
+    return Promise.resolve({ success: true, data: DEMO_SESSION_SUMMARY });
+
+  // Gamification — teacher session recap
+  if (ep.includes('/GAMIFICATION/TEACHER/SESSION/') && ep.includes('/RECAP'))
+    return Promise.resolve({
+      success: true,
+      data: {
+        classStats: { avgAccuracy: 72, participationRate: 85, totalStudents: 12, activeStudents: 10 },
+        topStudents: DEMO_SESSION_LEADERBOARD.slice(0, 5),
+        needsAttention: [
+          { studentId: 1005, studentName: 'Vijay Anand', avgAccuracy: 33, pollsAnswered: 3 },
+          { studentId: 1006, studentName: 'Sowmya Nair', avgAccuracy: 40, pollsAnswered: 2 },
+        ],
+      },
+    });
+
+  // Gamification — session leaderboard
+  if (ep.includes('/GAMIFICATION/LEADERBOARD/SESSION/'))
+    return Promise.resolve({ success: true, leaderboard: DEMO_SESSION_LEADERBOARD });
+
+  // Gamification — all-time leaderboard
+  if (ep.includes('/GAMIFICATION/LEADERBOARD/ALL-TIME'))
+    return Promise.resolve({ success: true, leaderboard: DEMO_LEADERBOARD });
+
+  // Gamification — finalize session
+  if (ep.includes('/GAMIFICATION/SESSION/') && ep.includes('/FINALIZE') && method === 'POST')
+    return Promise.resolve({ success: true });
+
+  // Gamification — generic fallback
   if (ep.includes('/GAMIFICATION/')) return Promise.resolve({ success: true, data: DEMO_GAMIFICATION });
 
   // AI Assistant v2
@@ -953,6 +1071,51 @@ export const handleDemoRequest = (endpoint, options = {}) => {
       });
     }
     return Promise.resolve({ tickets: [], replies: [] });
+  }
+
+  // Knowledge Cards
+  if (ep.includes('/KNOWLEDGE-CARDS')) {
+    // GET /knowledge-cards/session/:sessionId
+    if (ep.includes('/SESSION/') && method === 'GET')
+      return Promise.resolve({ success: true, round: DEMO_KNOWLEDGE_CARDS.round, pairs: DEMO_KNOWLEDGE_CARDS.pairs });
+
+    // POST /knowledge-cards/generate
+    if (ep.includes('/GENERATE') && method === 'POST')
+      return Promise.resolve({ success: true, pairs: DEMO_KNOWLEDGE_CARDS.pairs });
+
+    // POST /knowledge-cards/rounds/:id/distribute
+    if (ep.includes('/DISTRIBUTE') && method === 'POST')
+      return Promise.resolve({ success: true, distributed: 5 });
+
+    // PATCH /knowledge-cards/pairs/:id/activate
+    if (ep.includes('/ACTIVATE') && method === 'PATCH')
+      return Promise.resolve({ success: true });
+
+    // PATCH /knowledge-cards/pairs/:id/reveal
+    if (ep.includes('/REVEAL') && method === 'PATCH')
+      return Promise.resolve({ success: true });
+
+    // PATCH /knowledge-cards/pairs/:id/complete
+    if (ep.includes('/COMPLETE') && method === 'PATCH')
+      return Promise.resolve({ success: true, voteSummary: { up: 7, down: 2 } });
+
+    // PATCH /knowledge-cards/pairs/:id — edit pair
+    if (ep.match(/\/KNOWLEDGE-CARDS\/PAIRS\/\d+$/) && method === 'PATCH')
+      return Promise.resolve({ success: true });
+
+    // DELETE /knowledge-cards/pairs/:id
+    if (ep.match(/\/KNOWLEDGE-CARDS\/PAIRS\/\d+$/) && method === 'DELETE')
+      return Promise.resolve({ success: true });
+
+    // POST /knowledge-cards/vote
+    if (ep.includes('/VOTE') && method === 'POST')
+      return Promise.resolve({ success: true });
+
+    // POST /knowledge-cards/rounds/:id/end
+    if (ep.includes('/END') && method === 'POST')
+      return Promise.resolve({ success: true });
+
+    return Promise.resolve({ success: true });
   }
 
   // Fallback
