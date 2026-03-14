@@ -53,7 +53,7 @@ const KnowledgeCards = ({ sessionId, onlineCount = 0 }) => {
       setError('');
       const data = await apiRequest('/knowledge-cards/generate', {
         method: 'POST',
-        body: { sessionId, count, topic }
+        body: JSON.stringify({ sessionId, count, topic })
       });
       if (data.success) {
         await fetchRounds();
@@ -82,11 +82,11 @@ const KnowledgeCards = ({ sessionId, onlineCount = 0 }) => {
     try {
       await apiRequest(`/knowledge-cards/pairs/${editingPair.pairId}`, {
         method: 'PATCH',
-        body: {
+        body: JSON.stringify({
           question_text: editingPair.question_text,
           answer_text: editingPair.answer_text,
           difficulty: editingPair.difficulty
-        }
+        })
       });
       setEditingPair(null);
       await fetchRounds();

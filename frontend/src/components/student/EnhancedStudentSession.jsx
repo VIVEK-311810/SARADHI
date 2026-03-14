@@ -645,7 +645,7 @@ const EnhancedStudentSession = () => {
 
   const handleCardVote = async (pairId, vote) => {
     try {
-      await apiRequest('/knowledge-cards/vote', { method: 'POST', body: { pairId, vote } });
+      await apiRequest('/knowledge-cards/vote', { method: 'POST', body: JSON.stringify({ pairId, vote }) });
     } catch (err) {
       console.error('Vote error:', err);
     }
