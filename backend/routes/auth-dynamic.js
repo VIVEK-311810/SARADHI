@@ -1,7 +1,6 @@
 const express = require('express');
-const { passport, generateOAuthState } = require('../config/oauth-dynamic');
+const { passport, generateOAuthState, verifyOAuthState } = require('../config/oauth-dynamic');
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
 const pool = require('../db');
 const logger = require('../logger');
 
@@ -25,12 +24,9 @@ router.get('/google/edu', (req, res, next) => {
     logger.error('google-edu strategy not found');
     return res.status(500).json({ error: 'Teacher OAuth strategy not configured' });
   }
-
-  const state = generateOAuthState();
-  req.session.oauthState = state;
   passport.authenticate('google-edu', {
     scope: ['profile', 'email'],
-    state
+    state: generateOAuthState()  // self-verifying; no session needed
   })(req, res, next);
 });
 
@@ -40,36 +36,23 @@ router.get('/google/acin', (req, res, next) => {
     logger.error('google-acin strategy not found');
     return res.status(500).json({ error: 'Student OAuth strategy not configured' });
   }
-
-  const state = generateOAuthState();
-  req.session.oauthState = state;
   passport.authenticate('google-acin', {
     scope: ['profile', 'email'],
-    state
+    state: generateOAuthState()
   })(req, res, next);
 });
 
 // Generic Google OAuth2 authentication (determines strategy based on role selection)
 router.get('/google/:role?', (req, res, next) => {
-  const role = req.params.role;
+  const role  = req.params.role;
   const state = generateOAuthState();
-  req.session.oauthState = state;
 
   if (role === 'teacher') {
-    return passport.authenticate('google-edu', {
-      scope: ['profile', 'email'],
-      state
-    })(req, res, next);
+    return passport.authenticate('google-edu',  { scope: ['profile', 'email'], state })(req, res, next);
   } else if (role === 'student') {
-    return passport.authenticate('google-acin', {
-      scope: ['profile', 'email'],
-      state
-    })(req, res, next);
+    return passport.authenticate('google-acin', { scope: ['profile', 'email'], state })(req, res, next);
   } else {
-    return passport.authenticate('google-sso', {
-      scope: ['profile', 'email'],
-      state
-    })(req, res, next);
+    return passport.authenticate('google-sso',  { scope: ['profile', 'email'], state })(req, res, next);
   }
 });
 
@@ -78,14 +61,11 @@ router.get('/google/callback/edu',
   passport.authenticate('google-edu', { failureRedirect: '/auth?error=oauth_failed' }),
   async (req, res) => {
     try {
-      // Validate OAuth state parameter to prevent login CSRF
-      const returnedState = req.query.state;
-      const expectedState = req.session?.oauthState;
-      if (!returnedState || !expectedState || !crypto.timingSafeEqual(Buffer.from(returnedState), Buffer.from(expectedState))) {
-        logger.warn('OAuth state mismatch on EDU callback');
+      // Validate self-verifying state token (HMAC + TTL — no session required)
+      if (!verifyOAuthState(req.query.state)) {
+        logger.warn('OAuth state invalid or expired on EDU callback');
         return res.redirect('/auth?error=csrf_detected');
       }
-      delete req.session.oauthState;
 
       const user = req.user;
 
@@ -132,14 +112,11 @@ router.get('/google/callback/acin',
   passport.authenticate('google-acin', { failureRedirect: '/auth?error=oauth_failed' }),
   async (req, res) => {
     try {
-      // Validate OAuth state parameter to prevent login CSRF
-      const returnedState = req.query.state;
-      const expectedState = req.session?.oauthState;
-      if (!returnedState || !expectedState || !crypto.timingSafeEqual(Buffer.from(returnedState), Buffer.from(expectedState))) {
-        logger.warn('OAuth state mismatch on ACIN callback');
+      // Validate self-verifying state token (HMAC + TTL — no session required)
+      if (!verifyOAuthState(req.query.state)) {
+        logger.warn('OAuth state invalid or expired on ACIN callback');
         return res.redirect('/auth?error=csrf_detected');
       }
-      delete req.session.oauthState;
 
       const user = req.user;
 
@@ -186,14 +163,11 @@ router.get('/google/callback',
   passport.authenticate('google-sso', { failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth?error=oauth_failed`, session: false }),
   async (req, res) => {
     try {
-      // Validate OAuth state parameter to prevent login CSRF
-      const returnedState = req.query.state;
-      const expectedState = req.session?.oauthState;
-      if (!returnedState || !expectedState || !crypto.timingSafeEqual(Buffer.from(returnedState), Buffer.from(expectedState))) {
-        logger.warn('OAuth state mismatch on SSO callback');
+      // Validate self-verifying state token (HMAC + TTL — no session required)
+      if (!verifyOAuthState(req.query.state)) {
+        logger.warn('OAuth state invalid or expired on SSO callback');
         return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth?error=csrf_detected`);
       }
-      delete req.session.oauthState;
 
       const user = req.user;
 

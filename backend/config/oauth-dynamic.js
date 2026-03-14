@@ -4,9 +4,42 @@ const crypto = require('crypto');
 require('dotenv').config();
 const pool = require('../db');
 
-// Generate a cryptographically random OAuth state parameter to prevent login CSRF
+const STATE_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET;
+const STATE_TTL_MS  = 10 * 60 * 1000; // 10 minutes — enough for any OAuth round-trip
+
+/**
+ * Generate a self-verifying, time-limited OAuth state token.
+ * Format: <hex-nonce>.<timestamp-ms>.<hmac-sha256>
+ * No session or cookie required — the token proves its own authenticity.
+ */
 function generateOAuthState() {
-  return crypto.randomBytes(32).toString('hex');
+  const nonce     = crypto.randomBytes(16).toString('hex');
+  const timestamp = Date.now().toString();
+  const payload   = `${nonce}.${timestamp}`;
+  const sig       = crypto.createHmac('sha256', STATE_SECRET).update(payload).digest('hex');
+  return `${payload}.${sig}`;
+}
+
+/**
+ * Verify a state token returned by Google.
+ * Returns true only when signature is valid AND token is within TTL.
+ */
+function verifyOAuthState(state) {
+  if (!state || typeof state !== 'string') return false;
+  const parts = state.split('.');
+  if (parts.length !== 3) return false;
+  const [nonce, timestamp, sig] = parts;
+  // Verify HMAC
+  const payload     = `${nonce}.${timestamp}`;
+  const expected    = crypto.createHmac('sha256', STATE_SECRET).update(payload).digest('hex');
+  const sigBuf      = Buffer.from(sig,      'hex');
+  const expectedBuf = Buffer.from(expected, 'hex');
+  if (sigBuf.length !== expectedBuf.length) return false;
+  if (!crypto.timingSafeEqual(sigBuf, expectedBuf)) return false;
+  // Verify TTL
+  const age = Date.now() - parseInt(timestamp, 10);
+  if (age < 0 || age > STATE_TTL_MS) return false;
+  return true;
 }
 
 const logger = require('../logger');
@@ -151,5 +184,6 @@ logger.info('OAuth strategies configured successfully');
 module.exports = {
   passport,
   getOAuthConfig,
-  generateOAuthState
+  generateOAuthState,
+  verifyOAuthState
 };
