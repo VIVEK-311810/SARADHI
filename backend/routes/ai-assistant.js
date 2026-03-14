@@ -17,7 +17,7 @@ const router = express.Router();
 
 router.post('/session/:sessionId/chat', authenticate, async (req, res) => {
   const { sessionId } = req.params;
-  const { message, conversationId, mode = 'answer' } = req.body;
+  const { message, conversationId, mode = 'answer', resourceId = null } = req.body;
   const studentId = req.user.id;
 
   if (!message || message.trim().length === 0) {
@@ -124,7 +124,7 @@ router.post('/session/:sessionId/chat', authenticate, async (req, res) => {
         // RAG pipeline with streaming
         const effectiveMode = classification.type === 'explain_concept' ? 'explain' : mode;
         const result = await handleRAGQuery(
-          sendSSE, res, sessionId, message, classification, conversationHistory, effectiveMode
+          sendSSE, res, sessionId, message, classification, conversationHistory, effectiveMode, resourceId
         );
         answerText = result.answer;
         metadata = {
@@ -169,7 +169,7 @@ router.post('/session/:sessionId/chat', authenticate, async (req, res) => {
 
 // ─── RAG Query Handler (streaming) ──────────────────────────────────────────
 
-async function handleRAGQuery(sendSSE, res, sessionId, query, classification, conversationHistory, mode) {
+async function handleRAGQuery(sendSSE, res, sessionId, query, classification, conversationHistory, mode, resourceId = null) {
   // Retrieve relevant chunks
   sendSSE('status', { stage: 'retrieving' });
 
@@ -177,8 +177,12 @@ async function handleRAGQuery(sendSSE, res, sessionId, query, classification, co
     const embedding = await embeddingService.generateEmbedding(query);
     let chunks = await vectorStore.searchSimilar(embedding, sessionId.toUpperCase(), 8);
 
-    // If specific file question, filter to that file's chunks
-    if (classification.type === 'specific_file_question' && classification.fileName) {
+    // If student selected a specific file, filter chunks to that resource only
+    if (resourceId) {
+      const fileChunks = chunks.filter(c => String(c.resourceId) === String(resourceId));
+      if (fileChunks.length > 0) chunks = fileChunks;
+    } else if (classification.type === 'specific_file_question' && classification.fileName) {
+      // If specific file question (from query classification), filter to that file's chunks
       const fileChunks = chunks.filter(c =>
         c.file_name && c.file_name.toLowerCase().includes(classification.fileName.toLowerCase())
       );

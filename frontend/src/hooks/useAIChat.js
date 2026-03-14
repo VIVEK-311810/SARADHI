@@ -2,8 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://vk-edu-b2.onrender.com/api';
 
-const isDemoMode = () =>
-  process.env.NODE_ENV !== 'production' && localStorage.getItem('isDemo') === 'true';
+const isDemoMode = () => localStorage.getItem('isDemo') === 'true';
 
 /**
  * Custom hook for AI Study Assistant — handles SSE streaming, conversations, and state
@@ -30,7 +29,7 @@ export function useAIChat(sessionId) {
   /**
    * Send a message and stream the AI response via SSE
    */
-  const sendMessage = useCallback(async (text, mode = 'answer') => {
+  const sendMessage = useCallback(async (text, mode = 'answer', resourceId = null) => {
     if (!text.trim() || isStreaming) return;
 
     setError(null);
@@ -111,6 +110,7 @@ export function useAIChat(sessionId) {
           message: text,
           conversationId: activeConversationId,
           mode,
+          ...(resourceId ? { resourceId } : {}),
         }),
         signal: abortControllerRef.current.signal,
       });

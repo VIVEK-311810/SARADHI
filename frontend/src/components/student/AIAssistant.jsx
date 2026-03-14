@@ -20,6 +20,10 @@ const AIAssistant = () => {
   const [activeMode, setActiveMode] = useState('answer');
   const [showSidebar, setShowSidebar] = useState(false);
   const [doubtedMessages, setDoubtedMessages] = useState(new Set());
+  const [resources, setResources] = useState([]);
+  const [selectedResource, setSelectedResource] = useState(null); // { id, title, file_name }
+  const [showResourcePicker, setShowResourcePicker] = useState(false);
+  const resourcePickerRef = useRef(null);
 
   const {
     messages,
@@ -62,12 +66,16 @@ const AIAssistant = () => {
       .then(data => setSessionInfo(data))
       .catch(() => {});
 
+    apiRequest(`/resources/session/${sessionId}`)
+      .then(data => setResources(data.resources || []))
+      .catch(() => {});
+
     loadConversations();
   }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSend = () => {
     if (!inputMessage.trim() || isStreaming) return;
-    sendMessage(inputMessage.trim(), activeMode);
+    sendMessage(inputMessage.trim(), activeMode, selectedResource?.id || null);
     setInputMessage('');
     inputRef.current?.focus();
   };
@@ -80,8 +88,19 @@ const AIAssistant = () => {
   };
 
   const handleSuggestionClick = (suggestion) => {
-    sendMessage(suggestion, activeMode);
+    sendMessage(suggestion, activeMode, selectedResource?.id || null);
   };
+
+  // Close resource picker when clicking outside
+  useEffect(() => {
+    const handler = (e) => {
+      if (resourcePickerRef.current && !resourcePickerRef.current.contains(e.target)) {
+        setShowResourcePicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const handleDoubt = async (messageId) => {
     const success = await markAsDoubt(messageId);
@@ -336,7 +355,7 @@ const AIAssistant = () => {
           backgroundColor: colors.surface,
           padding: '12px 16px',
         }}>
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
+          <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
             {modes.map(m => (
               <button
                 key={m.key}
@@ -355,6 +374,101 @@ const AIAssistant = () => {
                 {m.label}
               </button>
             ))}
+
+            {/* File picker */}
+            <div ref={resourcePickerRef} style={{ marginLeft: 'auto', position: 'relative' }}>
+              {selectedResource ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{
+                    display: 'flex', alignItems: 'center', gap: '5px',
+                    padding: '3px 8px 3px 10px',
+                    backgroundColor: darkMode ? '#1e3a5f' : '#dbeafe',
+                    color: darkMode ? '#93c5fd' : '#1d4ed8',
+                    border: `1px solid ${darkMode ? '#2563eb' : '#bfdbfe'}`,
+                    borderRadius: '12px', fontSize: '11px', fontWeight: 500,
+                  }}>
+                    &#128196; {selectedResource.title || selectedResource.file_name}
+                    <button
+                      onClick={() => setSelectedResource(null)}
+                      title="Clear file filter"
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'inherit', fontSize: '13px', lineHeight: 1, padding: '0 2px',
+                      }}
+                    >
+                      &times;
+                    </button>
+                  </span>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowResourcePicker(v => !v)}
+                  title="Ask about a specific file"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '5px',
+                    padding: '4px 10px',
+                    backgroundColor: 'transparent',
+                    color: colors.textMuted,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '14px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                  }}
+                >
+                  &#128196; File
+                </button>
+              )}
+
+              {/* Dropdown */}
+              {showResourcePicker && !selectedResource && (
+                <div style={{
+                  position: 'absolute', bottom: '110%', right: 0,
+                  backgroundColor: colors.surface,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '10px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                  minWidth: '240px', maxWidth: '320px',
+                  zIndex: 100, overflow: 'hidden',
+                }}>
+                  <div style={{
+                    padding: '8px 12px',
+                    fontSize: '11px', fontWeight: 600, color: colors.textMuted,
+                    textTransform: 'uppercase', letterSpacing: '0.05em',
+                    borderBottom: `1px solid ${colors.border}`,
+                  }}>
+                    Ask about a specific file
+                  </div>
+                  {resources.length === 0 ? (
+                    <div style={{ padding: '16px 12px', fontSize: '13px', color: colors.textMuted, textAlign: 'center' }}>
+                      No resources uploaded yet
+                    </div>
+                  ) : (
+                    resources.map(r => (
+                      <button
+                        key={r.id}
+                        onClick={() => { setSelectedResource(r); setShowResourcePicker(false); }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '8px',
+                          width: '100%', padding: '9px 12px', textAlign: 'left',
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          color: colors.text, fontSize: '13px',
+                          borderBottom: `1px solid ${colors.border}`,
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.backgroundColor = darkMode ? '#334155' : '#f1f5f9'}
+                        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <span style={{ fontSize: '16px', flexShrink: 0 }}>
+                          {r.resource_type === 'pdf' ? '📄' : r.resource_type === 'pptx' ? '📊' : '📝'}
+                        </span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {r.title || r.file_name}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
@@ -364,10 +478,12 @@ const AIAssistant = () => {
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={
-                activeMode === 'explain' ? 'Ask me to explain a concept...' :
-                activeMode === 'quiz' ? 'Enter a topic for quiz questions...' :
-                activeMode === 'summarize' ? 'Enter a file name to summarize...' :
-                'Ask anything about your course materials...'
+                selectedResource
+                  ? `Ask anything about "${selectedResource.title || selectedResource.file_name}"...`
+                  : activeMode === 'explain' ? 'Ask me to explain a concept...'
+                  : activeMode === 'quiz' ? 'Enter a topic for quiz questions...'
+                  : activeMode === 'summarize' ? 'Enter a file name to summarize...'
+                  : 'Ask anything about your course materials...'
               }
               disabled={isStreaming}
               rows={1}
