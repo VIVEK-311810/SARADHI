@@ -4,6 +4,11 @@ const crypto = require('crypto');
 require('dotenv').config();
 const pool = require('../db');
 
+// Generate a cryptographically random OAuth state parameter to prevent login CSRF
+function generateOAuthState() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
 const logger = require('../logger');
 
 logger.info('OAuth-dynamic config loading', {
@@ -145,5 +150,6 @@ logger.info('OAuth strategies configured successfully');
 // Export configuration getter and passport
 module.exports = {
   passport,
-  getOAuthConfig
+  getOAuthConfig,
+  generateOAuthState
 };

@@ -209,22 +209,15 @@ async function sendTranscriptSegment(sessionId) {
 
     console.log(`[AudioProcessor] ✓ Segment sent successfully for session: ${sessionId} (${result.rows.length} transcripts)`);
 
-    // Broadcast segment sent notification via WebSocket
-    if (global.wss) {
-      const broadcastMessage = {
+    // Broadcast segment sent notification only to clients in this session
+    if (global.broadcastToSession) {
+      global.broadcastToSession(sessionId.toUpperCase(), {
         type: 'transcript-segment-sent',
         sessionId: sessionId,
         timestamp: new Date().toISOString(),
         segmentCount: result.rows.length,
         transcriptLength: transcriptSegment.length
-      };
-
-      global.wss.clients.forEach(client => {
-        if (client.readyState === 1) { // WebSocket.OPEN
-          client.send(JSON.stringify(broadcastMessage));
-        }
       });
-
       console.log(`✓ Broadcasted segment sent notification for session: ${sessionId}`);
     }
 

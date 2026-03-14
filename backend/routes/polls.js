@@ -96,10 +96,17 @@ router.put('/:pollId/activate', authenticate, authorize('teacher'), async (req, 
 
     await client.query('BEGIN');
 
-    const pollResult = await client.query('SELECT session_id FROM polls WHERE id = $1', [pollId]);
+    const pollResult = await client.query(
+      `SELECT p.session_id, s.teacher_id FROM polls p JOIN sessions s ON p.session_id = s.id WHERE p.id = $1`,
+      [pollId]
+    );
     if (pollResult.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Poll not found' });
+    }
+    if (String(pollResult.rows[0].teacher_id) !== String(req.user.id)) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'Access denied: you do not own this session' });
     }
 
     const sessionId = pollResult.rows[0].session_id;
@@ -131,6 +138,18 @@ router.put('/:pollId/activate', authenticate, authorize('teacher'), async (req, 
 router.put('/:pollId/close', authenticate, authorize('teacher'), async (req, res) => {
   try {
     const { pollId } = req.params;
+
+    // Verify teacher owns this poll's session
+    const ownerCheck = await pool.query(
+      `SELECT s.teacher_id FROM polls p JOIN sessions s ON p.session_id = s.id WHERE p.id = $1`,
+      [pollId]
+    );
+    if (ownerCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Poll not found' });
+    }
+    if (String(ownerCheck.rows[0].teacher_id) !== String(req.user.id)) {
+      return res.status(403).json({ error: 'Access denied: you do not own this session' });
+    }
 
     const result = await pool.query(
       'UPDATE polls SET is_active = FALSE WHERE id = $1 RETURNING *',
@@ -402,19 +421,26 @@ router.delete('/:pollId', authenticate, authorize('teacher'), async (req, res) =
   try {
     const { pollId } = req.params;
 
+    // Verify teacher owns this poll's session
+    const pollCheck = await pool.query(
+      `SELECT p.is_active, s.teacher_id FROM polls p JOIN sessions s ON p.session_id = s.id WHERE p.id = $1`,
+      [pollId]
+    );
+    if (pollCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Poll not found' });
+    }
+    if (String(pollCheck.rows[0].teacher_id) !== String(req.user.id)) {
+      return res.status(403).json({ error: 'Access denied: you do not own this session' });
+    }
+    if (pollCheck.rows[0].is_active === true) {
+      return res.status(400).json({ error: 'Cannot delete active poll' });
+    }
+
     const responseCheck = await pool.query(
       'SELECT COUNT(*) as count FROM poll_responses WHERE poll_id = $1', [pollId]
     );
     if (parseInt(responseCheck.rows[0].count) > 0) {
       return res.status(400).json({ error: 'Cannot delete poll with existing responses' });
-    }
-
-    const pollCheck = await pool.query('SELECT is_active FROM polls WHERE id = $1', [pollId]);
-    if (pollCheck.rows.length === 0) {
-      return res.status(404).json({ error: 'Poll not found' });
-    }
-    if (pollCheck.rows[0].is_active === true) {
-      return res.status(400).json({ error: 'Cannot delete active poll' });
     }
 
     await pool.query('DELETE FROM polls WHERE id = $1', [pollId]);

@@ -27,6 +27,34 @@ router.post('/session/:sessionId/chat', authenticate, async (req, res) => {
     return res.status(400).json({ error: 'Message too long (max 2000 characters)' });
   }
 
+  // Verify user belongs to this session (student must be enrolled; teacher must own it)
+  try {
+    const normalizedSessionId = sessionId.toUpperCase();
+    if (req.user.role === 'student') {
+      const { data: participant } = await supabase
+        .from('session_participants')
+        .select('id')
+        .eq('session_id', normalizedSessionId)
+        .eq('student_id', studentId)
+        .single();
+      if (!participant) {
+        return res.status(403).json({ error: 'You are not a participant in this session' });
+      }
+    } else if (req.user.role === 'teacher') {
+      const { data: session } = await supabase
+        .from('sessions')
+        .select('id')
+        .eq('session_id', normalizedSessionId)
+        .eq('teacher_id', studentId)
+        .single();
+      if (!session) {
+        return res.status(403).json({ error: 'You do not own this session' });
+      }
+    }
+  } catch {
+    return res.status(403).json({ error: 'Session access denied' });
+  }
+
   // Set up SSE headers
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',

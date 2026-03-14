@@ -13,6 +13,15 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 }
 });
 
+// Helper: verify teacher owns the session (prevents IDOR across all transcription routes)
+async function verifySessionOwnership(sessionId, teacherId) {
+  const result = await pool.query(
+    'SELECT 1 FROM sessions WHERE session_id = $1 AND teacher_id = $2',
+    [sessionId.toUpperCase(), teacherId]
+  );
+  return result.rows.length > 0;
+}
+
 // POST /api/transcription/start — Start transcription session (teacher only)
 router.post('/start', authenticate, authorize('teacher'), upload.single('pdf'), async (req, res) => {
   try {
@@ -67,6 +76,9 @@ router.post('/audio-chunk', authenticate, authorize('teacher'), upload.single('a
 
     if (!session_id) return res.status(400).json({ error: 'session_id is required' });
     if (!req.file) return res.status(400).json({ error: 'No audio file provided' });
+    if (!(await verifySessionOwnership(session_id, req.user.id))) {
+      return res.status(403).json({ error: 'Session not found or access denied' });
+    }
 
     const transcriptionResult = await audioProcessor.forwardToGPUServer(
       req.file.buffer, session_id, req.file.originalname, req.file.mimetype
@@ -105,6 +117,9 @@ router.post('/audio-stream', authenticate, authorize('teacher'), async (req, res
     if (!session_id) return res.status(400).json({ error: 'session_id is required' });
     if (!audio_data || !Array.isArray(audio_data) || audio_data.length === 0) {
       return res.status(400).json({ error: 'audio_data must be a non-empty array' });
+    }
+    if (!(await verifySessionOwnership(session_id, req.user.id))) {
+      return res.status(403).json({ error: 'Session not found or access denied' });
     }
 
     const GPU_URL = process.env.GPU_TRANSCRIPTION_URL || 'http://localhost:5000';
@@ -151,6 +166,9 @@ router.post('/pause', authenticate, authorize('teacher'), async (req, res) => {
   try {
     const { session_id } = req.body;
     if (!session_id) return res.status(400).json({ error: 'session_id is required' });
+    if (!(await verifySessionOwnership(session_id, req.user.id))) {
+      return res.status(403).json({ error: 'Session not found or access denied' });
+    }
 
     audioProcessor.stopSegmentTimer(session_id);
     const session = await audioProcessor.updateSessionStatus(session_id, 'paused', true);
@@ -167,6 +185,9 @@ router.post('/resume', authenticate, authorize('teacher'), async (req, res) => {
   try {
     const { session_id } = req.body;
     if (!session_id) return res.status(400).json({ error: 'session_id is required' });
+    if (!(await verifySessionOwnership(session_id, req.user.id))) {
+      return res.status(403).json({ error: 'Session not found or access denied' });
+    }
 
     const result = await pool.query(
       'SELECT segment_interval FROM transcription_sessions WHERE session_id = $1',
@@ -191,6 +212,9 @@ router.post('/stop', authenticate, authorize('teacher'), async (req, res) => {
   try {
     const { session_id } = req.body;
     if (!session_id) return res.status(400).json({ error: 'session_id is required' });
+    if (!(await verifySessionOwnership(session_id, req.user.id))) {
+      return res.status(403).json({ error: 'Session not found or access denied' });
+    }
 
     const session = await audioProcessor.endSession(session_id);
     res.json({ success: true, session_id, session, message: 'Session stopped' });
@@ -205,6 +229,9 @@ router.post('/generate-notes', authenticate, authorize('teacher'), async (req, r
   try {
     const { session_id } = req.body;
     if (!session_id) return res.status(400).json({ error: 'session_id is required' });
+    if (!(await verifySessionOwnership(session_id, req.user.id))) {
+      return res.status(403).json({ error: 'Session not found or access denied' });
+    }
 
     const success = await audioProcessor.sendFinalNotes(session_id);
     if (!success) {
@@ -224,6 +251,9 @@ router.post('/send-notes', authenticate, authorize('teacher'), async (req, res) 
     const { session_id, notes } = req.body;
     if (!session_id || !notes) {
       return res.status(400).json({ error: 'session_id and notes are required' });
+    }
+    if (!(await verifySessionOwnership(session_id, req.user.id))) {
+      return res.status(403).json({ error: 'Session not found or access denied' });
     }
 
     if (!process.env.FINAL_NOTES_WEBHOOK_URL) {

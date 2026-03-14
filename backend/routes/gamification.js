@@ -519,6 +519,16 @@ router.post('/calculate-points', authenticate, async (req, res) => {
   if (!studentId || !pollId || !sessionId || isCorrect === undefined) {
     return res.status(400).json({ error: 'Missing required fields: studentId, pollId, sessionId, isCorrect' });
   }
+
+  // Verify teacher owns this session — prevents awarding points in other teachers' sessions
+  const sessionOwnerCheck = await pool.query(
+    'SELECT 1 FROM sessions WHERE id = $1 AND teacher_id = $2',
+    [sessionId, req.user.id]
+  );
+  if (sessionOwnerCheck.rows.length === 0) {
+    return res.status(403).json({ error: 'Access denied: you do not own this session' });
+  }
+
   const result = await calculatePoints({ studentId, pollId, sessionId, isCorrect, difficulty: difficulty || 1 });
   if (result.success) {
     res.json(result);
