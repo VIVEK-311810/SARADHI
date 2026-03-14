@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { CheckCircle2, XCircle, Circle } from 'lucide-react';
+import { toast } from 'sonner';
 import LoadingSpinner from '../shared/LoadingSpinner';
 import { apiRequest, studentAPI, safeParseUser } from '../../utils/api';
 import { Badge } from '../ui/badge';
@@ -414,6 +415,13 @@ const EnhancedStudentSession = () => {
           setCardActivityActive(false);
           setKnowledgeCard(null);
           setCardActiveState(null);
+          break;
+
+        case 'notes-ready':
+          // Class notes are ready — student can find them in the Resources page
+          if (data.sessionId && data.sessionId.toUpperCase() === sessionId?.toUpperCase()) {
+            toast?.success?.('Class notes are ready! View them in Resources.');
+          }
           break;
 
         // ── Stuck ────────────────────────────────────────────────────────

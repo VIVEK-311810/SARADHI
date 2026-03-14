@@ -114,6 +114,7 @@ const ResourceViewer = () => {
       'image': '🖼️',
       'archive': '📦',
       'url': '🔗',
+      'auto_notes': '✨',
       'other': '📎'
     };
     return icons[type] || '📎';
@@ -128,10 +129,31 @@ const ResourceViewer = () => {
       'image': 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300',
       'archive': 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300',
       'url': 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300',
+      'auto_notes': 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300',
       'other': 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
     };
     return colors[type] || 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300';
   };
+
+  // Group resources by type — auto_notes appear in their own "Notes" section
+  const TYPE_ORDER = ['auto_notes', 'pdf', 'document', 'presentation', 'spreadsheet', 'image', 'url', 'archive', 'other'];
+  const TYPE_LABELS = {
+    'auto_notes': '✨ Notes',
+    'pdf': '📄 PDFs',
+    'document': '📝 Documents',
+    'presentation': '📊 Presentations',
+    'spreadsheet': '📈 Spreadsheets',
+    'image': '🖼️ Images',
+    'url': '🔗 Links',
+    'archive': '📦 Archives',
+    'other': '📎 Other',
+  };
+
+  const groupedResources = TYPE_ORDER.reduce((acc, type) => {
+    const items = filteredResources.filter(r => r.resource_type === type);
+    if (items.length > 0) acc[type] = items;
+    return acc;
+  }, {});
 
   if (loading) {
     return (
@@ -179,13 +201,14 @@ const ResourceViewer = () => {
               className="border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             >
               <option value="all">All Types</option>
-              <option value="pdf">PDFs</option>
-              <option value="document">Documents</option>
-              <option value="presentation">Presentations</option>
-              <option value="spreadsheet">Spreadsheets</option>
-              <option value="image">Images</option>
-              <option value="url">URLs</option>
-              <option value="archive">Archives</option>
+              <option value="auto_notes">✨ Notes (AI Generated)</option>
+              <option value="pdf">📄 PDFs</option>
+              <option value="document">📝 Documents</option>
+              <option value="presentation">📊 Presentations</option>
+              <option value="spreadsheet">📈 Spreadsheets</option>
+              <option value="image">🖼️ Images</option>
+              <option value="url">🔗 URLs</option>
+              <option value="archive">📦 Archives</option>
               <option value="other">Other</option>
             </select>
 
@@ -230,7 +253,8 @@ const ResourceViewer = () => {
               : 'Try adjusting your search or filters'}
           </p>
         </div>
-      ) : (
+      ) : filterType !== 'all' ? (
+        // Single-type view (flat list when a specific type is selected)
         <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
           {filteredResources.map((resource) => (
             <div
@@ -323,6 +347,117 @@ const ResourceViewer = () => {
                   </div>
                 </div>
               )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        // Grouped view when showing "All Types"
+        <div className="space-y-8">
+          {Object.entries(groupedResources).map(([type, items]) => (
+            <div key={type}>
+              <div className={`flex items-center gap-2 mb-3 px-4 py-2 rounded-lg font-semibold text-sm ${
+                type === 'auto_notes'
+                  ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+              }`}>
+                <span>{TYPE_LABELS[type] || type}</span>
+                <span className="ml-auto text-xs font-normal opacity-70">{items.length} file{items.length !== 1 ? 's' : ''}</span>
+                {type === 'auto_notes' && (
+                  <span className="text-xs bg-indigo-200 dark:bg-indigo-700 text-indigo-700 dark:text-indigo-200 px-2 py-0.5 rounded-full font-medium">AI Generated</span>
+                )}
+              </div>
+              <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
+                {items.map((resource) => (
+                  <div
+                    key={resource.id}
+                    className={`bg-white dark:bg-gray-800 rounded-lg shadow-md border hover:shadow-lg dark:hover:shadow-gray-900/50 transition-shadow duration-200 ${
+                      type === 'auto_notes'
+                        ? 'border-indigo-200 dark:border-indigo-700'
+                        : 'border-gray-200 dark:border-gray-700'
+                    } ${viewMode === 'list' ? 'flex items-center' : ''}`}
+                  >
+                    {viewMode === 'grid' ? (
+                      <div className="p-6">
+                        <div className="flex items-start justify-between mb-3">
+                          <span className="text-4xl">{getResourceIcon(resource.resource_type)}</span>
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${getResourceTypeColor(resource.resource_type)}`}>
+                            {resource.resource_type === 'auto_notes' ? 'AI Notes' : resource.resource_type}
+                          </span>
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 line-clamp-2">{resource.title}</h3>
+                        {resource.description && (
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">{resource.description}</p>
+                        )}
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-4 space-y-1">
+                          {resource.file_size && <div>📦 {utils.formatFileSize(resource.file_size)}</div>}
+                          <div>📅 {new Date(resource.created_at).toLocaleDateString()}</div>
+                          {resource.resource_type !== 'auto_notes' && (
+                            <div>👁️ {resource.view_count} views • ⬇️ {resource.download_count} downloads</div>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleView(resource)}
+                            className={`flex-1 text-white py-2 px-4 rounded-lg text-sm font-medium ${
+                              resource.resource_type === 'auto_notes'
+                                ? 'bg-indigo-600 hover:bg-indigo-700'
+                                : 'bg-blue-600 hover:bg-blue-700'
+                            }`}
+                          >
+                            {resource.resource_type === 'auto_notes' ? 'Open Notes' : 'View'}
+                          </button>
+                          {resource.resource_type !== 'url' && (
+                            <button
+                              onClick={() => handleDownload(resource)}
+                              className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg text-sm font-medium"
+                            >
+                              Download
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between p-4 w-full">
+                        <div className="flex items-center gap-3 flex-1">
+                          <span className="text-2xl">{getResourceIcon(resource.resource_type)}</span>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <h3 className="text-base font-semibold text-gray-900 dark:text-white">{resource.title}</h3>
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${getResourceTypeColor(resource.resource_type)}`}>
+                                {resource.resource_type === 'auto_notes' ? 'AI Notes' : resource.resource_type}
+                              </span>
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              📅 {new Date(resource.created_at).toLocaleDateString()}
+                              {resource.file_size && ` • 📦 ${utils.formatFileSize(resource.file_size)}`}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 ml-4">
+                          <button
+                            onClick={() => handleView(resource)}
+                            className={`text-white py-1.5 px-3 rounded-lg text-sm font-medium ${
+                              resource.resource_type === 'auto_notes'
+                                ? 'bg-indigo-600 hover:bg-indigo-700'
+                                : 'bg-blue-600 hover:bg-blue-700'
+                            }`}
+                          >
+                            {resource.resource_type === 'auto_notes' ? 'Open' : 'View'}
+                          </button>
+                          {resource.resource_type !== 'url' && (
+                            <button
+                              onClick={() => handleDownload(resource)}
+                              className="bg-green-600 hover:bg-green-700 text-white py-1.5 px-3 rounded-lg text-sm font-medium"
+                            >
+                              ↓
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
         </div>

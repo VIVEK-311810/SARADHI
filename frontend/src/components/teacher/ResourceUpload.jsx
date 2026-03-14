@@ -153,6 +153,7 @@ const ResourceUpload = () => {
       'document': '📝',
       'presentation': '📊',
       'spreadsheet': '📈',
+      'auto_notes': '✨',
       'other': '📎'
     };
     return icons[type] || '📎';

@@ -59,6 +59,11 @@ const EnhancedSessionManagement = () => {
   // Live class control state
   const [isGoingLive, setIsGoingLive] = useState(false);
 
+  // Notes generation state
+  const [notesStatus, setNotesStatus] = useState('none'); // 'none'|'generating'|'ready'|'failed'
+  const [notesUrl, setNotesUrl] = useState(null);
+  const notesPollingRef = useRef(null);
+
   // Live participant count (from WebSocket)
   const [onlineCount, setOnlineCount] = useState(0);
   const [presentCount, setPresentCount] = useState(0);
@@ -93,9 +98,13 @@ const EnhancedSessionManagement = () => {
     fetchGeneratedMCQs();
     setupWebSocketConnection();
 
+
     return () => {
       if (wsReconnectTimeoutRef.current) {
         clearTimeout(wsReconnectTimeoutRef.current);
+      }
+      if (notesPollingRef.current) {
+        clearInterval(notesPollingRef.current);
       }
       if (wsRef.current) {
         wsRef.current.close();
@@ -208,6 +217,14 @@ const EnhancedSessionManagement = () => {
             if (isCurrentSession(data.sessionId)) {
               fetchGeneratedMCQs();
               fetchPolls();
+            }
+            break;
+          case 'notes-ready':
+            if (isCurrentSession(data.sessionId)) {
+              setNotesStatus('ready');
+              setNotesUrl(data.notesUrl);
+              if (notesPollingRef.current) clearInterval(notesPollingRef.current);
+              toast.success('Class notes are ready for students!');
             }
             break;
           default:
@@ -334,12 +351,43 @@ const EnhancedSessionManagement = () => {
         body: JSON.stringify({ live: false })
       });
       setSession(prev => ({ ...prev, is_live: false }));
+      setNotesStatus('generating');
+      startNotesPolling();
     } catch (error) {
       console.error('Error ending class:', error);
     } finally {
       setIsGoingLive(false);
     }
   };
+
+  const startNotesPolling = () => {
+    if (notesPollingRef.current) clearInterval(notesPollingRef.current);
+    notesPollingRef.current = setInterval(async () => {
+      try {
+        const data = await apiRequest(`/sessions/${sessionId}/notes`);
+        setNotesStatus(data.status);
+        if (data.status === 'ready') {
+          setNotesUrl(data.url);
+          clearInterval(notesPollingRef.current);
+        } else if (data.status === 'failed') {
+          clearInterval(notesPollingRef.current);
+          toast.error('Notes generation failed. Students can contact their teacher for notes.');
+        }
+      } catch (_) {}
+    }, 10000);
+  };
+
+  // Load existing notes status on mount and resume polling if still generating
+  useEffect(() => {
+    apiRequest(`/sessions/${sessionId}/notes`).then(data => {
+      if (data && data.status && data.status !== 'none') {
+        setNotesStatus(data.status);
+        if (data.url) setNotesUrl(data.url);
+        if (data.status === 'generating') startNotesPolling();
+      }
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
 
   const handleOpenAttendance = () => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
@@ -734,6 +782,49 @@ const EnhancedSessionManagement = () => {
                   )}
                 </div>
               </div>
+
+              {/* Notes Generation Status */}
+              {notesStatus !== 'none' && (
+                <div className={`rounded-lg p-3 sm:p-4 border ${
+                  notesStatus === 'ready'
+                    ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-700'
+                    : notesStatus === 'failed'
+                      ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700'
+                      : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                }`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div>
+                      <h3 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">Auto Notes Generation</h3>
+                      {notesStatus === 'generating' && (
+                        <p className="text-xs text-blue-600 dark:text-blue-300 mt-1 flex items-center gap-2">
+                          <span className="inline-block w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                          Generating class notes from transcript + resources… (1–2 min)
+                        </p>
+                      )}
+                      {notesStatus === 'ready' && (
+                        <p className="text-xs text-indigo-600 dark:text-indigo-300 mt-1">
+                          Notes generated and visible to students in Resources.
+                        </p>
+                      )}
+                      {notesStatus === 'failed' && (
+                        <p className="text-xs text-red-600 dark:text-red-300 mt-1">
+                          Notes generation failed. Please share notes manually.
+                        </p>
+                      )}
+                    </div>
+                    {notesStatus === 'ready' && notesUrl && (
+                      <a
+                        href={notesUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap w-full sm:w-auto text-center"
+                      >
+                        Preview Notes PDF
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 sm:p-4">
                 <h3 className="font-semibold text-gray-900 dark:text-white mb-2 text-sm sm:text-base">Quick Actions</h3>

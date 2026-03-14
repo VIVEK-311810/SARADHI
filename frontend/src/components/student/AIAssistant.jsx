@@ -466,7 +466,7 @@ const AIAssistant = () => {
                         onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                       >
                         <span style={{ fontSize: '16px', flexShrink: 0 }}>
-                          {r.resource_type === 'pdf' ? '📄' : r.resource_type === 'pptx' ? '📊' : '📝'}
+                          {r.resource_type === 'pdf' ? '📄' : r.resource_type === 'presentation' ? '📊' : r.resource_type === 'auto_notes' ? '✨' : '📝'}
                         </span>
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {r.title || r.file_name}

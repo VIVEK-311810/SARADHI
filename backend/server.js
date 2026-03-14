@@ -86,6 +86,10 @@ wss.on('connection', (ws, req) => {
           handlePollResponse(ws, data);
           break;
         case 'activate-poll':
+          if (ws.userRole !== 'teacher') {
+            ws.send(JSON.stringify({ type: 'error', message: 'Only teachers can activate polls' }));
+            break;
+          }
           handleActivatePoll(data);
           break;
         case 'heartbeat':
@@ -128,7 +132,7 @@ wss.on('connection', (ws, req) => {
         }
         case 'stuck-reset': {
           // Teacher resets stuck count (e.g. after addressing)
-          if (ws.role === 'teacher' && ws.sessionId) {
+          if (ws.userRole === 'teacher' && ws.sessionId) {
             const sid = String(ws.sessionId).toUpperCase();
             if (global.stuckCounts) global.stuckCounts.delete(sid);
             broadcastToSession(sid, { type: 'stuck-update', count: 0 });
@@ -136,7 +140,7 @@ wss.on('connection', (ws, req) => {
           break;
         }
         case 'toggle-leaderboard':
-          if (ws.role === 'teacher' && data.sessionId) {
+          if (ws.userRole === 'teacher' && data.sessionId) {
             const normalizedSid = String(data.sessionId).toUpperCase();
             const visible = !!data.visible;
             pool.query(
@@ -1249,6 +1253,30 @@ async function autoMigrate() {
   `, 'ai_study_analytics');
 
   await run(`ALTER TABLE resource_chunks ADD COLUMN IF NOT EXISTS section_title VARCHAR(255)`, 'resource_chunks.section_title');
+
+  // Migration 009 – Auto Notes Generation: session live timing + notes lifecycle
+  await run(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS live_started_at TIMESTAMP`, 'sessions.live_started_at');
+  await run(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS live_ended_at TIMESTAMP`, 'sessions.live_ended_at');
+  await run(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS notes_status VARCHAR(20) DEFAULT 'none'`, 'sessions.notes_status');
+  await run(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS notes_url TEXT`, 'sessions.notes_url');
+  await run(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS notes_generated_at TIMESTAMP`, 'sessions.notes_generated_at');
+  await run(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS notes_error TEXT`, 'sessions.notes_error');
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS session_notes (
+      id                      SERIAL PRIMARY KEY,
+      session_id              INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+      status                  VARCHAR(20) NOT NULL DEFAULT 'generating',
+      notes_url               TEXT,
+      storage_path            TEXT,
+      transcript_length       INTEGER,
+      resource_count          INTEGER,
+      generation_started_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      generation_completed_at TIMESTAMP,
+      error_message           TEXT
+    )
+  `, 'session_notes');
+  await run(`CREATE INDEX IF NOT EXISTS idx_session_notes_session_id ON session_notes(session_id)`, 'idx_session_notes_session_id');
 
   // Initialize cache service
   const cacheService = require('./services/cacheService');

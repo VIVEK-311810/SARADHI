@@ -252,7 +252,13 @@ router.patch('/:sessionId/live', authenticate, authorize('teacher'), async (req,
     }
 
     const result = await pool.query(
-      'UPDATE sessions SET is_live = $1 WHERE session_id = $2 AND teacher_id = $3 RETURNING *',
+      `UPDATE sessions
+       SET is_live         = $1,
+           live_started_at = CASE WHEN $1 = TRUE  THEN CURRENT_TIMESTAMP ELSE live_started_at END,
+           live_ended_at   = CASE WHEN $1 = FALSE THEN CURRENT_TIMESTAMP ELSE live_ended_at   END,
+           notes_status    = CASE WHEN $1 = FALSE THEN 'generating'      ELSE notes_status    END
+       WHERE session_id = $2 AND teacher_id = $3
+       RETURNING *`,
       [live, sessionId.toUpperCase(), req.user.id]
     );
 
@@ -269,10 +275,37 @@ router.patch('/:sessionId/live', authenticate, authorize('teacher'), async (req,
       global.broadcastToDashboardsForSession(sessionId.toUpperCase(), wsMessage);
     }
 
+    // Auto-generate class notes when session ends
+    if (!live && result.rows[0]) {
+      const notesGenerator = require('../services/notesGeneratorService');
+      notesGenerator.generateNotesAsync(result.rows[0]).catch(err =>
+        logger.error('Auto notes generation failed (non-fatal)', { error: err.message, sessionId: sessionId.toUpperCase() })
+      );
+    }
+
     logger.info(`Class ${live ? 'started' : 'ended'}`, { sessionId: sessionId.toUpperCase(), teacherId: req.user.id });
     res.json({ success: true, is_live: live, session: result.rows[0] });
   } catch (error) {
     logger.error('Error toggling class live status', { error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /:sessionId/notes — Polling fallback for notes generation status
+router.get('/:sessionId/notes', authenticate, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const result = await pool.query(
+      'SELECT notes_status, notes_url, notes_generated_at, notes_error FROM sessions WHERE session_id = $1',
+      [sessionId.toUpperCase()]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    const { notes_status, notes_url, notes_generated_at, notes_error } = result.rows[0];
+    res.json({ status: notes_status || 'none', url: notes_url, generatedAt: notes_generated_at, error: notes_error });
+  } catch (error) {
+    logger.error('Error fetching notes status', { error: error.message });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
