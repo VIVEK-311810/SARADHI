@@ -132,8 +132,10 @@ const useAudioRecorder = (initialSessionId = '') => {
       }
 
       // Start session on backend
+      const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_URL}/transcription/start`, {
         method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
         body: formData
       });
 
@@ -216,9 +218,10 @@ const useAudioRecorder = (initialSessionId = '') => {
     try {
       console.log(`[useAudioRecorder] Sending raw audio stream: ${audioData.length} samples (${(audioData.length / 16000).toFixed(2)}s)`);
 
+      const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_URL}/transcription/audio-stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           audio_data: Array.from(audioData), // Convert Float32Array to regular array
           sample_rate: 16000,
@@ -247,9 +250,10 @@ const useAudioRecorder = (initialSessionId = '') => {
       setStatus('paused');
 
       try {
+        const token = localStorage.getItem('authToken');
         await fetch(`${API_URL}/transcription/pause`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ session_id: sessionId })
         });
       } catch (error) {
@@ -266,9 +270,10 @@ const useAudioRecorder = (initialSessionId = '') => {
       setStatus('recording');
 
       try {
+        const token = localStorage.getItem('authToken');
         await fetch(`${API_URL}/transcription/resume`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ session_id: sessionId })
         });
       } catch (error) {
@@ -309,9 +314,10 @@ const useAudioRecorder = (initialSessionId = '') => {
     // Stop session on backend
     if (sessionId && status !== 'idle') {
       try {
+        const token = localStorage.getItem('authToken');
         await fetch(`${API_URL}/transcription/stop`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ session_id: sessionId })
         });
       } catch (error) {
@@ -329,9 +335,10 @@ const useAudioRecorder = (initialSessionId = '') => {
 
     try {
       setIsProcessing(true);
+      const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_URL}/transcription/generate-notes`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ session_id: sessionId })
       });
 
@@ -360,9 +367,10 @@ const useAudioRecorder = (initialSessionId = '') => {
 
     try {
       setIsProcessing(true);
+      const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_URL}/transcription/send-notes`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           session_id: sessionId,
           notes: notes
