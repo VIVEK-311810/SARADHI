@@ -12,6 +12,7 @@ const AudioRecorder = ({ audioRecorder, sessionId: propSessionId }) => {
     setSegmentInterval,
     status,
     transcripts,
+    fullTranscript,
     notes,
     setNotes,
     isProcessing,
@@ -157,23 +158,25 @@ const AudioRecorder = ({ audioRecorder, sessionId: propSessionId }) => {
       <div>
         <h3 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white mb-2">Live Transcript</h3>
         <div className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4 h-48 sm:h-64 overflow-y-auto">
-          {transcripts.length === 0 ? (
+          {!fullTranscript ? (
             <p className="text-gray-400 dark:text-gray-500 text-center italic text-sm">Transcripts will appear here...</p>
           ) : (
-            <div className="space-y-2">
-              {transcripts.map((transcript, index) => (
-                <div key={index} className="bg-white dark:bg-gray-800 p-2 sm:p-3 rounded border border-gray-200 dark:border-gray-700">
-                  <p className="text-gray-800 dark:text-gray-200 text-sm sm:text-base">{transcript.text}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {transcript.timestamp.toLocaleTimeString()}
-                    {transcript.language && ` • ${transcript.language}`}
-                  </p>
-                </div>
-              ))}
+            <>
+              <p className="text-gray-800 dark:text-gray-200 text-sm sm:text-base leading-relaxed">
+                {fullTranscript}
+                {status === 'recording' && (
+                  <span className="inline-block w-0.5 h-4 bg-green-500 ml-0.5 animate-pulse align-middle" />
+                )}
+              </p>
               <div ref={transcriptEndRef} />
-            </div>
+            </>
           )}
         </div>
+        {fullTranscript && (
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 text-right">
+            {fullTranscript.split(/\s+/).filter(Boolean).length} words
+          </p>
+        )}
       </div>
 
       {/* Manual Notes Section */}

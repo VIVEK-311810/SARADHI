@@ -235,6 +235,13 @@ const useAudioRecorder = (initialSessionId = '') => {
       } else {
         const result = await response.json();
         console.log('[useAudioRecorder] Stream processed:', result.transcript?.substring(0, 50));
+        if (result.transcript && result.transcript.trim()) {
+          setTranscripts(prev => [...prev, {
+            text: result.transcript.trim(),
+            timestamp: new Date(),
+            language: result.detected_language || null
+          }]);
+        }
       }
 
     } catch (error) {
@@ -394,6 +401,8 @@ const useAudioRecorder = (initialSessionId = '') => {
     }
   };
 
+  const fullTranscript = transcripts.map(t => t.text).join(' ');
+
   return {
     // State
     sessionId,
@@ -403,6 +412,7 @@ const useAudioRecorder = (initialSessionId = '') => {
     setSegmentInterval,
     status,
     transcripts,
+    fullTranscript,
     notes,
     setNotes,
     isProcessing,
