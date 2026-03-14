@@ -109,6 +109,30 @@ router.post('/audio-chunk', authenticate, authorize('teacher'), upload.single('a
   }
 });
 
+// Convert a Float32 PCM sample array to a WAV Buffer (16-bit mono)
+function float32ToWav(samples, sampleRate) {
+  const numSamples = samples.length;
+  const buf = Buffer.alloc(44 + numSamples * 2);
+  buf.write('RIFF', 0);
+  buf.writeUInt32LE(36 + numSamples * 2, 4);
+  buf.write('WAVE', 8);
+  buf.write('fmt ', 12);
+  buf.writeUInt32LE(16, 16);
+  buf.writeUInt16LE(1, 20);              // PCM
+  buf.writeUInt16LE(1, 22);              // mono
+  buf.writeUInt32LE(sampleRate, 24);
+  buf.writeUInt32LE(sampleRate * 2, 28); // byte rate
+  buf.writeUInt16LE(2, 32);              // block align
+  buf.writeUInt16LE(16, 34);             // bits per sample
+  buf.write('data', 36);
+  buf.writeUInt32LE(numSamples * 2, 40);
+  for (let i = 0; i < numSamples; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    buf.writeInt16LE(Math.round(s * 32767), 44 + i * 2);
+  }
+  return buf;
+}
+
 // POST /api/transcription/audio-stream — Raw audio stream (teacher only)
 router.post('/audio-stream', authenticate, authorize('teacher'), async (req, res) => {
   try {
@@ -122,27 +146,45 @@ router.post('/audio-stream', authenticate, authorize('teacher'), async (req, res
       return res.status(403).json({ error: 'Session not found or access denied' });
     }
 
-    const GPU_URL = process.env.GPU_TRANSCRIPTION_URL || 'http://localhost:5000';
-    const gpuResponse = await fetch(`${GPU_URL}/transcribe-stream`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ audio_data, sample_rate: sample_rate || 16000, session_id, language: 'en' }),
-      timeout: 30000
-    });
+    const sr = sample_rate || 16000;
+    let transcript = '';
+    let detectedLanguage = null;
 
-    if (!gpuResponse.ok) {
-      const errorText = await gpuResponse.text();
-      throw new Error(`GPU server error (${gpuResponse.status}): ${errorText.substring(0, 200)}`);
+    // ── Primary: GPU server ────────────────────────────────────────────────
+    try {
+      const GPU_URL = process.env.GPU_TRANSCRIPTION_URL || 'http://localhost:5000';
+      const gpuResponse = await fetch(`${GPU_URL}/transcribe-stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audio_data, sample_rate: sr, session_id, language: 'en' }),
+        timeout: 30000
+      });
+
+      if (!gpuResponse.ok) {
+        const errorText = await gpuResponse.text();
+        throw new Error(`GPU server error (${gpuResponse.status}): ${errorText.substring(0, 200)}`);
+      }
+
+      const result = await gpuResponse.json();
+      transcript = result.transcript || result.text || '';
+      detectedLanguage = result.detected_language;
+
+    } catch (gpuError) {
+      // ── Fallback: Groq Whisper ─────────────────────────────────────────
+      logger.warn('audio-stream: GPU failed, falling back to Groq', { error: gpuError.message, session_id });
+      try {
+        const wavBuffer = float32ToWav(audio_data, sr);
+        const groqResult = await audioProcessor.transcribeWithGroq(wavBuffer, 'audio.wav', 'audio/wav');
+        transcript = groqResult.transcript || '';
+      } catch (groqError) {
+        logger.error('audio-stream: Groq fallback also failed', { error: groqError.message, session_id });
+        throw new Error(`All transcription providers failed. GPU: ${gpuError.message} | Groq: ${groqError.message}`);
+      }
     }
-
-    const result = await gpuResponse.json();
-    const transcript = result.transcript || result.text || '';
-    const detectedLanguage = result.detected_language;
 
     if (transcript && transcript.trim().length > 0) {
       await audioProcessor.saveTranscript(session_id, transcript, detectedLanguage);
 
-      // Broadcast only to clients in this session, not all connected clients
       if (global.broadcastToSession) {
         global.broadcastToSession(session_id.toUpperCase(), {
           type: 'transcript-received',

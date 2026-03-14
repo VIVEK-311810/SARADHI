@@ -540,6 +540,7 @@ async function endSession(sessionId) {
 
 module.exports = {
   forwardToGPUServer,
+  transcribeWithGroq,
   saveTranscript,
   startSegmentTimer,
   stopSegmentTimer,
