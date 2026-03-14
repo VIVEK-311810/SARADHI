@@ -496,13 +496,17 @@ async function endSession(sessionId) {
   try {
     console.log(`[AudioProcessor] Ending session: ${sessionId}`);
 
-    // ALWAYS send any remaining unsent transcripts before stopping
+    // Send any remaining unsent transcripts before stopping (non-fatal if webhook is down)
     console.log(`[AudioProcessor] Checking for unsent transcripts before session end...`);
-    const sent = await sendTranscriptSegment(sessionId);
-    if (sent) {
-      console.log(`[AudioProcessor] ✓ Remaining transcripts sent on session stop`);
-    } else {
-      console.log(`[AudioProcessor] No unsent transcripts found`);
+    try {
+      const sent = await sendTranscriptSegment(sessionId);
+      if (sent) {
+        console.log(`[AudioProcessor] ✓ Remaining transcripts sent on session stop`);
+      } else {
+        console.log(`[AudioProcessor] No unsent transcripts found`);
+      }
+    } catch (webhookError) {
+      console.warn(`[AudioProcessor] Webhook flush failed on stop (non-fatal): ${webhookError.message}`);
     }
 
     // Stop timer
