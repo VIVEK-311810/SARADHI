@@ -24,6 +24,8 @@ const useAudioRecorder = (initialSessionId = '') => {
   const streamRef = useRef(null);
   const wsRef = useRef(null);
   const statusRef = useRef('idle');
+  const mimeTypeRef = useRef('');
+  const chunkTimerRef = useRef(null);
 
   // Update sessionId when prop changes
   useEffect(() => {
@@ -63,6 +65,37 @@ const useAudioRecorder = (initialSessionId = '') => {
     setPdfFile(null);
     const fileInput = document.getElementById('pdf-input');
     if (fileInput) fileInput.value = '';
+  };
+
+  // Start a single 15-second MediaRecorder chunk; restart on stop (if still recording)
+  const startChunkRecorder = () => {
+    if (!streamRef.current || statusRef.current !== 'recording') return;
+
+    const mimeType = mimeTypeRef.current;
+    const mr = new MediaRecorder(streamRef.current, mimeType ? { mimeType } : {});
+    mediaRecorderRef.current = mr;
+
+    mr.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) {
+        sendAudioChunk(event.data);
+      }
+    };
+
+    mr.onstop = () => {
+      // Restart immediately if still in recording state
+      if (statusRef.current === 'recording') {
+        startChunkRecorder();
+      }
+    };
+
+    mr.onerror = (e) => console.error('[useAudioRecorder] MediaRecorder error:', e);
+
+    mr.start();
+
+    // Stop after 15 s — triggers ondataavailable with a complete WebM file
+    chunkTimerRef.current = setTimeout(() => {
+      if (mr.state === 'recording') mr.stop();
+    }, 15000);
   };
 
   // Send a WebM blob to /audio-chunk (binary, uses multer + Groq fallback)
@@ -138,27 +171,16 @@ const useAudioRecorder = (initialSessionId = '') => {
       streamRef.current = stream;
 
       // Pick best supported MIME type (Whisper/Groq accept webm and ogg)
-      const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg']
+      mimeTypeRef.current = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg']
         .find(t => MediaRecorder.isTypeSupported(t)) || '';
-
-      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
-      mediaRecorderRef.current = mediaRecorder;
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0 && statusRef.current !== 'paused') {
-          sendAudioChunk(event.data);
-        }
-      };
-
-      mediaRecorder.onerror = (e) => console.error('[useAudioRecorder] MediaRecorder error:', e);
-
-      // Fire ondataavailable every 15 seconds
-      mediaRecorder.start(15000);
 
       statusRef.current = 'recording';
       setStatus('recording');
       setTranscripts([]);
-      console.log(`[useAudioRecorder] Recording started (${mimeType || 'browser default'})`);
+      console.log(`[useAudioRecorder] Recording started (${mimeTypeRef.current || 'browser default'})`);
+
+      // Start first chunk — each chunk is a complete WebM file (stop/restart cycle)
+      startChunkRecorder();
 
     } catch (error) {
       console.error('[useAudioRecorder] Error starting recording:', error);
@@ -171,7 +193,8 @@ const useAudioRecorder = (initialSessionId = '') => {
 
   const pauseRecording = async () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.pause();
+      clearTimeout(chunkTimerRef.current);
+      mediaRecorderRef.current.stop(); // onstop won't restart because statusRef is 'paused'
       statusRef.current = 'paused';
       setStatus('paused');
 
@@ -189,10 +212,10 @@ const useAudioRecorder = (initialSessionId = '') => {
   };
 
   const resumeRecording = async () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'paused') {
-      mediaRecorderRef.current.resume();
+    if (statusRef.current === 'paused') {
       statusRef.current = 'recording';
       setStatus('recording');
+      startChunkRecorder(); // Start a fresh chunk recorder after pause
 
       try {
         const token = localStorage.getItem('authToken');
@@ -208,6 +231,9 @@ const useAudioRecorder = (initialSessionId = '') => {
   };
 
   const stopRecording = async () => {
+    clearTimeout(chunkTimerRef.current);
+    statusRef.current = 'idle'; // Set before stop so onstop doesn't restart
+
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current = null;
@@ -231,7 +257,6 @@ const useAudioRecorder = (initialSessionId = '') => {
       }
     }
 
-    statusRef.current = 'idle';
     setStatus('idle');
   };
 
