@@ -177,9 +177,11 @@ function startSegmentTimer(sessionId, intervalMinutes) {
   const intervalMs = intervalMinutes * 60 * 1000;
   console.log(`[AudioProcessor] Starting segment timer for session ${sessionId}: ${intervalMinutes} minutes`);
 
-  const timer = setInterval(async () => {
+  const timer = setInterval(() => {
     console.log(`[AudioProcessor] Timer fired for session: ${sessionId}`);
-    await sendTranscriptSegment(sessionId);
+    sendTranscriptSegment(sessionId).catch(err =>
+      console.error(`[AudioProcessor] Segment timer error (non-fatal):`, err.message)
+    );
   }, intervalMs);
 
   sessionTimers.set(sessionId, timer);
@@ -238,6 +240,11 @@ async function sendTranscriptSegment(sessionId) {
       return false;
     }
 
+    if (!TRANSCRIPT_WEBHOOK_URL) {
+      console.log(`[AudioProcessor] TRANSCRIPT_WEBHOOK_URL not set — skipping webhook for session: ${sessionId}`);
+      return false;
+    }
+
     // Send to webhook
     const payload = {
       transcript_segment: transcriptSegment,
@@ -287,7 +294,7 @@ async function sendTranscriptSegment(sessionId) {
 
   } catch (error) {
     console.error(`[AudioProcessor] Error sending transcript segment:`, error.message);
-    throw error;
+    return false; // Non-fatal — don't rethrow; setInterval callers have no .catch()
   }
 }
 
