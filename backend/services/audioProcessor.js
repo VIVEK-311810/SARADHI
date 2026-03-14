@@ -194,10 +194,11 @@ function startSegmentTimer(sessionId, intervalMinutes) {
  */
 async function sendTranscriptSegment(sessionId) {
   try {
-    console.log(`[AudioProcessor] Sending transcript segment for session: ${sessionId}`);
+    console.log(`[AudioProcessor] ▶ Timer fired — sending segment for session: ${sessionId}`);
 
     // Get database ID for most recent session
     let dbId = activeSessions.get(sessionId);
+    console.log(`[AudioProcessor]   activeSessions lookup '${sessionId}' → dbId=${dbId}`);
     if (!dbId) {
       const sessionQuery = `
         SELECT id FROM transcription_sessions
@@ -207,10 +208,11 @@ async function sendTranscriptSegment(sessionId) {
       `;
       const sessionResult = await pool.query(sessionQuery, [sessionId]);
       if (sessionResult.rows.length === 0) {
-        console.log(`[AudioProcessor] No session found for: ${sessionId}`);
+        console.log(`[AudioProcessor]   No transcription_sessions row found for: ${sessionId}`);
         return false;
       }
       dbId = sessionResult.rows[0].id;
+      console.log(`[AudioProcessor]   DB fallback resolved dbId=${dbId}`);
     }
 
     // Get all unsent transcripts for this session
@@ -219,13 +221,14 @@ async function sendTranscriptSegment(sessionId) {
       FROM transcripts
       WHERE session_db_id = $1
       AND sent_to_webhook = false
-      ORDER BY timestamp ASC
+      ORDER BY id ASC
     `;
 
     const result = await pool.query(query, [dbId]);
+    console.log(`[AudioProcessor]   Found ${result.rows.length} unsent transcript(s) for dbId=${dbId}`);
 
     if (result.rows.length === 0) {
-      console.log(`[AudioProcessor] No unsent transcripts for session: ${sessionId}`);
+      console.log(`[AudioProcessor]   No unsent transcripts for session: ${sessionId}`);
       return false;
     }
 
