@@ -102,12 +102,24 @@ function assignCardsToStudents(pairs, studentIds) {
   return assignments;
 }
 
+// ─── Helper: Resolve session by either numeric id or 6-char code ─────────────
+
+async function resolveSession(sessionIdOrCode) {
+  const numeric = parseInt(sessionIdOrCode);
+  if (!isNaN(numeric) && String(numeric) === String(sessionIdOrCode)) {
+    const r = await pool.query('SELECT id, session_id FROM sessions WHERE id = $1', [numeric]);
+    return r.rows[0] || null;
+  }
+  const r = await pool.query('SELECT id, session_id FROM sessions WHERE session_id = $1', [sessionIdOrCode]);
+  return r.rows[0] || null;
+}
+
 // ─── Helper: Verify teacher owns session ─────────────────────────────────────
 
-async function verifyTeacherOwnsSession(teacherId, sessionId) {
+async function verifyTeacherOwnsSession(teacherId, numericSessionId) {
   const result = await pool.query(
     'SELECT id FROM sessions WHERE id = $1 AND teacher_id = $2',
-    [sessionId, teacherId]
+    [numericSessionId, teacherId]
   );
   return result.rows.length > 0;
 }
@@ -137,12 +149,13 @@ router.post('/generate', authenticate, authorize('teacher'), async (req, res) =>
     const { sessionId, count = 10, topic = '' } = req.body;
     if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
 
-    const owns = await verifyTeacherOwnsSession(req.user.id, sessionId);
+    const session = await resolveSession(sessionId);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+
+    const owns = await verifyTeacherOwnsSession(req.user.id, session.id);
     if (!owns) return res.status(403).json({ error: 'Access denied: not your session' });
 
-    // Resolve the 6-char session code (used as Pinecone namespace) from the numeric DB id
-    const sessionRow = await pool.query('SELECT session_id FROM sessions WHERE id = $1', [sessionId]);
-    const sessionCode = sessionRow.rows[0]?.session_id || sessionId;
+    const sessionCode = session.session_id;
 
     const pairCount = Math.min(Math.max(parseInt(count) || 10, 3), 20);
     const pairs = await generateQAPairs(sessionCode, pairCount, topic);
@@ -284,12 +297,9 @@ router.post('/rounds/:roundId/distribute', authenticate, authorize('teacher'), a
     );
     if (pairsResult.rows.length < 2) return res.status(400).json({ error: 'Need at least 2 pairs to distribute' });
 
-    // Resolve the 6-char session code — session_participants uses session_id VARCHAR, not numeric id
-    const sessionCodeRow = await pool.query(
-      'SELECT session_id FROM sessions WHERE id = $1',
-      [round.session_id]
-    );
-    const sessionCode = sessionCodeRow.rows[0]?.session_id || round.session_id;
+    // Resolve 6-char session code — round.session_id may be numeric or 6-char depending on when it was created
+    const sessionMeta = await resolveSession(round.session_id);
+    const sessionCode = sessionMeta?.session_id || round.session_id;
 
     // Get online students from session_participants
     const studentsResult = await pool.query(
