@@ -298,7 +298,13 @@ const EnhancedStudentDashboard = () => {
             )}
           </div>
           <button
-            onClick={() => navigate('/student/leaderboard')}
+            onClick={() => {
+              const liveSession = joinedSessions.find(s => s.is_live);
+              navigate(liveSession
+                ? `/student/leaderboard/${liveSession.session_id}`
+                : '/student/leaderboard'
+              );
+            }}
             className="bg-white/20 hover:bg-white/30 px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 w-full sm:w-auto"
           >
             View Leaderboard

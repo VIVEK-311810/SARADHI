@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { utils, apiRequest } from '../../utils/api';
-import { isDemoMode, DEMO_LEADERBOARD, DEMO_GAMIFICATION } from '../../utils/demoData';
+import { isDemoMode, DEMO_LEADERBOARD, DEMO_SESSION_LEADERBOARD, DEMO_GAMIFICATION, DEMO_GAMIFICATION_XP } from '../../utils/demoData';
 import { StatCardsSkeleton, LeaderboardSkeleton } from '../shared/SkeletonLoader';
 
 // ─── Level Thresholds (mirrors backend) ──────────────────────────────────────
@@ -116,9 +116,9 @@ const Leaderboard = () => {
       setError(null);
 
       if (isDemoMode()) {
-        setLeaderboard(DEMO_LEADERBOARD);
-        setMyStats({ ...DEMO_GAMIFICATION, level: { level: 2, title: 'Active Learner', currentXP: 150, nextLevelXP: 300, xpToNextLevel: 150 } });
-        setMyXP({ totalXP: 150, level: { level: 2, title: 'Active Learner', currentXP: 150, nextLevelXP: 300 } });
+        setLeaderboard(viewType === 'session' && sessionId ? DEMO_SESSION_LEADERBOARD : DEMO_LEADERBOARD);
+        setMyStats(DEMO_GAMIFICATION);
+        setMyXP(DEMO_GAMIFICATION_XP);
         return;
       }
 

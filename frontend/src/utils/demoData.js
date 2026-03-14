@@ -215,11 +215,11 @@ export const DEMO_LEADERBOARD = [
 ];
 
 export const DEMO_SESSION_LEADERBOARD = [
-  { rank: 1, studentId: 1001, studentName: 'Priya Sundaram', sessionPoints: 67, correctAnswers: 5, totalAnswers: 6, currentStreak: 3, maxStreak: 3, avgAccuracy: 83, totalXP: 680, level: { level: 4, title: 'Dedicated' } },
-  { rank: 2, studentId: 9999, studentName: 'Demo Student', sessionPoints: 55, correctAnswers: 4, totalAnswers: 6, currentStreak: 2, maxStreak: 3, avgAccuracy: 67, totalXP: 420, level: { level: 3, title: 'Consistent' } },
-  { rank: 3, studentId: 1002, studentName: 'Arun Krishnan', sessionPoints: 48, correctAnswers: 4, totalAnswers: 6, currentStreak: 1, maxStreak: 2, avgAccuracy: 67, totalXP: 530, level: { level: 3, title: 'Consistent' } },
-  { rank: 4, studentId: 1003, studentName: 'Karthik Rajan', sessionPoints: 39, correctAnswers: 3, totalAnswers: 5, currentStreak: 0, maxStreak: 2, avgAccuracy: 60, totalXP: 360, level: { level: 3, title: 'Consistent' } },
-  { rank: 5, studentId: 1004, studentName: 'Divya Menon', sessionPoints: 30, correctAnswers: 2, totalAnswers: 5, currentStreak: 0, maxStreak: 1, avgAccuracy: 40, totalXP: 280, level: { level: 2, title: 'Active Learner' } },
+  { rank: 1, studentId: 1001, studentName: 'Priya Sundaram', points: 67, correctAnswers: 5, totalAnswers: 6, currentStreak: 3, maxStreak: 3, totalXP: 680, level: { level: 4, title: 'Dedicated' } },
+  { rank: 2, studentId: 9999, studentName: 'Demo Student', points: 55, correctAnswers: 4, totalAnswers: 6, currentStreak: 2, maxStreak: 3, totalXP: 420, level: { level: 3, title: 'Consistent' } },
+  { rank: 3, studentId: 1002, studentName: 'Arun Krishnan', points: 48, correctAnswers: 4, totalAnswers: 6, currentStreak: 1, maxStreak: 2, totalXP: 530, level: { level: 3, title: 'Consistent' } },
+  { rank: 4, studentId: 1003, studentName: 'Karthik Rajan', points: 39, correctAnswers: 3, totalAnswers: 5, currentStreak: 0, maxStreak: 2, totalXP: 360, level: { level: 3, title: 'Consistent' } },
+  { rank: 5, studentId: 1004, studentName: 'Divya Menon', points: 30, correctAnswers: 2, totalAnswers: 5, currentStreak: 0, maxStreak: 1, totalXP: 280, level: { level: 2, title: 'Active Learner' } },
 ];
 
 export const DEMO_KNOWLEDGE_CARDS = {
@@ -949,11 +949,11 @@ export const handleDemoRequest = (endpoint, options = {}) => {
 
   // Gamification — session leaderboard
   if (ep.includes('/GAMIFICATION/LEADERBOARD/SESSION/'))
-    return Promise.resolve({ success: true, leaderboard: DEMO_SESSION_LEADERBOARD });
+    return Promise.resolve({ success: true, data: DEMO_SESSION_LEADERBOARD });
 
   // Gamification — all-time leaderboard
   if (ep.includes('/GAMIFICATION/LEADERBOARD/ALL-TIME'))
-    return Promise.resolve({ success: true, leaderboard: DEMO_LEADERBOARD });
+    return Promise.resolve({ success: true, data: DEMO_LEADERBOARD });
 
   // Gamification — finalize session
   if (ep.includes('/GAMIFICATION/SESSION/') && ep.includes('/FINALIZE') && method === 'POST')
