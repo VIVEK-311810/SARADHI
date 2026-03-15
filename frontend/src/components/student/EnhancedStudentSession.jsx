@@ -88,6 +88,11 @@ const EnhancedStudentSession = () => {
       }
     }
 
+    // Track last visited session so sidebar AI Assistant can deep-link to it
+    if (sessionId && sessionId !== 'undefined' && sessionId !== 'null') {
+      try { localStorage.setItem('lastSessionId', sessionId); } catch {}
+    }
+
     const currentUser = safeParseUser();
     if (!currentUser || currentUser.role !== 'student') {
       navigate('/auth');

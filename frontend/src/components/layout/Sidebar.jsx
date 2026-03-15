@@ -71,13 +71,19 @@ export default function Sidebar({ role, mobileOpen = false, setMobileOpen }) {
   const location = useLocation();
   const navigate  = useNavigate();
 
-  // Resolve session-aware href for nav items that need a sessionId in the URL
+  // Resolve session-aware href for AI Assistant nav item
   const resolveHref = (item) => {
     if (item.href === '/student/ai-assistant') {
-      // If currently inside a session context, link directly to that session's AI Assistant
+      // 1. Currently inside a session — use that session's ID
       const sessionMatch = location.pathname.match(/\/student\/(?:session|ai-assistant)\/([^/]+)/);
       if (sessionMatch) return `/student/ai-assistant/${sessionMatch[1]}`;
-      return '/student/dashboard'; // fallback: send to dashboard to pick a session
+      // 2. Fall back to last visited session stored on mount of EnhancedStudentSession
+      try {
+        const last = localStorage.getItem('lastSessionId');
+        if (last) return `/student/ai-assistant/${last}`;
+      } catch {}
+      // 3. No session history — send to dashboard
+      return '/student/dashboard';
     }
     return item.href;
   };
