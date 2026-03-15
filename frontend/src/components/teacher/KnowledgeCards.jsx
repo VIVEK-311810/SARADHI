@@ -338,14 +338,6 @@ const KnowledgeCards = ({ sessionId, onlineCount = 0 }) => {
                             Reveal Answer
                           </button>
                         )}
-                        {pair.status === 'revealed' && (
-                          <button
-                            onClick={() => handleComplete(pair.id)}
-                            className="px-2 py-1 bg-primary-600 hover:bg-primary-700 text-white rounded text-xs font-medium"
-                          >
-                            Complete
-                          </button>
-                        )}
                       </div>
                     </div>
 
