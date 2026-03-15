@@ -323,8 +323,11 @@ router.post('/rounds/:roundId/distribute', authenticate, authorize('teacher'), a
     const sessionCode = sessionMeta.session_id;
 
     // Get online students from session_participants (uses numeric session FK)
+    // Exclude the teacher who owns this session to prevent them being assigned cards
     const studentsResult = await pool.query(
-      'SELECT student_id FROM session_participants WHERE session_id = $1 AND is_active = true',
+      `SELECT sp.student_id FROM session_participants sp
+       JOIN sessions s ON sp.session_id = s.id
+       WHERE sp.session_id = $1 AND sp.is_active = true AND sp.student_id != s.teacher_id`,
       [sessionNumericId]
     );
     if (studentsResult.rows.length < 2) {
