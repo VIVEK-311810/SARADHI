@@ -8,7 +8,6 @@ import {
   BarChart2,
   MessageSquare,
   Trophy,
-  Bot,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -28,11 +27,10 @@ const TEACHER_NAV = [
 ];
 
 const STUDENT_NAV = [
-  { label: 'Dashboard',    href: '/student/dashboard',       icon: LayoutDashboard },
-  { label: 'Join Session', href: '/student/join',             icon: Zap },
-  { label: 'Leaderboard',  href: '/student/leaderboard',     icon: Trophy },
-  { label: 'AI Assistant', href: '/student/ai-assistant',    icon: Bot,            matchPrefix: true },
-  { label: 'Community',    href: '/community',               icon: MessageSquare },
+  { label: 'Dashboard',    href: '/student/dashboard',   icon: LayoutDashboard },
+  { label: 'Join Session', href: '/student/join',         icon: Zap },
+  { label: 'Leaderboard',  href: '/student/leaderboard', icon: Trophy },
+  { label: 'Community',    href: '/community',            icon: MessageSquare },
 ];
 
 // ── Accessible Tooltip wrapper (Radix) ────────────────────────────────────────
@@ -70,23 +68,6 @@ export default function Sidebar({ role, mobileOpen = false, setMobileOpen }) {
 
   const location = useLocation();
   const navigate  = useNavigate();
-
-  // Resolve session-aware href for AI Assistant nav item
-  const resolveHref = (item) => {
-    if (item.href === '/student/ai-assistant') {
-      // 1. Currently inside a session — use that session's ID
-      const sessionMatch = location.pathname.match(/\/student\/(?:session|ai-assistant)\/([^/]+)/);
-      if (sessionMatch) return `/student/ai-assistant/${sessionMatch[1]}`;
-      // 2. Fall back to last visited session stored on mount of EnhancedStudentSession
-      try {
-        const last = localStorage.getItem('lastSessionId');
-        if (last) return `/student/ai-assistant/${last}`;
-      } catch {}
-      // 3. No session history — send to dashboard
-      return '/student/dashboard';
-    }
-    return item.href;
-  };
 
   const navItems  = role === 'teacher' ? TEACHER_NAV : STUDENT_NAV;
 
@@ -190,11 +171,10 @@ export default function Sidebar({ role, mobileOpen = false, setMobileOpen }) {
               const active = isActive(item);
               const Icon   = item.icon;
 
-              const resolvedHref = resolveHref(item);
               const linkEl = (
                 <NavLink
                   key={item.href}
-                  to={resolvedHref}
+                  to={item.href}
                   className={cn(
                     'group relative flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-150',
                     'px-3 py-2.5',
