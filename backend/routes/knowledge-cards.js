@@ -193,12 +193,17 @@ router.post('/generate', authenticate, authorize('teacher'), async (req, res) =>
 router.get('/session/:sessionId', authenticate, authorize('teacher'), async (req, res) => {
   try {
     const { sessionId } = req.params;
-    const owns = await verifyTeacherOwnsSession(req.user.id, sessionId);
+    const sessionMeta = await resolveSession(sessionId);
+    if (!sessionMeta) return res.status(404).json({ error: 'Session not found' });
+
+    const owns = await verifyTeacherOwnsSession(req.user.id, sessionMeta.id);
     if (!owns) return res.status(403).json({ error: 'Access denied' });
 
+    // knowledge_card_rounds stores the 6-char session code
+    const sessionCode = sessionMeta.session_id;
     const roundsResult = await pool.query(
       'SELECT * FROM knowledge_card_rounds WHERE session_id = $1 ORDER BY created_at DESC',
-      [sessionId]
+      [sessionCode]
     );
     const rounds = [];
     for (const round of roundsResult.rows) {
@@ -358,8 +363,8 @@ router.post('/rounds/:roundId/distribute', authenticate, authorize('teacher'), a
     }
 
     // Broadcast personalized cards to each student via WebSocket
-    const sessionResult2 = await pool.query('SELECT session_id FROM sessions WHERE id = $1', [round.session_id]);
-    const sessionIdString = sessionResult2.rows[0]?.session_id;
+    // sessionCode is already the 6-char code resolved above — no extra query needed
+    const sessionIdString = sessionCode;
     const normalizedSid = sessionIdString ? sessionIdString.toUpperCase() : null;
     const wsConnections = global.sessionConnections && normalizedSid
       ? global.sessionConnections.get(normalizedSid)
@@ -425,9 +430,8 @@ router.patch('/pairs/:pairId/activate', authenticate, authorize('teacher'), asyn
       [pair.round_id]
     );
 
-    // Broadcast to session
-    const sessionResult = await pool.query('SELECT session_id FROM sessions WHERE id = $1', [pair.session_id]);
-    const sessionIdString = sessionResult.rows[0]?.session_id;
+    // Broadcast to session — pair.session_id is the 6-char code stored in knowledge_card_rounds
+    const sessionIdString = pair.session_id;
     if (global.broadcastToSession && sessionIdString) {
       global.broadcastToSession(sessionIdString.toUpperCase(), {
         type: 'card-activate-question',
@@ -461,8 +465,7 @@ router.patch('/pairs/:pairId/reveal', authenticate, authorize('teacher'), async 
       [pairId]
     );
 
-    const sessionResult = await pool.query('SELECT session_id FROM sessions WHERE id = $1', [pair.session_id]);
-    const sessionIdString = sessionResult.rows[0]?.session_id;
+    const sessionIdString = pair.session_id;
     if (global.broadcastToSession && sessionIdString) {
       global.broadcastToSession(sessionIdString.toUpperCase(), {
         type: 'card-reveal-answer',
@@ -509,8 +512,7 @@ router.patch('/pairs/:pairId/complete', authenticate, authorize('teacher'), asyn
     }
     await Promise.all(xpPromises);
 
-    const sessionResult = await pool.query('SELECT session_id FROM sessions WHERE id = $1', [pair.session_id]);
-    const sessionIdString = sessionResult.rows[0]?.session_id;
+    const sessionIdString = pair.session_id;
     if (global.broadcastToSession && sessionIdString) {
       global.broadcastToSession(sessionIdString.toUpperCase(), {
         type: 'cards-round-complete',
@@ -563,9 +565,8 @@ router.post('/vote', authenticate, authorize('student'), async (req, res) => {
 
     const votes = await getPairVotes(parseInt(pairId));
 
-    // Broadcast updated vote count
-    const sessionResult = await pool.query('SELECT session_id FROM sessions WHERE id = $1', [pair.session_id]);
-    const sessionIdString = sessionResult.rows[0]?.session_id;
+    // Broadcast updated vote count — pair.session_id is the 6-char code from knowledge_card_rounds
+    const sessionIdString = pair.session_id;
     if (global.broadcastToSession && sessionIdString) {
       global.broadcastToSession(sessionIdString.toUpperCase(), {
         type: 'card-vote-result',
@@ -601,8 +602,8 @@ router.post('/rounds/:roundId/end', authenticate, authorize('teacher'), async (r
       [roundId]
     );
 
-    const sessionResult = await pool.query('SELECT session_id FROM sessions WHERE id = $1', [round.session_id]);
-    const sessionIdString = sessionResult.rows[0]?.session_id;
+    // round.session_id is the 6-char code stored in knowledge_card_rounds
+    const sessionIdString = round.session_id;
     if (global.broadcastToSession && sessionIdString) {
       global.broadcastToSession(sessionIdString.toUpperCase(), {
         type: 'cards-activity-end',
