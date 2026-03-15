@@ -103,7 +103,7 @@ const TicketDetail = () => {
       <div className="max-w-3xl mx-auto p-4">
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 text-center">
           <p className="text-red-700 dark:text-red-400 mb-4">{error}</p>
-          <button onClick={() => navigate(-1)} className="text-blue-600 dark:text-blue-400 underline text-sm">Go back</button>
+          <button onClick={() => navigate(-1)} className="text-primary-600 dark:text-primary-400 underline text-sm">Go back</button>
         </div>
       </div>
     );
@@ -114,7 +114,7 @@ const TicketDetail = () => {
       {/* Back button */}
       <button
         onClick={() => navigate(-1)}
-        className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+        className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -124,7 +124,7 @@ const TicketDetail = () => {
 
       {/* Ticket */}
       {ticket && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+        <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-4 sm:p-6">
           <div className="flex flex-wrap items-center gap-2 mb-3">
             {ticket.status === 'resolved' ? (
               <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Resolved</span>
@@ -132,15 +132,15 @@ const TicketDetail = () => {
               <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">Open</span>
             )}
             {ticket.subject && (
-              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">{ticket.subject}</span>
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">{ticket.subject}</span>
             )}
           </div>
 
-          <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-3">{ticket.title}</h1>
-          <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300 whitespace-pre-wrap mb-4">{ticket.content}</p>
+          <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-3">{ticket.title}</h1>
+          <p className="text-sm sm:text-base text-slate-700 dark:text-slate-300 whitespace-pre-wrap mb-4">{ticket.content}</p>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-100 dark:border-gray-700">
-            <p className="text-xs text-gray-400 dark:text-gray-500">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+            <p className="text-xs text-slate-400 dark:text-slate-500">
               Asked by <span className="font-medium">{ticket.author_name || 'Unknown'}</span> · {timeAgo(ticket.created_at)}
             </p>
             {canModerate && ticket.status === 'open' && (
@@ -158,12 +158,12 @@ const TicketDetail = () => {
 
       {/* Replies */}
       <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide px-1">
+        <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide px-1">
           {replies.length} {replies.length === 1 ? 'Reply' : 'Replies'}
         </h2>
 
         {replies.length === 0 && (
-          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 text-center text-gray-400 dark:text-gray-500 text-sm">
+          <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-sm rounded-xl border border-slate-200/60 dark:border-slate-700/60 p-6 text-center text-slate-400 dark:text-slate-500 text-sm">
             No replies yet. Be the first to help!
           </div>
         )}
@@ -171,10 +171,10 @@ const TicketDetail = () => {
         {replies.map(reply => (
           <div
             key={reply.id}
-            className={`bg-white dark:bg-gray-800 rounded-lg border p-4 sm:p-5 ${
+            className={`rounded-xl border p-4 sm:p-5 backdrop-blur-sm ${
               reply.is_solution
-                ? 'border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-900/10'
-                : 'border-gray-200 dark:border-gray-700'
+                ? 'border-green-400/60 dark:border-green-600/60 bg-green-50/80 dark:bg-green-900/10'
+                : 'bg-white/75 dark:bg-slate-800/75 border-slate-200/60 dark:border-slate-700/60'
             }`}
           >
             {reply.is_solution && (
@@ -185,9 +185,9 @@ const TicketDetail = () => {
                 Accepted Solution
               </div>
             )}
-            <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{reply.content}</p>
-            <div className="flex flex-wrap items-center justify-between gap-2 mt-3 pt-2 border-t border-gray-100 dark:border-gray-700/50">
-              <p className="text-xs text-gray-400 dark:text-gray-500">
+            <p className="text-sm sm:text-base text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{reply.content}</p>
+            <div className="flex flex-wrap items-center justify-between gap-2 mt-3 pt-2 border-t border-slate-100 dark:border-slate-700/50">
+              <p className="text-xs text-slate-400 dark:text-slate-500">
                 {reply.author_name || 'Unknown'} · {timeAgo(reply.created_at)}
               </p>
               {canModerate && !reply.is_solution && ticket && ticket.status !== 'resolved' && (
@@ -206,21 +206,21 @@ const TicketDetail = () => {
 
       {/* Reply form */}
       {ticket && ticket.status !== 'resolved' && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Your Answer</h3>
+        <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-4 sm:p-5">
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Your Answer</h3>
           <form onSubmit={submitReply}>
             <textarea
               value={replyContent}
               onChange={(e) => setReplyContent(e.target.value)}
               placeholder="Write a helpful reply..."
               rows={4}
-              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none mb-3"
+              className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-white bg-white dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none mb-3"
             />
             {error && <p className="text-xs text-red-600 dark:text-red-400 mb-2">{error}</p>}
             <button
               type="submit"
               disabled={submitting || !replyContent.trim()}
-              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium py-2.5 px-6 rounded-lg text-sm disabled:opacity-60"
+              className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-medium py-2.5 px-6 rounded-lg text-sm disabled:opacity-60"
             >
               {submitting ? 'Posting...' : 'Post Reply'}
             </button>

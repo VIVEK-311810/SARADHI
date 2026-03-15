@@ -170,23 +170,23 @@ const ResourceUpload = () => {
       <div className="mb-6">
         <button
           onClick={() => navigate(-1)}
-          className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-2"
+          className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-blue-300 flex items-center gap-2"
         >
           ← Back
         </button>
         <h1 className="text-3xl font-bold mt-2 dark:text-white">Upload Resources</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">Session: {sessionId}</p>
+        <p className="text-slate-600 dark:text-slate-400 mt-1">Session: {sessionId}</p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Upload Form */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h2 className="text-xl font-bold mb-4 dark:text-white">Upload New Resource</h2>
+        <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-6">
+          <h2 className="text-xl font-bold mb-4 text-slate-900 dark:text-white">Upload New Resource</h2>
 
           {/* Drag & Drop Zone */}
           <div
             className={`border-2 border-dashed rounded-lg p-8 text-center mb-4 transition-colors ${
-              dragActive ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-600'
+              dragActive ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-slate-300 dark:border-slate-600'
             }`}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
@@ -196,7 +196,7 @@ const ResourceUpload = () => {
             {file ? (
               <div>
                 <p className="text-lg font-semibold dark:text-white">{file.name}</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{formatFileSize(file.size)}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{formatFileSize(file.size)}</p>
                 <button
                   onClick={() => setFile(null)}
                   className="mt-2 text-red-600 hover:text-red-700 text-sm"
@@ -206,13 +206,13 @@ const ResourceUpload = () => {
               </div>
             ) : (
               <div>
-                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="mx-auto h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
                   Drag and drop your file here, or
                 </p>
-                <label className="mt-2 cursor-pointer text-blue-600 hover:text-blue-700">
+                <label className="mt-2 cursor-pointer text-primary-600 hover:text-primary-700">
                   browse files
                   <input
                     type="file"
@@ -221,7 +221,7 @@ const ResourceUpload = () => {
                     accept=".pdf,.doc,.docx,.ppt,.pptx"
                   />
                 </label>
-                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                   Supported: PDF, Word, PowerPoint (max 50MB)
                 </p>
               </div>
@@ -230,21 +230,21 @@ const ResourceUpload = () => {
 
           {/* Title Input */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
               Title *
             </label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-white"
               placeholder="e.g., Week 1 Lecture Notes"
             />
           </div>
 
           {/* Description Input */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
               Description {file && (file.name.toLowerCase().endsWith('.ppt') || file.name.toLowerCase().endsWith('.pptx')) && (
                 <span className="text-red-600">*</span>
               )}
@@ -252,10 +252,10 @@ const ResourceUpload = () => {
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white ${
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-white ${
                 file && (file.name.toLowerCase().endsWith('.ppt') || file.name.toLowerCase().endsWith('.pptx'))
                   ? 'border-orange-300 dark:border-orange-600'
-                  : 'border-gray-300 dark:border-gray-600'
+                  : 'border-slate-300 dark:border-slate-600'
               }`}
               rows="4"
               placeholder={
@@ -280,7 +280,7 @@ const ResourceUpload = () => {
                 onChange={(e) => setIsDownloadable(e.target.checked)}
                 className="mr-2"
               />
-              <span className="text-sm text-gray-700 dark:text-gray-300">Allow students to download this file</span>
+              <span className="text-sm text-slate-700 dark:text-slate-300">Allow students to download this file</span>
             </label>
           </div>
 
@@ -288,12 +288,12 @@ const ResourceUpload = () => {
           {isUploading && (
             <div className="mb-4">
               <div className="flex justify-between mb-1">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Uploading...</span>
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{uploadProgress}%</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Uploading...</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{uploadProgress}%</span>
               </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+              <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
                 <div
-                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                  className="bg-gradient-to-r from-primary-500 to-accent-500 h-2 rounded-full transition-all duration-300"
                   style={{ width: `${uploadProgress}%` }}
                 ></div>
               </div>
@@ -304,33 +304,33 @@ const ResourceUpload = () => {
           <button
             onClick={handleUpload}
             disabled={isUploading || !file || !title}
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="w-full bg-primary-600 text-white py-2.5 px-4 rounded-xl hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium shadow-sm"
           >
             {isUploading ? 'Uploading...' : 'Upload Resource'}
           </button>
         </div>
 
         {/* Resources List */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-6">
           <h2 className="text-xl font-bold mb-4 dark:text-white">Uploaded Resources ({resources.length})</h2>
 
           {loadingResources ? (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">Loading resources...</div>
+            <div className="text-center py-8 text-slate-500 dark:text-slate-400">Loading resources...</div>
           ) : resources.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">No resources uploaded yet</div>
+            <div className="text-center py-8 text-slate-500 dark:text-slate-400">No resources uploaded yet</div>
           ) : (
             <div className="space-y-3 max-h-[600px] overflow-y-auto">
               {resources.map((resource) => (
-                <div key={resource.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div key={resource.id} className="bg-white/50 dark:bg-slate-700/50 border border-slate-200/60 dark:border-slate-600/60 rounded-xl p-4 hover:shadow-card hover:border-primary-200/60 dark:hover:border-primary-700/40 transition-all duration-200">
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-3 flex-1">
                       <span className="text-2xl">{getResourceTypeIcon(resource.resource_type)}</span>
                       <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900 dark:text-white">{resource.title}</h3>
+                        <h3 className="font-semibold text-slate-900 dark:text-white">{resource.title}</h3>
                         {resource.description && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{resource.description}</p>
+                          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">{resource.description}</p>
                         )}
-                        <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center gap-4 mt-2 text-xs text-slate-500 dark:text-slate-400">
                           <span>{formatFileSize(resource.file_size)}</span>
                           <span>Views: {resource.view_count}</span>
                           <span>Downloads: {resource.download_count}</span>
@@ -340,7 +340,7 @@ const ResourceUpload = () => {
                             resource.vectorization_status === 'completed' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' :
                             resource.vectorization_status === 'processing' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' :
                             resource.vectorization_status === 'failed' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300' :
-                            'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300'
+                            'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-300'
                           }`}>
                             {resource.vectorization_status === 'completed' ? '✓ AI Ready' :
                              resource.vectorization_status === 'processing' ? '⏳ Processing...' :

@@ -37,7 +37,7 @@ const TicketCard = ({ ticket, onUpvote }) => {
   return (
     <div
       onClick={() => navigate(`/community/tickets/${ticket.id}`)}
-      className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 sm:p-5 cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md transition-all duration-150 active:scale-[0.99]"
+      className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-sm border border-slate-200/60 dark:border-slate-700/60 rounded-xl p-4 sm:p-5 cursor-pointer hover:border-primary-300/60 dark:hover:border-primary-600/40 hover:shadow-card transition-all duration-200 active:scale-[0.99]"
     >
       <div className="flex items-start gap-3">
         {/* Upvote column */}
@@ -46,8 +46,8 @@ const TicketCard = ({ ticket, onUpvote }) => {
             onClick={handleUpvote}
             className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg border transition-colors ${
               ticket.has_upvoted
-                ? 'bg-orange-50 border-orange-300 text-orange-600 dark:bg-orange-900/20 dark:border-orange-600 dark:text-orange-400'
-                : 'border-gray-200 text-gray-500 hover:border-orange-300 hover:text-orange-500 dark:border-gray-600 dark:text-gray-400 dark:hover:border-orange-600 dark:hover:text-orange-400'
+                ? 'bg-accent-50 border-accent-300 text-accent-600 dark:bg-accent-900/20 dark:border-accent-600 dark:text-accent-400'
+                : 'border-slate-200 text-slate-500 hover:border-accent-300 hover:text-accent-500 dark:border-slate-600 dark:text-slate-400 dark:hover:border-accent-600 dark:hover:text-accent-400'
             }`}
             aria-label="Upvote"
           >
@@ -63,18 +63,18 @@ const TicketCard = ({ ticket, onUpvote }) => {
           <div className="flex flex-wrap items-center gap-2 mb-1.5">
             {statusBadge(ticket.status)}
             {ticket.subject && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
                 {ticket.subject}
               </span>
             )}
           </div>
-          <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white line-clamp-2 mb-1">
+          <h3 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white line-clamp-2 mb-1">
             {ticket.title}
           </h3>
-          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 line-clamp-2 mb-2">
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-2">
             {ticket.content}
           </p>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400 dark:text-gray-500">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400 dark:text-slate-500">
             <span>{ticket.author_name || 'Unknown'}</span>
             <span>·</span>
             <span>{timeAgo(ticket.created_at)}</span>

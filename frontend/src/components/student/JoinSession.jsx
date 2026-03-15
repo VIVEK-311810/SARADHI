@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { apiRequest, safeParseUser } from '../../utils/api';
 import { Button } from '../ui/button';
-import { Card, CardContent } from '../ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Input } from '../ui/input';
 
 const JoinSession = () => {
@@ -65,55 +65,63 @@ const JoinSession = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 sm:px-6">
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white">Join a Session</h1>
-        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mt-2">Enter the Session Code provided by your teacher</p>
+    <div className="max-w-lg mx-auto">
+      <div className="mb-6 sm:mb-8 text-center">
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-accent-100 dark:bg-accent-900/30 mb-4">
+          <svg className="w-7 h-7 text-accent-600 dark:text-accent-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-bold font-display text-slate-900 dark:text-white">Join a Session</h1>
+        <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-1">Enter the Session Code provided by your teacher</p>
       </div>
 
-      <Card>
-        <CardContent className="p-4 sm:p-6">
+      <Card variant="glass">
+        <CardContent className="p-5 sm:p-7">
           <form onSubmit={handleJoinSession} className="space-y-4 sm:space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Session Code *</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 text-center">
+                Session Code
+              </label>
               <Input
                 type="text"
                 value={sessionId}
                 onChange={(e) => setSessionId(e.target.value.toUpperCase())}
-                className="text-center text-xl sm:text-2xl font-mono tracking-wider h-14"
+                className="text-center text-2xl sm:text-3xl font-mono tracking-[0.3em] h-16 border-2 border-slate-300 dark:border-slate-600 focus:border-primary-400"
                 placeholder="ABC123"
                 maxLength="6"
                 required
                 autoComplete="off"
                 autoCapitalize="characters"
               />
-              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1.5 text-center">
-                Session codes are 6 characters (letters and numbers)
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 text-center">
+                6 characters — letters and numbers
               </p>
             </div>
 
             {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3 sm:p-4 flex items-start gap-2">
-                <svg className="w-4 h-4 text-red-500 dark:text-red-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="bg-error-50 dark:bg-error-900/20 border border-error-200 dark:border-error-800 rounded-xl p-3 sm:p-4 flex items-start gap-2">
+                <svg className="w-4 h-4 text-error-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <p className="text-red-700 dark:text-red-300 text-sm">{error}</p>
+                <p className="text-error-700 dark:text-error-300 text-sm">{error}</p>
               </div>
             )}
 
-            <Button
-              type="submit"
-              disabled={loading || !sessionId.trim()}
-              className="w-full h-12 text-base"
-            >
-              {loading ? 'Joining...' : 'Join Session'}
+            <Button type="submit" disabled={loading || !sessionId.trim()} className="w-full h-12 text-base" variant="accent">
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  Joining...
+                </span>
+              ) : 'Join Session'}
             </Button>
           </form>
 
-          <div className="mt-4 sm:mt-5 text-center">
+          <div className="mt-5 text-center">
             <button
               onClick={() => navigate('/student/dashboard')}
-              className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm sm:text-base py-2 font-medium"
+              className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 text-sm font-medium py-2 cursor-pointer transition-colors"
             >
               ← Back to dashboard
             </button>

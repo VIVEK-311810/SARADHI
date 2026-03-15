@@ -19,8 +19,8 @@ const ERROR_CONFIG = {
   },
   notfound: {
     Icon: FileQuestion,
-    iconBg: 'bg-blue-100 dark:bg-blue-900/30',
-    iconColor: 'text-blue-600 dark:text-blue-400',
+    iconBg: 'bg-primary-100 dark:bg-primary-900/30',
+    iconColor: 'text-primary-600 dark:text-primary-400',
     defaultTitle: 'Not Found',
     defaultMessage: "The resource you're looking for doesn't exist or has been removed.",
   },
@@ -57,10 +57,10 @@ const ErrorScreen = ({
       <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5 ${iconBg}`}>
         <Icon className={`w-8 h-8 ${iconColor}`} />
       </div>
-      <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">
+      <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">
         {title ?? defaultTitle}
       </h2>
-      <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400 mb-8">
+      <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mb-8">
         {message ?? defaultMessage}
       </p>
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -88,7 +88,7 @@ const ErrorScreen = ({
 
   if (fullPage) {
     return (
-      <div className={`min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 ${className}`}>
+      <div className={`min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 ${className}`}>
         {content}
       </div>
     );

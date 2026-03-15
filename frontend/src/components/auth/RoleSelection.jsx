@@ -11,6 +11,18 @@ const GoogleIcon = () => (
   </svg>
 );
 
+const CheckIcon = () => (
+  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+  </svg>
+);
+
+const ArrowIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+  </svg>
+);
+
 const RoleSelection = () => {
   const navigate = useNavigate();
   const [selectedRole, setSelectedRole] = useState('');
@@ -32,9 +44,7 @@ const RoleSelection = () => {
 
   const handleRoleSelect = (role) => {
     setSelectedRole(role);
-
     const API_BASE_URL = process.env.REACT_APP_AUTH_URL;
-
     if (role === 'teacher') {
       window.location.href = `${API_BASE_URL}/auth/google/edu`;
     } else if (role === 'student') {
@@ -43,335 +53,161 @@ const RoleSelection = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-saradhi-50 via-white to-coral-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-900">
-      {/* Mobile View */}
-      <div className="lg:hidden p-4">
-        <div className="max-w-md mx-auto bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-6">
-          <div className="text-center mb-6">
-            <img src="/saradhi_ai_logo_final.png" alt="SARADHI-AI Logo" className="h-16 w-auto mx-auto mb-4" />
-            <h1 className="text-2xl font-bold font-display text-slate-900 dark:text-white mb-2">SASTRA Educational Platform</h1>
-            <p className="text-sm text-slate-600 dark:text-slate-300">Interactive Learning & Real-time Polling</p>
+    <div className="min-h-screen relative overflow-hidden bg-slate-950 flex items-center justify-center p-4">
+      {/* Gradient mesh background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-primary-600/30 rounded-full blur-[120px]" />
+        <div className="absolute -bottom-40 -right-40 w-[600px] h-[600px] bg-accent-500/20 rounded-full blur-[120px]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-primary-800/20 rounded-full blur-[80px]" />
+        {/* Subtle grid */}
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: 'linear-gradient(rgba(255,255,255,0.8) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.8) 1px, transparent 1px)',
+            backgroundSize: '64px 64px',
+          }}
+        />
+      </div>
+
+      {/* Main glass card */}
+      <div className="relative z-10 w-full max-w-xl">
+        {/* Logo + heading */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 shadow-glow-primary mb-5 animate-float">
+            <img src="/saradhi_ai_logo_final.png" alt="SARADHI-AI" className="w-12 h-12 object-contain" />
           </div>
+          <h1 className="text-3xl sm:text-4xl font-display font-bold text-white mb-2 tracking-tight">
+            Welcome to SARADHI-AI
+          </h1>
+          <p className="text-slate-400 text-base">
+            SASTRA's AI-powered interactive classroom platform
+          </p>
+        </div>
 
-          <div className="space-y-4">
-            {/* Teacher Card - Mobile */}
-            <div
-              onClick={() => handleRoleSelect('teacher')}
-              className="border-2 border-slate-300 dark:border-slate-600 rounded-xl p-4 hover:border-saradhi-500 hover:bg-saradhi-50 active:bg-saradhi-100 dark:hover:border-saradhi-400 dark:hover:bg-saradhi-900/20 transition-all cursor-pointer"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-saradhi-100 dark:bg-saradhi-900/30 rounded-full flex items-center justify-center flex-shrink-0">
-                  <svg className="w-7 h-7 text-saradhi-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">Teacher</h3>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">@*.sastra.edu email</p>
-                  <button className="w-full bg-saradhi-700 hover:bg-saradhi-600 text-white font-medium py-2 px-4 rounded-lg text-sm">
-                    Sign in as Teacher
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Student Card - Mobile */}
-            <div
-              onClick={() => handleRoleSelect('student')}
-              className="border-2 border-slate-300 dark:border-slate-600 rounded-xl p-4 hover:border-coral-500 hover:bg-coral-50 active:bg-coral-100 dark:hover:border-coral-400 dark:hover:bg-coral-900/20 transition-all cursor-pointer"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-coral-100 dark:bg-coral-900/30 rounded-full flex items-center justify-center flex-shrink-0">
-                  <svg className="w-7 h-7 text-coral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">Student</h3>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">@sastra.ac.in email</p>
-                  <button className="w-full bg-coral-500 hover:bg-coral-400 text-white font-medium py-2 px-4 rounded-lg text-sm">
-                    Sign in as Student
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* SSO Button - Mobile */}
-          <div className="mt-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="flex-1 h-px bg-slate-200 dark:bg-slate-600"></div>
-              <span className="text-xs text-slate-400 dark:text-slate-500">or sign in directly</span>
-              <div className="flex-1 h-px bg-slate-200 dark:bg-slate-600"></div>
-            </div>
+        {/* Glass container */}
+        <div className="bg-white/[0.07] backdrop-blur-xl border border-white/10 rounded-3xl p-6 sm:p-8 shadow-glass-lg">
+          {/* Role cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            {/* Teacher */}
             <button
-              onClick={handleGoogleLogin}
-              className="w-full flex items-center justify-center gap-2 bg-white dark:bg-slate-700 border-2 border-slate-300 dark:border-slate-600 hover:border-saradhi-400 hover:bg-saradhi-50 active:bg-saradhi-100 dark:hover:border-saradhi-400 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-medium py-3 px-4 rounded-xl transition-all text-sm"
+              onClick={() => handleRoleSelect('teacher')}
+              disabled={!!selectedRole}
+              className="group relative text-left rounded-2xl border border-white/10 bg-white/5 hover:bg-primary-600/20 hover:border-primary-400/50 p-5 transition-all duration-200 cursor-pointer disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
             >
-              <GoogleIcon />
-              Sign in with Google
-              <span className="text-slate-400 dark:text-slate-500 font-normal text-xs">(auto-detect role)</span>
+              <div className="w-12 h-12 rounded-xl bg-primary-500/20 border border-primary-400/30 flex items-center justify-center mb-4 group-hover:bg-primary-500/30 transition-colors">
+                <svg className="w-6 h-6 text-primary-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+              </div>
+              <h3 className="font-semibold text-white text-base mb-1">Teacher</h3>
+              <p className="text-xs text-slate-400 mb-3">@*.sastra.edu</p>
+              <ul className="space-y-1.5">
+                {['Manage sessions & polls', 'View analytics', 'Upload resources'].map(f => (
+                  <li key={f} className="flex items-center gap-2 text-xs text-slate-300">
+                    <CheckIcon />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-4 flex items-center gap-1.5 text-primary-300 text-sm font-medium">
+                Sign in <ArrowIcon />
+              </div>
+              {selectedRole === 'teacher' && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-primary-900/60 backdrop-blur-sm">
+                  <div className="w-5 h-5 border-2 border-primary-300 border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </button>
+
+            {/* Student */}
+            <button
+              onClick={() => handleRoleSelect('student')}
+              disabled={!!selectedRole}
+              className="group relative text-left rounded-2xl border border-white/10 bg-white/5 hover:bg-accent-500/15 hover:border-accent-400/50 p-5 transition-all duration-200 cursor-pointer disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
+            >
+              <div className="w-12 h-12 rounded-xl bg-accent-500/20 border border-accent-400/30 flex items-center justify-center mb-4 group-hover:bg-accent-500/30 transition-colors">
+                <svg className="w-6 h-6 text-accent-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+                </svg>
+              </div>
+              <h3 className="font-semibold text-white text-base mb-1">Student</h3>
+              <p className="text-xs text-slate-400 mb-3">@sastra.ac.in</p>
+              <ul className="space-y-1.5">
+                {['Join live sessions', 'Answer polls & quizzes', 'AI learning assistant'].map(f => (
+                  <li key={f} className="flex items-center gap-2 text-xs text-slate-300">
+                    <CheckIcon />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-4 flex items-center gap-1.5 text-accent-300 text-sm font-medium">
+                Sign in <ArrowIcon />
+              </div>
+              {selectedRole === 'student' && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-slate-900/60 backdrop-blur-sm">
+                  <div className="w-5 h-5 border-2 border-accent-300 border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
             </button>
           </div>
 
-          {/* Demo Buttons - Mobile */}
-          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
-            <p className="text-xs text-slate-400 dark:text-slate-500 text-center mb-2">Try a demo — no login required</p>
-            <div className="grid grid-cols-2 gap-2">
+          {/* Divider */}
+          <div className="flex items-center gap-3 mb-5">
+            <div className="flex-1 h-px bg-white/10" />
+            <span className="text-xs text-slate-500">or sign in directly</span>
+            <div className="flex-1 h-px bg-white/10" />
+          </div>
+
+          {/* Google SSO */}
+          <button
+            onClick={handleGoogleLogin}
+            className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-800 font-semibold py-3 px-6 rounded-xl transition-all duration-150 text-sm shadow-sm cursor-pointer mb-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+          >
+            <GoogleIcon />
+            Sign in with Google
+            <span className="text-slate-400 font-normal text-xs">(role auto-detected)</span>
+          </button>
+
+          {/* Security notice */}
+          <div className="flex items-start gap-3 bg-primary-500/10 border border-primary-500/20 rounded-xl p-3.5 mb-5">
+            <svg className="w-4 h-4 text-primary-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            <p className="text-xs text-slate-400">
+              Protected by Google OAuth2 — we never store your password. Official SASTRA credentials required.
+            </p>
+          </div>
+
+          {/* Demo buttons */}
+          <div className="border-t border-white/10 pt-5">
+            <p className="text-xs text-slate-500 text-center mb-3">Try a demo — no login required</p>
+            <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={handleDemoLogin}
-                className="flex flex-col items-center gap-1 border-2 border-dashed border-saradhi-300 dark:border-saradhi-600 text-saradhi-700 dark:text-saradhi-400 hover:bg-saradhi-50 active:bg-saradhi-100 dark:hover:bg-saradhi-900/20 font-medium py-2.5 px-3 rounded-xl text-xs transition-colors"
+                className="flex items-center gap-2.5 border border-dashed border-primary-500/40 text-primary-300 hover:bg-primary-500/10 font-medium py-2.5 px-3 rounded-xl text-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
-                Student Demo
+                <div>
+                  <div className="font-semibold">Student Demo</div>
+                  <div className="text-primary-500 font-normal">Polls, AI assistant</div>
+                </div>
               </button>
               <button
                 onClick={handleTeacherDemoLogin}
-                className="flex flex-col items-center gap-1 border-2 border-dashed border-coral-300 dark:border-coral-600 text-coral-700 dark:text-coral-400 hover:bg-coral-50 active:bg-coral-100 dark:hover:bg-coral-900/20 font-medium py-2.5 px-3 rounded-xl text-xs transition-colors"
+                className="flex items-center gap-2.5 border border-dashed border-accent-500/40 text-accent-300 hover:bg-accent-500/10 font-medium py-2.5 px-3 rounded-xl text-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                 </svg>
-                Teacher Demo
+                <div>
+                  <div className="font-semibold">Teacher Demo</div>
+                  <div className="text-accent-500 font-normal">Sessions, analytics</div>
+                </div>
               </button>
             </div>
-          </div>
-
-          <div className="mt-4 text-center text-xs text-slate-500 dark:text-slate-400">
-            <p>Secured by Google OAuth2 • SASTRA Credentials Required</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Desktop View - Split Screen */}
-      <div className="hidden lg:flex min-h-screen">
-        {/* Left Hero Section */}
-        <div className="w-1/2 bg-gradient-to-br from-saradhi-700 to-saradhi-900 p-12 flex flex-col justify-center text-white relative overflow-hidden">
-          {/* Background Pattern */}
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-20 left-20 w-72 h-72 bg-white rounded-full blur-3xl"></div>
-            <div className="absolute bottom-20 right-20 w-96 h-96 bg-saradhi-400 rounded-full blur-3xl"></div>
-          </div>
-
-          <div className="relative z-10 max-w-xl">
-
-            <h1 className="text-5xl font-bold font-display mb-6">Welcome to<br />SASTRA Educational Platform</h1>
-            <p className="text-xl text-saradhi-100 mb-12">Transform your classroom with interactive learning, real-time polling, and AI-powered assistance.</p>
-
-            <div className="space-y-6">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg mb-1">Real-time Engagement</h3>
-                  <p className="text-saradhi-100 text-sm">Live polls, quizzes, and instant feedback for interactive learning</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg mb-1">AI-Powered Learning</h3>
-                  <p className="text-saradhi-100 text-sm">Smart resource search and personalized assistance for students</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg mb-1">Advanced Analytics</h3>
-                  <p className="text-saradhi-100 text-sm">Track performance, engagement, and learning outcomes</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-12 pt-8 border-t border-white/20">
-              <p className="text-sm text-saradhi-100">Trusted by SASTRA University for innovative education</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Login Section */}
-        <div className="w-1/2 flex items-center justify-center p-12 bg-slate-50 dark:bg-slate-900">
-          <div className="w-full max-w-lg">
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold font-display text-slate-900 dark:text-white mb-3">Sign in to continue</h2>
-              <p className="text-slate-600 dark:text-slate-300">Select your role to access the platform</p>
-            </div>
-
-            <div className="space-y-6">
-              {/* Teacher Card - Desktop */}
-              <div
-                onClick={() => handleRoleSelect('teacher')}
-                className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl p-8 hover:border-saradhi-500 dark:hover:border-saradhi-400 hover:shadow-xl transition-all cursor-pointer group"
-              >
-                <div className="flex items-start gap-6">
-                  <div className="w-16 h-16 bg-saradhi-100 dark:bg-saradhi-900/30 rounded-2xl flex items-center justify-center group-hover:bg-saradhi-200 dark:group-hover:bg-saradhi-900/50 transition-colors flex-shrink-0">
-                    <svg className="w-8 h-8 text-saradhi-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Teacher</h3>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">Use your @*.sastra.edu email</p>
-
-                    <div className="space-y-2 mb-5">
-                      <div className="flex items-center text-sm text-slate-700 dark:text-slate-300">
-                        <svg className="w-4 h-4 text-saradhi-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Create and manage sessions
-                      </div>
-                      <div className="flex items-center text-sm text-slate-700 dark:text-slate-300">
-                        <svg className="w-4 h-4 text-saradhi-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Create polls and track analytics
-                      </div>
-                      <div className="flex items-center text-sm text-slate-700 dark:text-slate-300">
-                        <svg className="w-4 h-4 text-saradhi-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Upload resources and materials
-                      </div>
-                    </div>
-
-                    <button className="w-full bg-saradhi-700 hover:bg-saradhi-600 text-white font-semibold py-3 px-6 rounded-xl transition-colors text-base flex items-center justify-center gap-2">
-                      Sign in as Teacher
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Student Card - Desktop */}
-              <div
-                onClick={() => handleRoleSelect('student')}
-                className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl p-8 hover:border-coral-500 dark:hover:border-coral-400 hover:shadow-xl transition-all cursor-pointer group"
-              >
-                <div className="flex items-start gap-6">
-                  <div className="w-16 h-16 bg-coral-100 dark:bg-coral-900/30 rounded-2xl flex items-center justify-center group-hover:bg-coral-200 dark:group-hover:bg-coral-900/50 transition-colors flex-shrink-0">
-                    <svg className="w-8 h-8 text-coral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Student</h3>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">Use your @sastra.ac.in email</p>
-
-                    <div className="space-y-2 mb-5">
-                      <div className="flex items-center text-sm text-slate-700 dark:text-slate-300">
-                        <svg className="w-4 h-4 text-coral-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Join interactive sessions
-                      </div>
-                      <div className="flex items-center text-sm text-slate-700 dark:text-slate-300">
-                        <svg className="w-4 h-4 text-coral-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Participate in polls and quizzes
-                      </div>
-                      <div className="flex items-center text-sm text-slate-700 dark:text-slate-300">
-                        <svg className="w-4 h-4 text-coral-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Access AI learning assistant
-                      </div>
-                    </div>
-
-                    <button className="w-full bg-coral-500 hover:bg-coral-400 text-white font-semibold py-3 px-6 rounded-xl transition-colors text-base flex items-center justify-center gap-2">
-                      Sign in as Student
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* SSO Button - Desktop */}
-            <div className="mt-6">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="flex-1 h-px bg-slate-200 dark:bg-slate-600"></div>
-                <span className="text-sm text-slate-400 dark:text-slate-500 whitespace-nowrap">or sign in directly</span>
-                <div className="flex-1 h-px bg-slate-200 dark:bg-slate-600"></div>
-              </div>
-              <button
-                onClick={handleGoogleLogin}
-                className="w-full flex items-center justify-center gap-3 bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 hover:border-saradhi-400 dark:hover:border-saradhi-400 hover:shadow-md active:bg-saradhi-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold py-3.5 px-6 rounded-xl transition-all text-base"
-              >
-                <GoogleIcon />
-                Sign in with Google
-                <span className="text-xs font-normal text-slate-400 dark:text-slate-500">(role auto-detected from email)</span>
-              </button>
-            </div>
-
-            {/* Security Notice */}
-            <div className="mt-6 bg-saradhi-50 dark:bg-saradhi-900/20 rounded-xl p-4 border border-saradhi-100 dark:border-saradhi-800">
-              <div className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-saradhi-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-                <div>
-                  <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-1">Secure Authentication</h4>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">Your login is protected by Google OAuth2. We never store your password.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Demo Buttons - Desktop */}
-            <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
-              <p className="text-xs text-slate-400 dark:text-slate-500 text-center mb-3">Try a live demo — no login required</p>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={handleDemoLogin}
-                  className="flex items-center gap-3 border-2 border-dashed border-saradhi-300 dark:border-saradhi-600 text-saradhi-700 dark:text-saradhi-400 hover:bg-saradhi-50 active:bg-saradhi-100 dark:hover:bg-saradhi-900/20 font-medium py-3.5 px-4 rounded-xl transition-colors group"
-                >
-                  <svg className="w-5 h-5 flex-shrink-0 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  <div className="text-left">
-                    <div className="font-semibold text-sm">Student Demo</div>
-                    <div className="text-xs text-saradhi-500 dark:text-saradhi-400 font-normal">Live polls, AI assistant</div>
-                  </div>
-                </button>
-                <button
-                  onClick={handleTeacherDemoLogin}
-                  className="flex items-center gap-3 border-2 border-dashed border-coral-300 dark:border-coral-600 text-coral-700 dark:text-coral-400 hover:bg-coral-50 active:bg-coral-100 dark:hover:bg-coral-900/20 font-medium py-3.5 px-4 rounded-xl transition-colors group"
-                >
-                  <svg className="w-5 h-5 flex-shrink-0 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                  </svg>
-                  <div className="text-left">
-                    <div className="font-semibold text-sm">Teacher Demo</div>
-                    <div className="text-xs text-coral-500 dark:text-coral-400 font-normal">Sessions, polls, analytics</div>
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            <p className="text-center text-sm text-slate-500 dark:text-slate-400 mt-4">
-              Having trouble? Make sure to use your official SASTRA email address.
-            </p>
           </div>
         </div>
       </div>

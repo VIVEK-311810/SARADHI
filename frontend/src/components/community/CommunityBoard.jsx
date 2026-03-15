@@ -75,22 +75,22 @@ const CommunityBoard = () => {
   const tabClass = (tab) =>
     `px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
       activeTab === tab
-        ? 'bg-blue-600 text-white'
-        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+        ? 'bg-primary-600 text-white'
+        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
     }`;
 
   return (
     <div className="max-w-3xl mx-auto space-y-4 sm:space-y-6 p-3 sm:p-4">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+      <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Community</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Ask doubts, share answers, upvote helpful questions</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">Community</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Ask doubts, share answers, upvote helpful questions</p>
           </div>
           <button
             onClick={() => setModalOpen(true)}
-            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium py-2.5 px-5 rounded-lg text-sm"
+            className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-medium py-2.5 px-5 rounded-lg text-sm"
           >
             + New Doubt
           </button>
@@ -119,8 +119,8 @@ const CommunityBoard = () => {
               onClick={() => setStatusFilter(s)}
               className={`px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium border transition-colors capitalize ${
                 statusFilter === s
-                  ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100'
-                  : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-gray-500'
+                  ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-slate-100'
+                  : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:border-slate-500'
               }`}
             >
               {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
@@ -133,7 +133,7 @@ const CommunityBoard = () => {
           <select
             value={subjectFilter}
             onChange={(e) => setSubjectFilter(e.target.value)}
-            className="px-3 py-1.5 text-xs sm:text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-1.5 text-xs sm:text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             {SUBJECTS.map(s => <option key={s}>{s}</option>)}
           </select>
@@ -148,12 +148,12 @@ const CommunityBoard = () => {
           {error}
         </div>
       ) : tickets.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-8 text-center">
-          <svg className="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-8 text-center">
+          <svg className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">No doubts posted yet.</p>
-          <p className="text-gray-400 dark:text-gray-500 text-xs sm:text-sm mt-1">Be the first to ask a question!</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm sm:text-base">No doubts posted yet.</p>
+          <p className="text-slate-400 dark:text-slate-500 text-xs sm:text-sm mt-1">Be the first to ask a question!</p>
         </div>
       ) : (
         <div className="space-y-3">

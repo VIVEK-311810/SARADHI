@@ -123,16 +123,16 @@ const ResourceViewer = () => {
   const getResourceTypeColor = (type) => {
     const colors = {
       'pdf': 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300',
-      'document': 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300',
+      'document': 'bg-primary-100 dark:bg-primary-900/30 text-primary-800 dark:text-primary-300',
       'presentation': 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300',
       'spreadsheet': 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300',
       'image': 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300',
-      'archive': 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300',
-      'url': 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300',
+      'archive': 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-300',
+      'url': 'bg-primary-100 dark:bg-primary-900/30 text-primary-800 dark:text-primary-300',
       'auto_notes': 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300',
-      'other': 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+      'other': 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
     };
-    return colors[type] || 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300';
+    return colors[type] || 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-300';
   };
 
   // Group resources by type — auto_notes appear in their own "Notes" section
@@ -158,7 +158,7 @@ const ResourceViewer = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="text-gray-600 dark:text-gray-400">Loading resources...</div>
+        <div className="text-slate-600 dark:text-slate-400">Loading resources...</div>
       </div>
     );
   }
@@ -169,19 +169,19 @@ const ResourceViewer = () => {
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Session Resources</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">Session ID: {sessionId}</p>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Session Resources</h1>
+            <p className="text-slate-600 dark:text-slate-400 mt-1">Session ID: {sessionId}</p>
           </div>
           <button
             onClick={() => navigate('/student/dashboard')}
-            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+            className="text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-blue-300"
           >
             ← Back to Dashboard
           </button>
         </div>
 
         {/* Search and Filter Bar */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-4">
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md border border-slate-200 dark:border-slate-700 p-4">
           <div className="flex flex-col md:flex-row gap-4">
             {/* Search */}
             <div className="flex-1">
@@ -190,7 +190,7 @@ const ResourceViewer = () => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search resources..."
-                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
               />
             </div>
 
@@ -198,7 +198,7 @@ const ResourceViewer = () => {
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
             >
               <option value="all">All Types</option>
               <option value="auto_notes">✨ Notes (AI Generated)</option>
@@ -216,7 +216,7 @@ const ResourceViewer = () => {
             <div className="flex gap-2">
               <button
                 onClick={() => setViewMode('grid')}
-                className={`px-4 py-2 rounded-lg ${viewMode === 'grid' ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
+                className={`px-4 py-2 rounded-lg ${viewMode === 'grid' ? 'bg-primary-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'}`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
@@ -224,7 +224,7 @@ const ResourceViewer = () => {
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={`px-4 py-2 rounded-lg ${viewMode === 'list' ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
+                className={`px-4 py-2 rounded-lg ${viewMode === 'list' ? 'bg-primary-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'}`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -234,7 +234,7 @@ const ResourceViewer = () => {
           </div>
 
           {/* Results Count */}
-          <div className="mt-3 text-sm text-gray-600 dark:text-gray-400">
+          <div className="mt-3 text-sm text-slate-600 dark:text-slate-400">
             Showing {filteredResources.length} of {resources.length} resources
           </div>
         </div>
@@ -242,12 +242,12 @@ const ResourceViewer = () => {
 
       {/* Resources Display */}
       {filteredResources.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-12 text-center">
-          <div className="text-gray-400 text-5xl mb-4">📂</div>
-          <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
+        <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-12 text-center">
+          <div className="text-slate-400 text-5xl mb-4">📂</div>
+          <h3 className="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">
             {resources.length === 0 ? 'No resources available' : 'No matching resources'}
           </h3>
-          <p className="text-gray-500 dark:text-gray-400">
+          <p className="text-slate-500 dark:text-slate-400">
             {resources.length === 0
               ? 'Your teacher hasn\'t uploaded any resources yet'
               : 'Try adjusting your search or filters'}
@@ -259,7 +259,7 @@ const ResourceViewer = () => {
           {filteredResources.map((resource) => (
             <div
               key={resource.id}
-              className={`bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 hover:shadow-lg dark:hover:shadow-gray-900/50 transition-shadow duration-200 ${viewMode === 'list' ? 'flex items-center' : ''}`}
+              className={`bg-white/75 dark:bg-slate-800/75 backdrop-blur-sm rounded-xl border border-slate-200/60 dark:border-slate-700/60 hover:shadow-card hover:border-primary-200/60 dark:hover:border-primary-700/40 transition-all duration-200 ${viewMode === 'list' ? 'flex items-center' : ''}`}
             >
               {viewMode === 'grid' ? (
                 // Grid View
@@ -271,17 +271,17 @@ const ResourceViewer = () => {
                     </span>
                   </div>
 
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 line-clamp-2">
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2 line-clamp-2">
                     {resource.title}
                   </h3>
 
                   {resource.description && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-3 line-clamp-2">
                       {resource.description}
                     </p>
                   )}
 
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-4 space-y-1">
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mb-4 space-y-1">
                     {resource.file_size && (
                       <div>📦 {utils.formatFileSize(resource.file_size)}</div>
                     )}
@@ -292,7 +292,7 @@ const ResourceViewer = () => {
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleView(resource)}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm font-medium"
+                      className="flex-1 bg-primary-600 hover:bg-primary-700 text-white py-2 px-4 rounded-lg text-sm font-medium"
                     >
                       View
                     </button>
@@ -313,15 +313,15 @@ const ResourceViewer = () => {
                     <span className="text-3xl">{getResourceIcon(resource.resource_type)}</span>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{resource.title}</h3>
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{resource.title}</h3>
                         <span className={`px-2 py-1 rounded text-xs font-medium ${getResourceTypeColor(resource.resource_type)}`}>
                           {resource.resource_type}
                         </span>
                       </div>
                       {resource.description && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{resource.description}</p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{resource.description}</p>
                       )}
-                      <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
                         {resource.file_size && <span>📦 {utils.formatFileSize(resource.file_size)}</span>}
                         <span>📅 {new Date(resource.created_at).toLocaleDateString()}</span>
                         <span>👁️ {resource.view_count} • ⬇️ {resource.download_count}</span>
@@ -332,7 +332,7 @@ const ResourceViewer = () => {
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleView(resource)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm font-medium"
+                      className="bg-primary-600 hover:bg-primary-700 text-white py-2 px-4 rounded-lg text-sm font-medium"
                     >
                       View
                     </button>
@@ -358,7 +358,7 @@ const ResourceViewer = () => {
               <div className={`flex items-center gap-2 mb-3 px-4 py-2 rounded-lg font-semibold text-sm ${
                 type === 'auto_notes'
                   ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                  : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
               }`}>
                 <span>{TYPE_LABELS[type] || type}</span>
                 <span className="ml-auto text-xs font-normal opacity-70">{items.length} file{items.length !== 1 ? 's' : ''}</span>
@@ -370,10 +370,10 @@ const ResourceViewer = () => {
                 {items.map((resource) => (
                   <div
                     key={resource.id}
-                    className={`bg-white dark:bg-gray-800 rounded-lg shadow-md border hover:shadow-lg dark:hover:shadow-gray-900/50 transition-shadow duration-200 ${
+                    className={`bg-white/75 dark:bg-slate-800/75 backdrop-blur-sm rounded-xl border hover:shadow-card transition-all duration-200 ${
                       type === 'auto_notes'
                         ? 'border-indigo-200 dark:border-indigo-700'
-                        : 'border-gray-200 dark:border-gray-700'
+                        : 'border-slate-200 dark:border-slate-700'
                     } ${viewMode === 'list' ? 'flex items-center' : ''}`}
                   >
                     {viewMode === 'grid' ? (
@@ -384,11 +384,11 @@ const ResourceViewer = () => {
                             {resource.resource_type === 'auto_notes' ? 'AI Notes' : resource.resource_type}
                           </span>
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 line-clamp-2">{resource.title}</h3>
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2 line-clamp-2">{resource.title}</h3>
                         {resource.description && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">{resource.description}</p>
+                          <p className="text-sm text-slate-600 dark:text-slate-400 mb-3 line-clamp-2">{resource.description}</p>
                         )}
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-4 space-y-1">
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mb-4 space-y-1">
                           {resource.file_size && <div>📦 {utils.formatFileSize(resource.file_size)}</div>}
                           <div>📅 {new Date(resource.created_at).toLocaleDateString()}</div>
                           {resource.resource_type !== 'auto_notes' && (
@@ -401,7 +401,7 @@ const ResourceViewer = () => {
                             className={`flex-1 text-white py-2 px-4 rounded-lg text-sm font-medium ${
                               resource.resource_type === 'auto_notes'
                                 ? 'bg-indigo-600 hover:bg-indigo-700'
-                                : 'bg-blue-600 hover:bg-blue-700'
+                                : 'bg-primary-600 hover:bg-primary-700'
                             }`}
                           >
                             {resource.resource_type === 'auto_notes' ? 'Open Notes' : 'View'}
@@ -422,12 +422,12 @@ const ResourceViewer = () => {
                           <span className="text-2xl">{getResourceIcon(resource.resource_type)}</span>
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-0.5">
-                              <h3 className="text-base font-semibold text-gray-900 dark:text-white">{resource.title}</h3>
+                              <h3 className="text-base font-semibold text-slate-900 dark:text-white">{resource.title}</h3>
                               <span className={`px-2 py-0.5 rounded text-xs font-medium ${getResourceTypeColor(resource.resource_type)}`}>
                                 {resource.resource_type === 'auto_notes' ? 'AI Notes' : resource.resource_type}
                               </span>
                             </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
                               📅 {new Date(resource.created_at).toLocaleDateString()}
                               {resource.file_size && ` • 📦 ${utils.formatFileSize(resource.file_size)}`}
                             </div>
@@ -439,7 +439,7 @@ const ResourceViewer = () => {
                             className={`text-white py-1.5 px-3 rounded-lg text-sm font-medium ${
                               resource.resource_type === 'auto_notes'
                                 ? 'bg-indigo-600 hover:bg-indigo-700'
-                                : 'bg-blue-600 hover:bg-blue-700'
+                                : 'bg-primary-600 hover:bg-primary-700'
                             }`}
                           >
                             {resource.resource_type === 'auto_notes' ? 'Open' : 'View'}

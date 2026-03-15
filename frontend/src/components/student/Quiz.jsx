@@ -115,13 +115,13 @@ const Quiz = () => {
     if (!submitted) {
       return `${base} ${
         selectedOption === index
-          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-900 dark:text-blue-300'
-          : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+          ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-900 dark:text-primary-300'
+          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700/50'
       }`;
     }
     if (index === poll.correctAnswer) return `${base} border-green-500 bg-green-50 dark:bg-green-900/20 text-green-900 dark:text-green-300`;
     if (index === selectedOption) return `${base} border-red-400 bg-red-50 dark:bg-red-900/20 text-red-900 dark:text-red-300`;
-    return `${base} border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500`;
+    return `${base} border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500`;
   };
 
   const getScoreColor = (pct) => {
@@ -133,10 +133,10 @@ const Quiz = () => {
   // ── Loading ──────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+      <div className="flex items-center justify-center p-4 min-h-[60vh]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400 text-sm sm:text-base">Loading quiz...</p>
+          <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-slate-600 dark:text-slate-400 text-sm sm:text-base">Loading quiz...</p>
         </div>
       </div>
     );
@@ -145,20 +145,20 @@ const Quiz = () => {
   // ── Empty state ──────────────────────────────────────────────────────────
   if (polls.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 sm:p-8 text-center">
-          <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-7 h-7 sm:w-8 sm:h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="flex items-center justify-center p-4 min-h-[60vh]">
+        <div className="max-w-md w-full bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-6 sm:p-8 text-center">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-7 h-7 sm:w-8 sm:h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
           </div>
-          <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-2">No Quiz Available Yet</h2>
-          <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base mb-6">
+          <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-2">No Quiz Available Yet</h2>
+          <p className="text-slate-500 dark:text-slate-400 text-sm sm:text-base mb-6">
             Questions will appear here after your teacher activates polls in a live session.
           </p>
           <button
             onClick={() => navigate('/student/dashboard')}
-            className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 text-sm sm:text-base"
+            className="px-5 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 text-sm sm:text-base"
           >
             Back to Dashboard
           </button>
@@ -174,19 +174,19 @@ const Quiz = () => {
     const pct = Math.round((correct / total) * 100);
 
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-6 sm:py-10 px-4">
+      <div className="py-6 sm:py-10 px-4">
         <div className="max-w-2xl mx-auto">
           {/* Score card */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 sm:p-8 text-center mb-6">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-4">Quiz Complete!</h1>
+          <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-6 sm:p-8 text-center mb-6">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-4">Quiz Complete!</h1>
             <div className={`text-5xl sm:text-6xl font-bold mb-2 ${getScoreColor(pct)}`}>
               {pct}%
             </div>
-            <p className="text-gray-600 dark:text-gray-400 text-base sm:text-lg mb-6">
+            <p className="text-slate-600 dark:text-slate-400 text-base sm:text-lg mb-6">
               {correct} out of {total} correct
             </p>
             {/* Score bar */}
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-6">
+            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3 mb-6">
               <div
                 className={`h-3 rounded-full transition-all ${pct >= 70 ? 'bg-green-500' : pct >= 50 ? 'bg-yellow-400' : 'bg-red-400'}`}
                 style={{ width: `${pct}%` }}
@@ -195,13 +195,13 @@ const Quiz = () => {
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
                 onClick={handleRetry}
-                className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 font-medium text-sm sm:text-base"
+                className="px-6 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 font-medium text-sm sm:text-base"
               >
                 Retry Quiz
               </button>
               <button
                 onClick={() => navigate(`/student/session/${sessionId}/history`)}
-                className="px-6 py-2.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 active:bg-gray-100 dark:active:bg-gray-600 font-medium text-sm sm:text-base"
+                className="px-6 py-2.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 active:bg-slate-100 dark:active:bg-slate-600 font-medium text-sm sm:text-base"
               >
                 Back to Session
               </button>
@@ -209,25 +209,25 @@ const Quiz = () => {
           </div>
 
           {/* Q&A review */}
-          <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3">Review Answers</h2>
+          <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-3">Review Answers</h2>
           <div className="space-y-3 sm:space-y-4">
             {answers.map((a, qi) => (
-              <div key={qi} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
+              <div key={qi} className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-sm rounded-xl border border-slate-200/60 dark:border-slate-700/60 p-4 sm:p-5">
                 <div className="flex items-start gap-3 mb-3">
                   <span className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${a.isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                     {a.isCorrect ? '✓' : '✗'}
                   </span>
-                  <p className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">{a.question}</p>
+                  <p className="font-medium text-slate-900 dark:text-white text-sm sm:text-base">{a.question}</p>
                 </div>
                 <div className="space-y-1.5 ml-9">
                   {a.options.map((opt, i) => (
                     <div key={i} className={`flex items-start gap-2 text-xs sm:text-sm rounded px-2 py-1 ${
                       i === a.correctAnswer ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 font-medium' :
-                      i === a.selected && !a.isCorrect ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'
+                      i === a.selected && !a.isCorrect ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400' : 'text-slate-600 dark:text-slate-400'
                     }`}>
                       <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0 ${
                         i === a.correctAnswer ? 'bg-green-200 text-green-800' :
-                        i === a.selected && !a.isCorrect ? 'bg-red-200 text-red-700' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+                        i === a.selected && !a.isCorrect ? 'bg-red-200 text-red-700' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
                       }`}>
                         {String.fromCharCode(65 + i)}
                       </span>
@@ -242,8 +242,8 @@ const Quiz = () => {
                   ))}
                 </div>
                 {a.justification && (
-                  <div className="mt-3 ml-9 p-2 sm:p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
-                    <p className="text-xs sm:text-sm text-blue-900 dark:text-blue-300">
+                  <div className="mt-3 ml-9 p-2 sm:p-3 bg-primary-50 dark:bg-primary-900/20 rounded-lg border border-primary-100 dark:border-primary-800">
+                    <p className="text-xs sm:text-sm text-primary-900 dark:text-primary-300">
                       <span className="font-medium">Explanation: </span>{a.justification}
                     </p>
                   </div>
@@ -262,13 +262,13 @@ const Quiz = () => {
   const isLast = currentIndex + 1 === polls.length;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-4 sm:py-8 px-4">
+    <div className="py-4 sm:py-8 px-4">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-4 sm:mb-6 gap-3">
           <button
             onClick={() => navigate(`/student/session/${sessionId}/history`)}
-            className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm sm:text-base py-1"
+            className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm sm:text-base py-1"
           >
             <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -277,10 +277,10 @@ const Quiz = () => {
           </button>
 
           <div className="text-center flex-1">
-            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-medium truncate">
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium truncate">
               {sessionTitle || 'Practice Quiz'}
             </p>
-            <p className="text-xs text-gray-400 dark:text-gray-500">
+            <p className="text-xs text-slate-400 dark:text-slate-500">
               Question {currentIndex + 1} of {polls.length}
             </p>
           </div>
@@ -289,8 +289,8 @@ const Quiz = () => {
             onClick={handleToggleShuffle}
             className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border text-xs sm:text-sm font-medium transition-colors ${
               shuffle
-                ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
-                : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                ? 'border-primary-400 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
+                : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
             }`}
           >
             <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -302,16 +302,16 @@ const Quiz = () => {
         </div>
 
         {/* Progress bar */}
-        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-5 sm:mb-6">
+        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mb-5 sm:mb-6">
           <div
-            className="h-2 bg-blue-500 rounded-full transition-all duration-300"
+            className="h-2 bg-primary-500 rounded-full transition-all duration-300"
             style={{ width: `${progress}%` }}
           ></div>
         </div>
 
         {/* Question card */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 mb-4">
-          <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4 sm:mb-5 leading-snug">
+        <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-4 sm:p-6 mb-4">
+          <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-4 sm:mb-5 leading-snug">
             {poll.question}
           </h2>
 
@@ -327,8 +327,8 @@ const Quiz = () => {
                 <span className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold flex-shrink-0 ${
                   submitted && index === poll.correctAnswer ? 'bg-green-200 text-green-800' :
                   submitted && index === selectedOption && index !== poll.correctAnswer ? 'bg-red-200 text-red-700' :
-                  selectedOption === index && !submitted ? 'bg-blue-200 text-blue-800' :
-                  'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                  selectedOption === index && !submitted ? 'bg-primary-200 text-primary-800' :
+                  'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
                 }`}>
                   {String.fromCharCode(65 + index)}
                 </span>
@@ -344,8 +344,8 @@ const Quiz = () => {
 
           {/* Justification — shown after submit */}
           {submitted && poll.justification && (
-            <div className="mt-4 p-3 sm:p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">
-              <p className="text-xs sm:text-sm text-blue-900 dark:text-blue-300">
+            <div className="mt-4 p-3 sm:p-4 bg-primary-50 dark:bg-primary-900/20 border border-primary-100 dark:border-primary-800 rounded-lg">
+              <p className="text-xs sm:text-sm text-primary-900 dark:text-primary-300">
                 <span className="font-semibold">Explanation: </span>{poll.justification}
               </p>
             </div>
@@ -383,14 +383,14 @@ const Quiz = () => {
             <button
               onClick={handleSubmit}
               disabled={selectedOption === null}
-              className="w-full py-3 sm:py-3.5 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed transition-colors text-sm sm:text-base"
+              className="w-full py-3 sm:py-3.5 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 active:bg-primary-800 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed transition-colors text-sm sm:text-base"
             >
               Submit Answer
             </button>
           ) : (
             <button
               onClick={handleNext}
-              className="w-full py-3 sm:py-3.5 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 active:bg-blue-800 transition-colors text-sm sm:text-base"
+              className="w-full py-3 sm:py-3.5 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 active:bg-primary-800 transition-colors text-sm sm:text-base"
             >
               {isLast ? 'Finish Quiz' : 'Next Question →'}
             </button>

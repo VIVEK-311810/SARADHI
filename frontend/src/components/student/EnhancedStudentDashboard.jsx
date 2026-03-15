@@ -13,17 +13,9 @@ const EnhancedStudentDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
   const [joinedSessions, setJoinedSessions] = useState([]);
-  const [stats, setStats] = useState({
-    sessionsJoined: 0,
-    pollsAnswered: 0,
-    averageScore: 0,
-    activeSessions: 0
-  });
+  const [stats, setStats] = useState({ sessionsJoined: 0, pollsAnswered: 0, averageScore: 0, activeSessions: 0 });
   const [gamificationStats, setGamificationStats] = useState({
-    totalPoints: 0,
-    totalXP: 0,
-    rank: 1,
-    totalStudents: 1,
+    totalPoints: 0, totalXP: 0, rank: 1, totalStudents: 1,
     level: { level: 1, title: 'Newcomer', currentXP: 0, nextLevelXP: 100, xpToNextLevel: 100 },
     badges: []
   });
@@ -40,7 +32,6 @@ const EnhancedStudentDashboard = () => {
     }
     fetchStudentData();
 
-    // WebSocket for real-time class-started / class-ended push
     if (!isDemoMode()) {
       const WS_BASE_URL = process.env.REACT_APP_API_URL
         ? process.env.REACT_APP_API_URL.replace('http://', 'ws://').replace('https://', 'wss://').replace('/api', '')
@@ -49,52 +40,32 @@ const EnhancedStudentDashboard = () => {
       const ws = new WebSocket(`${WS_BASE_URL}?token=${token}`);
       dashboardWsRef.current = ws;
 
-      ws.onopen = () => {
-        ws.send(JSON.stringify({ type: 'join-dashboard' }));
-      };
-
+      ws.onopen = () => { ws.send(JSON.stringify({ type: 'join-dashboard' })); };
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'class-started' && data.sessionId) {
-            setJoinedSessions(prev => prev.map(s =>
-              s.session_id === data.sessionId ? { ...s, is_live: true } : s
-            ));
+            setJoinedSessions(prev => prev.map(s => s.session_id === data.sessionId ? { ...s, is_live: true } : s));
           } else if (data.type === 'class-ended' && data.sessionId) {
-            setJoinedSessions(prev => prev.map(s =>
-              s.session_id === data.sessionId ? { ...s, is_live: false } : s
-            ));
+            setJoinedSessions(prev => prev.map(s => s.session_id === data.sessionId ? { ...s, is_live: false } : s));
           }
         } catch (_) {}
       };
-
       ws.onerror = () => {};
       ws.onclose = () => {};
     }
 
-    // Fallback poll every 30s
-    const refreshInterval = setInterval(() => {
-      fetchStudentData();
-    }, 30000);
-
+    const refreshInterval = setInterval(() => { fetchStudentData(); }, 30000);
     return () => {
       clearInterval(refreshInterval);
-      if (dashboardWsRef.current) {
-        dashboardWsRef.current.close();
-        dashboardWsRef.current = null;
-      }
+      if (dashboardWsRef.current) { dashboardWsRef.current.close(); dashboardWsRef.current = null; }
     };
   }, [navigate]);
 
   const fetchStudentData = async () => {
     try {
       const currentUser = safeParseUser();
-      if (!currentUser || !currentUser.id) {
-        console.error('No current user found');
-        setLoading(false);
-        return;
-      }
-
+      if (!currentUser || !currentUser.id) { setLoading(false); return; }
       const studentId = currentUser.id;
       const data = await studentAPI.getDashboardSummary(studentId);
 
@@ -117,7 +88,6 @@ const EnhancedStudentDashboard = () => {
         activeSessions: data.stats.active_sessions
       });
 
-      // Fetch weak topics (non-critical)
       apiRequest(`/students/${studentId}/weak-topics`)
         .then(d => setWeakTopics(d.weakTopics || []))
         .catch(() => {});
@@ -132,27 +102,17 @@ const EnhancedStudentDashboard = () => {
           ]);
           if (gamificationData.success) {
             const stats = gamificationData.data;
-            if (xpData.success) {
-              stats.totalXP = xpData.data.totalXP;
-              stats.level = xpData.data.level;
-            }
+            if (xpData.success) { stats.totalXP = xpData.data.totalXP; stats.level = xpData.data.level; }
             setGamificationStats(stats);
           }
         }
-      } catch (gamErr) {
-        // Non-critical
-      }
+      } catch (_) {}
 
     } catch (error) {
       console.error('Error fetching student data:', error);
       setFetchError(error.message || 'Failed to load dashboard');
       setJoinedSessions([]);
-      setStats({
-        sessionsJoined: 0,
-        pollsAnswered: 0,
-        averageScore: 0,
-        activeSessions: 0
-      });
+      setStats({ sessionsJoined: 0, pollsAnswered: 0, averageScore: 0, activeSessions: 0 });
     } finally {
       setLoading(false);
     }
@@ -164,15 +124,13 @@ const EnhancedStudentDashboard = () => {
         method: 'POST',
         body: JSON.stringify({ student_id: studentId }),
       });
-    } catch (err) {
-      // Non-critical
-    }
+    } catch (_) {}
   }
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6 px-4 sm:px-6 pb-8">
-        <div className="rounded-xl skeleton-shimmer h-32 sm:h-36 w-full" />
+      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
+        <div className="rounded-2xl skeleton-shimmer h-32 sm:h-36 w-full" />
         <StatCardsSkeleton count={4} />
         <SessionListSkeleton rows={3} />
       </div>
@@ -190,281 +148,245 @@ const EnhancedStudentDashboard = () => {
     );
   }
 
+  const xpPct = gamificationStats.level?.nextLevelXP
+    ? Math.min(100, Math.round(((gamificationStats.totalXP || 0) / gamificationStats.level.nextLevelXP) * 100))
+    : 0;
+
+  const statCards = [
+    { label: 'Sessions', value: stats.sessionsJoined, icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4', iconBg: 'bg-primary-100 dark:bg-primary-900/30', iconColor: 'text-primary-600 dark:text-primary-400' },
+    { label: 'Polls', value: stats.pollsAnswered, icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', iconBg: 'bg-teal-100 dark:bg-teal-900/30', iconColor: 'text-teal-600 dark:text-teal-400' },
+    { label: 'Avg Score', value: `${stats.averageScore}%`, icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z', iconBg: 'bg-accent-100 dark:bg-accent-900/30', iconColor: 'text-accent-500 dark:text-accent-400' },
+    { label: 'Active', value: stats.activeSessions, icon: 'M13 10V3L4 14h7v7l9-11h-7z', iconBg: 'bg-emerald-100 dark:bg-emerald-900/30', iconColor: 'text-emerald-600 dark:text-emerald-400' },
+  ];
+
+  const liveSession = joinedSessions.find(s => s.is_live);
+
   return (
-    <div className="max-w-7xl mx-auto space-y-6 px-4 sm:px-6 pb-8">
+    <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6 pb-8">
+
       {/* Welcome Header */}
-      <div className="bg-gradient-to-r from-coral-500 to-saradhi-700 rounded-xl p-4 sm:p-6 text-white">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-accent-500 to-primary-700 dark:from-accent-600 dark:to-primary-900 p-5 sm:p-7 text-white shadow-glow-accent">
+        <div className="absolute top-0 right-0 w-56 h-56 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-40 h-40 bg-primary-500/10 rounded-full translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+        <div className="relative z-10 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div>
-            <h1 className="text-xl sm:text-3xl font-bold font-display">Welcome, {currentUser.fullName}!</h1>
-            <p className="text-coral-100 mt-1 sm:mt-2 text-sm sm:text-base">Ready to learn and participate</p>
-            <p className="text-coral-200 text-xs sm:text-sm mt-1">ID: {currentUser.id}</p>
-          </div>
-          <button
-            onClick={() => navigate('/student/join')}
-            className="bg-white text-saradhi-700 hover:bg-saradhi-50 font-medium py-3 px-4 sm:px-6 rounded-lg transition-colors duration-200 shadow-lg text-center w-full sm:w-auto"
-          >
-            + Join Session
-          </button>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-        <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 sm:p-6 shadow-card border border-slate-200/80 dark:border-slate-700/80">
-          <div className="flex flex-col sm:flex-row sm:items-center">
-            <div className="p-2 sm:p-3 rounded-full bg-saradhi-100 dark:bg-saradhi-900/30 w-fit mb-2 sm:mb-0">
-              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-saradhi-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-            </div>
-            <div className="sm:ml-4">
-              <p className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-400">Sessions</p>
-              <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{stats.sessionsJoined}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 sm:p-6 shadow-card border border-slate-200/80 dark:border-slate-700/80">
-          <div className="flex flex-col sm:flex-row sm:items-center">
-            <div className="p-2 sm:p-3 rounded-full bg-teal-100 dark:bg-teal-900/30 w-fit mb-2 sm:mb-0">
-              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div className="sm:ml-4">
-              <p className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-400">Polls</p>
-              <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{stats.pollsAnswered}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 sm:p-6 shadow-card border border-slate-200/80 dark:border-slate-700/80">
-          <div className="flex flex-col sm:flex-row sm:items-center">
-            <div className="p-2 sm:p-3 rounded-full bg-coral-100 dark:bg-coral-900/30 w-fit mb-2 sm:mb-0">
-              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-coral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </div>
-            <div className="sm:ml-4">
-              <p className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-400">Score</p>
-              <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{stats.averageScore}%</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 sm:p-6 shadow-card border border-slate-200/80 dark:border-slate-700/80">
-          <div className="flex flex-col sm:flex-row sm:items-center">
-            <div className="p-2 sm:p-3 rounded-full bg-emerald-100 dark:bg-emerald-900/30 w-fit mb-2 sm:mb-0">
-              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-            <div className="sm:ml-4">
-              <p className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-400">Active</p>
-              <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{stats.activeSessions}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Gamification Card */}
-      <div className="bg-gradient-to-r from-saradhi-600 to-saradhi-800 rounded-xl shadow-lg p-4 sm:p-6 text-white">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs font-medium bg-white/20 px-2 py-0.5 rounded-full">
-                Lv{gamificationStats.level?.level} {gamificationStats.level?.title}
+            <p className="text-orange-200 text-sm font-medium mb-1">Welcome back</p>
+            <h1 className="text-xl sm:text-3xl font-bold font-display">{currentUser?.fullName || 'Student'}</h1>
+            <p className="text-orange-200 mt-1 text-sm">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="font-mono text-xs bg-white/10 px-2 py-0.5 rounded">{currentUser?.id}</span>
+                <span>·</span>
+                <span>Level {gamificationStats.level?.level} {gamificationStats.level?.title}</span>
               </span>
-            </div>
-            <div className="grid grid-cols-3 gap-4 sm:flex sm:items-center sm:gap-6 mb-3">
-              <div className="text-center">
-                <p className="text-2xl sm:text-4xl font-bold font-display">{gamificationStats.totalXP || 0}</p>
-                <p className="text-xs sm:text-sm text-saradhi-200">Total XP</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl sm:text-4xl font-bold font-display">#{gamificationStats.rank}</p>
-                <p className="text-xs sm:text-sm text-saradhi-200">Rank</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl sm:text-4xl font-bold font-display">{gamificationStats.totalPoints || 0}</p>
-                <p className="text-xs sm:text-sm text-saradhi-200">Points</p>
-              </div>
-            </div>
-            {gamificationStats.level?.nextLevelXP && (
-              <div className="w-full max-w-xs">
-                <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-white rounded-full"
-                    style={{ width: `${Math.min(100, Math.round(((gamificationStats.totalXP || 0) / gamificationStats.level.nextLevelXP) * 100))}%` }}
-                  />
-                </div>
-                <p className="text-xs text-saradhi-200 mt-0.5">{gamificationStats.level.xpToNextLevel} XP to next level</p>
-              </div>
-            )}
+            </p>
           </div>
-          <button
-            onClick={() => {
-              const liveSession = joinedSessions.find(s => s.is_live);
-              navigate(liveSession
-                ? `/student/leaderboard/${liveSession.session_id}`
-                : '/student/leaderboard'
-              );
-            }}
-            className="bg-white/20 hover:bg-white/30 px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 w-full sm:w-auto"
+          <Button
+            variant="glass"
+            onClick={() => navigate('/student/join')}
+            className="w-full sm:w-auto bg-white/15 hover:bg-white/25 text-white border-white/20 font-semibold"
           >
-            View Leaderboard
-          </button>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Join Session
+          </Button>
         </div>
       </div>
 
-      {/* Return to Class Banner — shown when a live session exists */}
-      {(() => {
-        const liveSession = joinedSessions.find(s => s.is_live);
-        if (!liveSession) return null;
-        return (
-          <div className="bg-teal-600 dark:bg-teal-700 rounded-xl p-4 text-white flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-lg">
+      {/* Live session banner */}
+      {liveSession && (
+        <div className="rounded-2xl border border-teal-300/60 bg-teal-50/80 dark:bg-teal-900/20 dark:border-teal-700/60 backdrop-blur-md p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-glass">
+          <div className="flex items-center gap-3">
+            <div className="w-2.5 h-2.5 rounded-full bg-teal-500 animate-pulse-glow flex-shrink-0" />
+            <div>
+              <p className="font-bold text-teal-900 dark:text-teal-100 text-sm">Class is live right now!</p>
+              <p className="text-teal-700 dark:text-teal-300 text-xs">{liveSession.title} — {liveSession.course_name}</p>
+            </div>
+          </div>
+          <Button
+            variant="teal"
+            size="sm"
+            onClick={async () => {
+              await rejoinSession(liveSession.session_id, currentUser.id);
+              navigate(`/student/session/${liveSession.session_id}`);
+            }}
+            className="w-full sm:w-auto"
+          >
+            Return to Class →
+          </Button>
+        </div>
+      )}
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {statCards.map((stat, i) => (
+          <Card key={stat.label} variant="glass" className="hover:shadow-card-hover transition-shadow duration-200 animate-fade-up" style={{ animationDelay: `${i * 60}ms` }}>
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3">
+                <div className={`p-2 rounded-xl ${stat.iconBg} w-fit mb-2 sm:mb-0 flex-shrink-0`}>
+                  <svg className={`w-5 h-5 ${stat.iconColor}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={stat.icon} />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{stat.label}</p>
+                  <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{stat.value}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Gamification XP Card */}
+      <Card variant="glass" className="overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary-500/5 to-accent-500/5 pointer-events-none" />
+        <CardContent className="p-4 sm:p-6 relative">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs font-semibold bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 px-2.5 py-0.5 rounded-full">
+                  Lv{gamificationStats.level?.level} · {gamificationStats.level?.title}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                {[
+                  { v: gamificationStats.totalXP || 0, l: 'Total XP' },
+                  { v: `#${gamificationStats.rank}`, l: 'Rank' },
+                  { v: gamificationStats.totalPoints || 0, l: 'Points' },
+                ].map(({ v, l }) => (
+                  <div key={l}>
+                    <p className="text-xl sm:text-3xl font-bold font-display text-slate-900 dark:text-white">{v}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{l}</p>
+                  </div>
+                ))}
+              </div>
+              {gamificationStats.level?.nextLevelXP && (
+                <div className="max-w-xs">
+                  <div className="h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
+                    <div
+                      className="h-full bg-gradient-to-r from-primary-500 to-accent-500 rounded-full transition-all duration-500"
+                      style={{ width: `${xpPct}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-400">{gamificationStats.level.xpToNextLevel} XP to next level</p>
+                </div>
+              )}
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => {
+                navigate(liveSession ? `/student/leaderboard/${liveSession.session_id}` : '/student/leaderboard');
+              }}
+              className="w-full sm:w-auto"
+            >
+              View Leaderboard
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Weak Topics */}
+      {weakTopics.length > 0 && (
+        <Card variant="glass" className="border-warning-500/30 dark:border-warning-500/20">
+          <CardHeader className="border-b border-slate-200/60 dark:border-slate-700/60">
             <div className="flex items-center gap-3">
-              <div className="w-3 h-3 rounded-full bg-white animate-pulse flex-shrink-0" />
+              <div className="p-2 rounded-xl bg-warning-100 dark:bg-warning-900/30">
+                <svg className="w-5 h-5 text-warning-600 dark:text-warning-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
               <div>
-                <p className="font-bold text-sm sm:text-base">Class is live right now!</p>
-                <p className="text-teal-100 text-xs sm:text-sm">{liveSession.title} — {liveSession.course_name}</p>
+                <CardTitle>Needs Revision</CardTitle>
+                <CardDescription>Topics where you've answered incorrectly</CardDescription>
               </div>
             </div>
-            <button
-              onClick={async () => {
-                await rejoinSession(liveSession.session_id, currentUser.id);
-                navigate(`/student/session/${liveSession.session_id}`);
-              }}
-              className="bg-white text-teal-700 hover:bg-teal-50 active:bg-teal-100 font-bold py-2.5 px-5 rounded-lg text-sm w-full sm:w-auto text-center"
-            >
-              Return to Class →
-            </button>
-          </div>
-        );
-      })()}
-
-      {/* Weak Topics Panel */}
-      {weakTopics.length > 0 && (
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-card border border-orange-200 dark:border-orange-800/60">
-          <div className="p-4 sm:p-6 border-b border-orange-100 dark:border-orange-800/40 flex items-center gap-3">
-            <span className="text-xl">⚠️</span>
-            <div>
-              <h2 className="text-lg font-bold font-display text-slate-900 dark:text-white">Needs Revision</h2>
-              <p className="text-slate-500 dark:text-slate-400 text-sm">Topics where you've answered incorrectly</p>
-            </div>
-          </div>
-          <div className="p-4 sm:p-6 space-y-4">
+          </CardHeader>
+          <CardContent className="p-4 sm:p-6 space-y-3">
             {weakTopics.map((topic, i) => (
-              <div key={i} className="rounded-xl border border-orange-100 dark:border-orange-800/40 bg-orange-50 dark:bg-orange-900/10 p-4">
+              <div key={i} className="rounded-xl border border-warning-200/60 dark:border-warning-800/40 bg-warning-50/60 dark:bg-warning-900/10 p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm">{topic.course}</span>
-                  <span className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 px-2 py-0.5 rounded-full font-medium">
-                    {topic.wrongCount} wrong
-                  </span>
+                  <Badge variant="warning">{topic.wrongCount} wrong</Badge>
                 </div>
                 <div className="space-y-2">
                   {topic.questions.map((q, j) => (
-                    <div key={j} className="text-xs text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 rounded-lg p-2.5 border border-orange-100 dark:border-orange-800/30">
+                    <div key={j} className="text-xs bg-white/80 dark:bg-slate-800/80 rounded-lg p-2.5 border border-warning-100 dark:border-warning-800/30">
                       <p className="font-medium text-slate-700 dark:text-slate-300 mb-1">{q.question}</p>
-                      <p className="text-red-500 dark:text-red-400">Your answer: {q.yourAnswer}</p>
-                      <p className="text-green-600 dark:text-green-400">Correct: {q.correctAnswer}</p>
+                      <p className="text-error-500">Your answer: {q.yourAnswer}</p>
+                      <p className="text-success-600 dark:text-success-400">Correct: {q.correctAnswer}</p>
                     </div>
                   ))}
                 </div>
               </div>
             ))}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Your Sessions */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-card border border-slate-200/80 dark:border-slate-700/80">
-        <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700">
-          <h2 className="text-lg sm:text-xl font-bold font-display text-slate-900 dark:text-white">Your Sessions</h2>
-          <p className="text-slate-600 dark:text-slate-400 mt-1 text-sm">Sessions you've joined</p>
-        </div>
+      {/* Sessions */}
+      <Card variant="glass">
+        <CardHeader className="border-b border-slate-200/60 dark:border-slate-700/60">
+          <CardTitle>Your Sessions</CardTitle>
+          <CardDescription>Sessions you've joined</CardDescription>
+        </CardHeader>
 
         {joinedSessions.length === 0 ? (
-          <div className="p-8 sm:p-12 text-center">
-            <svg className="w-12 h-12 sm:w-16 sm:h-16 text-slate-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-            <h3 className="text-lg sm:text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">No sessions yet</h3>
-            <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">Join your first session to start</p>
-            <button
-              onClick={() => navigate('/student/join')}
-              className="bg-saradhi-700 hover:bg-saradhi-600 text-white font-medium py-3 px-6 rounded-xl transition-colors duration-200 w-full sm:w-auto"
-            >
+          <CardContent className="py-12 text-center">
+            <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300 mb-2">No sessions yet</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Join your first session to start learning</p>
+            <Button onClick={() => navigate('/student/join')} className="w-full sm:w-auto">
               Join a Session
-            </button>
-          </div>
+            </Button>
+          </CardContent>
         ) : (
-          <div className="divide-y divide-slate-200 dark:divide-slate-700">
+          <div className="divide-y divide-slate-200/60 dark:divide-slate-700/60">
             {joinedSessions.map((session) => (
-              <div key={session.id} className="p-4 sm:p-6 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors duration-200">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div key={session.id} className="p-4 sm:p-5 hover:bg-primary-50/40 dark:hover:bg-primary-900/10 transition-colors duration-200">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white truncate">{session.title}</h3>
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <h3 className="text-base font-semibold text-slate-900 dark:text-white truncate">{session.title}</h3>
                       {session.is_live ? (
                         <Badge variant="live" dot>Live</Badge>
                       ) : session.is_active ? (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-saradhi-100 text-saradhi-700 dark:bg-saradhi-900/30 dark:text-saradhi-400">
-                          Ready
-                        </span>
+                        <Badge variant="primary">Ready</Badge>
                       ) : (
                         <Badge variant="ended" dot>Ended</Badge>
                       )}
                     </div>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 truncate">{session.course_name}</p>
-                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-                      <span className="font-medium">{session.session_id}</span>
-                      <span className="mx-2">|</span>
-                      <span>{session.teacher_name}</span>
-                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{session.course_name}</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 font-mono">{session.session_id} · {session.teacher_name}</p>
                   </div>
-                  <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 w-full sm:w-auto">
+                  <div className="flex flex-wrap gap-2">
                     {session.is_live && (
-                      <button
+                      <Button
+                        size="sm"
+                        variant="teal"
                         onClick={async () => {
                           await rejoinSession(session.session_id, currentUser.id);
                           navigate(`/student/session/${session.session_id}`);
                         }}
-                        className="bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-medium py-2.5 px-3 rounded-lg transition-colors duration-200 text-sm col-span-2 sm:col-span-1"
                       >
                         Join Live
-                      </button>
+                      </Button>
                     )}
-
-                    <button
-                      onClick={() => navigate(`/student/session/${session.session_id}/history`)}
-                      className="bg-slate-600 hover:bg-slate-700 text-white font-medium py-2.5 px-3 rounded-lg transition-colors duration-200 text-sm"
-                    >
+                    <Button size="sm" variant="secondary" onClick={() => navigate(`/student/session/${session.session_id}/history`)}>
                       View
-                    </button>
-
-                    <Button
-                      size="sm"
-                      onClick={() => navigate(`/session/${session.session_id}/resources`)}
-                    >
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => navigate(`/session/${session.session_id}/resources`)}>
                       Resources
                     </Button>
-
-                    <Button
-                      size="sm"
-                      onClick={() => navigate(`/community/session/${session.session_id}`)}
-                      className="bg-teal-600 hover:bg-teal-700 text-white"
-                    >
+                    <Button size="sm" variant="outline" onClick={() => navigate(`/community/session/${session.session_id}`)}>
                       Doubts
                     </Button>
-
-                    <Button
-                      size="sm"
-                      onClick={() => navigate(`/student/ai-assistant/${session.session_id}`)}
-                      className="bg-saradhi-700 hover:bg-saradhi-600 text-white"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <Button size="sm" onClick={() => navigate(`/student/ai-assistant/${session.session_id}`)}>
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                       </svg>
                       AI Tutor
@@ -475,7 +397,7 @@ const EnhancedStudentDashboard = () => {
             ))}
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 };

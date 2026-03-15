@@ -66,12 +66,12 @@ const PollCreation = ({ sessionId, onPollCreated }) => {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="label dark:text-gray-300">Question *</label>
+          <label className="label dark:text-slate-300">Question *</label>
           <textarea
             name="question"
             value={formData.question}
             onChange={handleChange}
-            className="input-field dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            className="input-field dark:bg-slate-700 dark:border-slate-600 dark:text-white"
             rows="3"
             placeholder="Enter your question here..."
             required
@@ -79,18 +79,18 @@ const PollCreation = ({ sessionId, onPollCreated }) => {
         </div>
 
         <div>
-          <label className="label dark:text-gray-300">Options *</label>
+          <label className="label dark:text-slate-300">Options *</label>
           <div className="space-y-2">
             {formData.options.map((option, index) => (
               <div key={index} className="flex items-center space-x-2">
-                <span className="text-sm font-medium text-gray-600 dark:text-gray-400 w-8">
+                <span className="text-sm font-medium text-slate-600 dark:text-slate-400 w-8">
                   {String.fromCharCode(65 + index)}.
                 </span>
                 <input
                   type="text"
                   value={option}
                   onChange={(e) => handleOptionChange(index, e.target.value)}
-                  className="input-field flex-1 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  className="input-field flex-1 dark:bg-slate-700 dark:border-slate-600 dark:text-white"
                   placeholder={`Option ${String.fromCharCode(65 + index)}`}
                   required
                 />
@@ -102,31 +102,31 @@ const PollCreation = ({ sessionId, onPollCreated }) => {
                   onChange={handleChange}
                   className="text-primary-600"
                 />
-                <span className="text-sm text-gray-500 dark:text-gray-400">Correct</span>
+                <span className="text-sm text-slate-500 dark:text-slate-400">Correct</span>
               </div>
             ))}
           </div>
         </div>
 
         <div>
-          <label className="label dark:text-gray-300">Justification/Explanation</label>
+          <label className="label dark:text-slate-300">Justification/Explanation</label>
           <textarea
             name="justification"
             value={formData.justification}
             onChange={handleChange}
-            className="input-field dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            className="input-field dark:bg-slate-700 dark:border-slate-600 dark:text-white"
             rows="2"
             placeholder="Explain why the correct answer is right..."
           />
         </div>
 
         <div>
-          <label className="label dark:text-gray-300">Time Limit (seconds)</label>
+          <label className="label dark:text-slate-300">Time Limit (seconds)</label>
           <select
             name="time_limit"
             value={formData.time_limit}
             onChange={handleChange}
-            className="input-field dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            className="input-field dark:bg-slate-700 dark:border-slate-600 dark:text-white"
           >
             <option value={30}>30 seconds</option>
             <option value={60}>1 minute</option>

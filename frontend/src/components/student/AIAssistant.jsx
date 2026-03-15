@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { utils, apiRequest } from '../../utils/api';
-import { useTheme } from '../../context/ThemeContext';
 import { useAIChat } from '../../hooks/useAIChat';
 import SourceCard from './SourceCard';
 import QuizCard from './QuizCard';
@@ -9,8 +8,6 @@ import QuizCard from './QuizCard';
 const AIAssistant = () => {
   const navigate = useNavigate();
   const { sessionId } = useParams();
-  const { theme } = useTheme();
-  const darkMode = theme === 'dark';
   const currentUser = utils.getCurrentUser();
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -21,77 +18,30 @@ const AIAssistant = () => {
   const [showSidebar, setShowSidebar] = useState(false);
   const [doubtedMessages, setDoubtedMessages] = useState(new Set());
   const [resources, setResources] = useState([]);
-  const [selectedResource, setSelectedResource] = useState(null); // { id, title, file_name }
+  const [selectedResource, setSelectedResource] = useState(null);
   const [showResourcePicker, setShowResourcePicker] = useState(false);
   const resourcePickerRef = useRef(null);
 
   const {
-    messages,
-    isStreaming,
-    currentStatus,
-    conversations,
-    activeConversationId,
-    error,
-    sendMessage,
-    cancelStream,
-    loadConversations,
-    loadConversation,
-    startNewConversation,
-    deleteConversation,
-    markAsDoubt,
-    setError,
+    messages, isStreaming, currentStatus, conversations, activeConversationId,
+    error, sendMessage, cancelStream, loadConversations, loadConversation,
+    startNewConversation, deleteConversation, markAsDoubt, setError,
   } = useAIChat(sessionId);
 
-  // Scroll to bottom when messages change
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
+  useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
+
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
-
-  // Auth guard and session info
-  useEffect(() => {
-    if (!currentUser || currentUser.role !== 'student') {
-      navigate('/auth');
-      return;
-    }
-    if (!sessionId) {
-      navigate('/student/dashboard');
-      return;
-    }
-
-    apiRequest(`/sessions/${sessionId}`)
-      .then(data => setSessionInfo(data))
-      .catch(() => {});
-
-    apiRequest(`/resources/session/${sessionId}`)
-      .then(data => setResources(data.resources || []))
-      .catch(() => {});
-
+    if (!currentUser || currentUser.role !== 'student') { navigate('/auth'); return; }
+    if (!sessionId) { navigate('/student/dashboard'); return; }
+    apiRequest(`/sessions/${sessionId}`).then(data => setSessionInfo(data)).catch(() => {});
+    apiRequest(`/resources/session/${sessionId}`).then(data => setResources(data.resources || [])).catch(() => {});
     loadConversations();
   }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSend = () => {
-    if (!inputMessage.trim() || isStreaming) return;
-    sendMessage(inputMessage.trim(), activeMode, selectedResource?.id || null);
-    setInputMessage('');
-    inputRef.current?.focus();
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
-  const handleSuggestionClick = (suggestion) => {
-    sendMessage(suggestion, activeMode, selectedResource?.id || null);
-  };
-
-  // Close resource picker when clicking outside
   useEffect(() => {
     const handler = (e) => {
       if (resourcePickerRef.current && !resourcePickerRef.current.contains(e.target)) {
@@ -102,23 +52,24 @@ const AIAssistant = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleDoubt = async (messageId) => {
-    const success = await markAsDoubt(messageId);
-    if (success) {
-      setDoubtedMessages(prev => new Set([...prev, messageId]));
-    }
+  const handleSend = () => {
+    if (!inputMessage.trim() || isStreaming) return;
+    sendMessage(inputMessage.trim(), activeMode, selectedResource?.id || null);
+    setInputMessage('');
+    inputRef.current?.focus();
   };
 
-  // Theme colors
-  const colors = {
-    bg: darkMode ? '#0f172a' : '#f8fafc',
-    surface: darkMode ? '#1e293b' : '#ffffff',
-    border: darkMode ? '#334155' : '#e2e8f0',
-    text: darkMode ? '#e2e8f0' : '#1e293b',
-    textMuted: darkMode ? '#94a3b8' : '#64748b',
-    primary: '#3b82f6',
-    userBubble: '#3b82f6',
-    assistantBubble: darkMode ? '#1e293b' : '#ffffff',
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  };
+
+  const handleSuggestionClick = (suggestion) => {
+    sendMessage(suggestion, activeMode, selectedResource?.id || null);
+  };
+
+  const handleDoubt = async (messageId) => {
+    const success = await markAsDoubt(messageId);
+    if (success) setDoubtedMessages(prev => new Set([...prev, messageId]));
   };
 
   const modes = [
@@ -128,188 +79,121 @@ const AIAssistant = () => {
     { key: 'summarize', label: 'Summary' },
   ];
 
-  const confidenceColors = {
-    high: '#22c55e',
-    medium: '#f59e0b',
-    low: '#ef4444',
-    none: '#6b7280',
+  const statusMessages = {
+    starting: 'Starting...', classifying: 'Understanding your question...',
+    retrieving: 'Searching course materials...', generating: 'Generating answer...',
+    summarizing: 'Creating summary...', 'generating quiz': 'Creating quiz questions...',
   };
 
-  const statusMessages = {
-    starting: 'Starting...',
-    classifying: 'Understanding your question...',
-    retrieving: 'Searching course materials...',
-    generating: 'Generating answer...',
-    summarizing: 'Creating summary...',
-    'generating quiz': 'Creating quiz questions...',
-  };
+  const confidenceColors = { high: 'bg-emerald-500', medium: 'bg-amber-500', low: 'bg-red-500', none: 'bg-slate-400' };
+
+  const suggestions = selectedResource ? [
+    `Summarize "${selectedResource.title || selectedResource.file_name}"`,
+    'What are the key concepts?', 'Quiz me on this document', 'Most important points?',
+  ] : ['What topics are covered?', 'List all resources', 'Explain the main concepts', 'Generate a practice quiz'];
 
   return (
-    <div style={{
-      display: 'flex',
-      height: '100vh',
-      backgroundColor: colors.bg,
-      color: colors.text,
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    }}>
-      {/* Sidebar */}
-      <div style={{
-        width: showSidebar ? '280px' : '0px',
-        borderRight: showSidebar ? `1px solid ${colors.border}` : 'none',
-        backgroundColor: colors.surface,
-        overflow: 'hidden',
-        transition: 'width 0.2s',
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
-        <div style={{ padding: '16px', borderBottom: `1px solid ${colors.border}` }}>
-          <button
-            onClick={() => { startNewConversation(); setShowSidebar(false); }}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              backgroundColor: colors.primary,
-              color: '#fff',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: 500,
-            }}
-          >
-            + New Chat
-          </button>
-        </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
-          {conversations.map(conv => (
-            <div
-              key={conv.id}
-              onClick={() => { loadConversation(conv.id); setShowSidebar(false); }}
-              style={{
-                padding: '10px 12px',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                marginBottom: '4px',
-                backgroundColor: conv.id === activeConversationId ? (darkMode ? '#334155' : '#e0e7ff') : 'transparent',
-                fontSize: '13px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                {conv.title || 'Untitled'}
-              </span>
+    <div className="flex h-[calc(100vh-56px)] bg-slate-50 dark:bg-slate-950">
+
+      {/* ── Conversation sidebar ── */}
+      <div className={`flex-col bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-r border-slate-200/60 dark:border-slate-700/60 transition-all duration-200 overflow-hidden flex-shrink-0 ${showSidebar ? 'w-72 flex' : 'w-0 hidden md:flex md:w-0'}`}>
+        {showSidebar && (
+          <>
+            <div className="p-3 border-b border-slate-200/60 dark:border-slate-700/60">
               <button
-                onClick={(e) => { e.stopPropagation(); deleteConversation(conv.id); }}
-                style={{
-                  background: 'none', border: 'none', color: colors.textMuted,
-                  cursor: 'pointer', fontSize: '14px', padding: '2px 4px',
-                }}
-                title="Delete"
+                onClick={() => { startNewConversation(); setShowSidebar(false); }}
+                className="w-full bg-primary-600 hover:bg-primary-500 active:bg-primary-700 text-white text-sm font-medium py-2 px-3 rounded-xl transition-colors cursor-pointer"
               >
-                x
+                + New Chat
               </button>
             </div>
-          ))}
-          {conversations.length === 0 && (
-            <p style={{ color: colors.textMuted, fontSize: '12px', textAlign: 'center', padding: '20px' }}>
-              No conversations yet
-            </p>
-          )}
-        </div>
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {conversations.map(conv => (
+                <div
+                  key={conv.id}
+                  onClick={() => { loadConversation(conv.id); setShowSidebar(false); }}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer text-sm transition-colors ${conv.id === activeConversationId ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'}`}
+                >
+                  <span className="flex-1 truncate">{conv.title || 'Untitled'}</span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); deleteConversation(conv.id); }}
+                    className="text-slate-400 hover:text-red-500 transition-colors p-0.5 cursor-pointer flex-shrink-0"
+                    title="Delete"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+              {conversations.length === 0 && (
+                <p className="text-xs text-slate-400 text-center py-6">No conversations yet</p>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Main chat area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      {/* ── Main chat area ── */}
+      <div className="flex-1 flex flex-col min-w-0">
+
         {/* Header */}
-        <div style={{
-          padding: '12px 16px',
-          borderBottom: `1px solid ${colors.border}`,
-          backgroundColor: colors.surface,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-        }}>
+        <div className="flex items-center gap-3 px-4 py-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/60 dark:border-slate-700/60 flex-shrink-0">
           <button
-            onClick={() => setShowSidebar(!showSidebar)}
-            style={{
-              background: 'none', border: 'none', color: colors.text,
-              cursor: 'pointer', fontSize: '18px', padding: '4px',
-            }}
+            onClick={() => setShowSidebar(v => !v)}
+            className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-colors cursor-pointer"
+            aria-label="Toggle sidebar"
           >
-            {showSidebar ? '\u2190' : '\u2630'}
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+            </svg>
           </button>
-          <div style={{ flex: 1 }}>
-            <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>
-              AI Study Assistant
-            </h2>
-            {sessionInfo && (
-              <p style={{ margin: 0, fontSize: '12px', color: colors.textMuted }}>
-                {sessionInfo.name || sessionInfo.session_name || sessionId}
-              </p>
-            )}
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center flex-shrink-0">
+                <svg className="w-4 h-4 text-teal-600 dark:text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-white leading-tight">AI Study Assistant</h2>
+                {sessionInfo && (
+                  <p className="text-xs text-slate-400 truncate">{sessionInfo.name || sessionInfo.session_name || sessionId}</p>
+                )}
+              </div>
+            </div>
           </div>
+
           <button
             onClick={() => navigate('/student/dashboard')}
-            style={{
-              padding: '6px 12px',
-              backgroundColor: 'transparent',
-              color: colors.textMuted,
-              border: `1px solid ${colors.border}`,
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '12px',
-            }}
+            className="text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
           >
-            Back
+            ← Back
           </button>
         </div>
 
         {/* Messages */}
-        <div style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-        }}>
-          {/* Welcome screen */}
+        <div className="flex-1 overflow-y-auto px-4 py-5 space-y-4">
           {messages.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-              <h3 style={{ margin: '0 0 8px', fontSize: '20px', fontWeight: 600 }}>
-                AI Study Assistant
-              </h3>
-              <p style={{ color: colors.textMuted, fontSize: '14px', maxWidth: '400px', margin: '0 auto 24px' }}>
+            <div className="flex flex-col items-center justify-center h-full text-center pb-8">
+              <div className="w-16 h-16 rounded-2xl bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center mb-4">
+                <svg className="w-8 h-8 text-teal-600 dark:text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-1">AI Study Assistant</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mb-6">
                 {selectedResource
                   ? `Asking about: ${selectedResource.title || selectedResource.file_name}`
                   : 'Ask questions about your course materials, get explanations, generate quizzes, or summarize resources.'}
               </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
-                {(selectedResource ? [
-                  `Summarize "${selectedResource.title || selectedResource.file_name}"`,
-                  'What are the key concepts?',
-                  'Quiz me on this document',
-                  'What are the most important points?',
-                ] : [
-                  'What topics are covered?',
-                  'List all resources',
-                  'Explain the main concepts',
-                  'Generate a practice quiz',
-                ]).map((s, i) => (
+              <div className="flex flex-wrap gap-2 justify-center">
+                {suggestions.map((s, i) => (
                   <button
                     key={i}
                     onClick={() => handleSuggestionClick(s)}
-                    style={{
-                      padding: '8px 14px',
-                      backgroundColor: colors.surface,
-                      border: `1px solid ${colors.border}`,
-                      borderRadius: '20px',
-                      color: colors.text,
-                      cursor: 'pointer',
-                      fontSize: '13px',
-                    }}
+                    className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full text-sm text-slate-700 dark:text-slate-300 hover:border-primary-300 dark:hover:border-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors cursor-pointer"
                   >
                     {s}
                   </button>
@@ -318,13 +202,10 @@ const AIAssistant = () => {
             </div>
           )}
 
-          {/* Message list */}
           {messages.map((msg, idx) => (
             <MessageBubble
               key={msg.id || idx}
               msg={msg}
-              colors={colors}
-              darkMode={darkMode}
               currentStatus={currentStatus}
               statusMessages={statusMessages}
               confidenceColors={confidenceColors}
@@ -335,22 +216,14 @@ const AIAssistant = () => {
             />
           ))}
 
-          {/* Error */}
           {error && (
-            <div style={{
-              padding: '10px 16px',
-              backgroundColor: darkMode ? '#450a0a' : '#fef2f2',
-              border: `1px solid ${darkMode ? '#7f1d1d' : '#fecaca'}`,
-              borderRadius: '8px',
-              color: darkMode ? '#fca5a5' : '#dc2626',
-              fontSize: '13px',
-              display: 'flex',
-              justifyContent: 'space-between',
-            }}>
-              {error}
-              <button onClick={() => setError(null)} style={{
-                background: 'none', border: 'none', color: 'inherit', cursor: 'pointer',
-              }}>x</button>
+            <div className="flex items-center justify-between gap-3 bg-error-50 dark:bg-error-900/20 border border-error-200 dark:border-error-800 rounded-xl px-4 py-3 text-sm text-error-700 dark:text-error-300">
+              <span>{error}</span>
+              <button onClick={() => setError(null)} className="text-error-500 hover:text-error-700 cursor-pointer flex-shrink-0">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
           )}
 
@@ -358,119 +231,67 @@ const AIAssistant = () => {
         </div>
 
         {/* Input area */}
-        <div style={{
-          borderTop: `1px solid ${colors.border}`,
-          backgroundColor: colors.surface,
-          padding: '12px 16px',
-        }}>
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="border-t border-slate-200/60 dark:border-slate-700/60 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-3 flex-shrink-0">
+          {/* Mode pills + resource picker */}
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
             {modes.map(m => (
               <button
                 key={m.key}
                 onClick={() => setActiveMode(m.key)}
-                style={{
-                  padding: '4px 12px',
-                  backgroundColor: activeMode === m.key ? colors.primary : 'transparent',
-                  color: activeMode === m.key ? '#fff' : colors.textMuted,
-                  border: `1px solid ${activeMode === m.key ? colors.primary : colors.border}`,
-                  borderRadius: '14px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: activeMode === m.key ? 600 : 400,
-                }}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer border ${
+                  activeMode === m.key
+                    ? 'bg-primary-600 text-white border-primary-600'
+                    : 'bg-transparent text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-primary-300 dark:hover:border-primary-600'
+                }`}
               >
                 {m.label}
               </button>
             ))}
 
-            {/* File picker */}
-            <div ref={resourcePickerRef} style={{ marginLeft: 'auto', position: 'relative' }}>
+            <div ref={resourcePickerRef} className="ml-auto relative">
               {selectedResource ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span style={{
-                    display: 'flex', alignItems: 'center', gap: '5px',
-                    padding: '3px 8px 3px 10px',
-                    backgroundColor: darkMode ? '#1e3a5f' : '#dbeafe',
-                    color: darkMode ? '#93c5fd' : '#1d4ed8',
-                    border: `1px solid ${darkMode ? '#2563eb' : '#bfdbfe'}`,
-                    borderRadius: '12px', fontSize: '11px', fontWeight: 500,
-                  }}>
-                    &#128196; {selectedResource.title || selectedResource.file_name}
-                    <button
-                      onClick={() => setSelectedResource(null)}
-                      title="Clear file filter"
-                      style={{
-                        background: 'none', border: 'none', cursor: 'pointer',
-                        color: 'inherit', fontSize: '13px', lineHeight: 1, padding: '0 2px',
-                      }}
-                    >
-                      &times;
-                    </button>
-                  </span>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-primary-100 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-800 rounded-full text-xs text-primary-700 dark:text-primary-300">
+                  <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span className="max-w-[120px] truncate">{selectedResource.title || selectedResource.file_name}</span>
+                  <button onClick={() => setSelectedResource(null)} className="hover:text-primary-900 cursor-pointer" title="Clear">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
               ) : (
                 <button
                   onClick={() => setShowResourcePicker(v => !v)}
+                  className="flex items-center gap-1.5 px-3 py-1 text-xs text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded-full hover:border-primary-300 transition-colors cursor-pointer"
                   title="Ask about a specific file"
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '5px',
-                    padding: '4px 10px',
-                    backgroundColor: 'transparent',
-                    color: colors.textMuted,
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: '14px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                  }}
                 >
-                  &#128196; File
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                  </svg>
+                  File
                 </button>
               )}
 
-              {/* Dropdown */}
               {showResourcePicker && !selectedResource && (
-                <div style={{
-                  position: 'absolute', bottom: '110%', right: 0,
-                  backgroundColor: colors.surface,
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '10px',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-                  minWidth: '240px', maxWidth: '320px',
-                  zIndex: 100, overflow: 'hidden',
-                }}>
-                  <div style={{
-                    padding: '8px 12px',
-                    fontSize: '11px', fontWeight: 600, color: colors.textMuted,
-                    textTransform: 'uppercase', letterSpacing: '0.05em',
-                    borderBottom: `1px solid ${colors.border}`,
-                  }}>
-                    Ask about a specific file
+                <div className="absolute bottom-full right-0 mb-2 w-64 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl border border-slate-200/60 dark:border-slate-700/60 rounded-2xl shadow-glass overflow-hidden z-50">
+                  <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200/60 dark:border-slate-700/60">
+                    Ask about a file
                   </div>
                   {resources.length === 0 ? (
-                    <div style={{ padding: '16px 12px', fontSize: '13px', color: colors.textMuted, textAlign: 'center' }}>
-                      No resources uploaded yet
-                    </div>
+                    <div className="px-3 py-4 text-xs text-slate-400 text-center">No resources uploaded yet</div>
                   ) : (
                     resources.map(r => (
                       <button
                         key={r.id}
                         onClick={() => { setSelectedResource(r); setShowResourcePicker(false); }}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: '8px',
-                          width: '100%', padding: '9px 12px', textAlign: 'left',
-                          background: 'none', border: 'none', cursor: 'pointer',
-                          color: colors.text, fontSize: '13px',
-                          borderBottom: `1px solid ${colors.border}`,
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.backgroundColor = darkMode ? '#334155' : '#f1f5f9'}
-                        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                        className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer border-b border-slate-100 dark:border-slate-700/50 last:border-0"
                       >
-                        <span style={{ fontSize: '16px', flexShrink: 0 }}>
-                          {r.resource_type === 'pdf' ? '📄' : r.resource_type === 'presentation' ? '📊' : r.resource_type === 'auto_notes' ? '✨' : '📝'}
-                        </span>
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {r.title || r.file_name}
-                        </span>
+                        <svg className="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span className="truncate">{r.title || r.file_name}</span>
                       </button>
                     ))
                   )}
@@ -479,51 +300,29 @@ const AIAssistant = () => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+          {/* Text + send */}
+          <div className="flex gap-2 items-end">
             <textarea
               ref={inputRef}
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={
-                selectedResource
-                  ? `Ask anything about "${selectedResource.title || selectedResource.file_name}"...`
-                  : activeMode === 'explain' ? 'Ask me to explain a concept...'
-                  : activeMode === 'quiz' ? 'Enter a topic for quiz questions...'
-                  : activeMode === 'summarize' ? 'Enter a file name to summarize...'
-                  : 'Ask anything about your course materials...'
+                selectedResource ? `Ask about "${selectedResource.title || selectedResource.file_name}"...`
+                : activeMode === 'explain' ? 'Ask me to explain a concept...'
+                : activeMode === 'quiz' ? 'Enter a topic for quiz questions...'
+                : activeMode === 'summarize' ? 'Enter a file name to summarize...'
+                : 'Ask anything about your course materials...'
               }
               disabled={isStreaming}
               rows={1}
-              style={{
-                flex: 1,
-                padding: '10px 14px',
-                backgroundColor: colors.bg,
-                border: `1px solid ${colors.border}`,
-                borderRadius: '10px',
-                color: colors.text,
-                fontSize: '14px',
-                resize: 'none',
-                outline: 'none',
-                minHeight: '42px',
-                maxHeight: '120px',
-                fontFamily: 'inherit',
-              }}
+              className="flex-1 resize-none rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 px-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent disabled:opacity-60 min-h-[42px] max-h-[120px] transition-colors"
+              style={{ height: '42px' }}
             />
             {isStreaming ? (
               <button
                 onClick={cancelStream}
-                style={{
-                  padding: '10px 16px',
-                  backgroundColor: '#ef4444',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  minHeight: '42px',
-                }}
+                className="bg-error-500 hover:bg-error-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer flex-shrink-0 h-[42px]"
               >
                 Stop
               </button>
@@ -531,38 +330,22 @@ const AIAssistant = () => {
               <button
                 onClick={handleSend}
                 disabled={!inputMessage.trim()}
-                style={{
-                  padding: '10px 16px',
-                  backgroundColor: inputMessage.trim() ? colors.primary : colors.border,
-                  color: inputMessage.trim() ? '#fff' : colors.textMuted,
-                  border: 'none',
-                  borderRadius: '10px',
-                  cursor: inputMessage.trim() ? 'pointer' : 'default',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  minHeight: '42px',
-                }}
+                className="bg-primary-600 hover:bg-primary-500 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white disabled:text-slate-400 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer disabled:cursor-not-allowed flex-shrink-0 h-[42px]"
               >
-                Send
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
               </button>
             )}
           </div>
         </div>
       </div>
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.3; }
-        }
-      `}</style>
     </div>
   );
 };
 
-// ─── Message Bubble Component ───────────────────────────────────────────────
-
-function MessageBubble({ msg, colors, darkMode, currentStatus, statusMessages, confidenceColors, doubtedMessages, onDoubt, onSuggestionClick, onQuickAction }) {
+// ─── Message Bubble ──────────────────────────────────────────────────────────
+function MessageBubble({ msg, currentStatus, statusMessages, confidenceColors, doubtedMessages, onDoubt, onSuggestionClick, onQuickAction }) {
   const isUser = msg.role === 'user';
   const [copied, setCopied] = React.useState(false);
 
@@ -575,67 +358,49 @@ function MessageBubble({ msg, colors, darkMode, currentStatus, statusMessages, c
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent: isUser ? 'flex-end' : 'flex-start',
-    }}>
-      <div style={{
-        maxWidth: isUser ? '70%' : '85%',
-        padding: '12px 16px',
-        borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-        backgroundColor: isUser ? colors.userBubble : colors.assistantBubble,
-        color: isUser ? '#fff' : colors.text,
-        border: isUser ? 'none' : `1px solid ${colors.border}`,
-        fontSize: '14px',
-        lineHeight: 1.6,
-      }}>
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+        isUser
+          ? 'bg-primary-600 text-white rounded-br-sm'
+          : 'bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-slate-200/60 dark:border-slate-700/60 text-slate-800 dark:text-slate-100 rounded-bl-sm shadow-card'
+      }`}>
+
         {/* Streaming indicator */}
         {msg.isStreaming && !msg.content && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: colors.textMuted }}>
-            <span style={{
-              width: '6px', height: '6px', borderRadius: '50%',
-              backgroundColor: colors.primary, animation: 'pulse 1.5s infinite',
-            }} />
-            {statusMessages[currentStatus] || 'Thinking...'}
+          <div className="flex items-center gap-2 text-slate-400">
+            <span className="flex gap-1">
+              {[0, 1, 2].map(i => (
+                <span key={i} className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-pulse-glow" style={{ animationDelay: `${i * 150}ms` }} />
+              ))}
+            </span>
+            <span className="text-xs">{statusMessages[currentStatus] || 'Thinking...'}</span>
           </div>
         )}
 
         {/* Content */}
         {msg.content && (
           <div
-            style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+            className="whitespace-pre-wrap break-words"
             dangerouslySetInnerHTML={{ __html: formatContent(msg.content) }}
           />
         )}
 
         {/* Quiz */}
         {msg.message_type === 'quiz' && msg.metadata?.questions && (
-          <div style={{ marginTop: '12px' }}>
+          <div className="mt-3">
             <QuizCard questions={msg.metadata.questions} />
           </div>
         )}
 
         {/* Resources */}
         {msg.metadata?.resources?.length > 0 && (
-          <div style={{ marginTop: '12px' }}>
+          <div className="mt-3 space-y-2">
             {msg.metadata.resources.map((r, i) => (
-              <div key={i} style={{
-                padding: '8px 12px',
-                backgroundColor: darkMode ? '#0f172a' : '#f8fafc',
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                marginBottom: '6px',
-                fontSize: '13px',
-              }}>
-                <div style={{ fontWeight: 600 }}>{r.title || r.file_name}</div>
-                {r.summary && (
-                  <div style={{ color: colors.textMuted, fontSize: '12px', marginTop: '4px' }}>
-                    {r.summary.substring(0, 150)}{r.summary.length > 150 ? '...' : ''}
-                  </div>
-                )}
+              <div key={i} className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 rounded-xl p-3 text-xs">
+                <div className="font-semibold text-slate-800 dark:text-slate-200 mb-1">{r.title || r.file_name}</div>
+                {r.summary && <div className="text-slate-500">{r.summary.substring(0, 150)}{r.summary.length > 150 ? '...' : ''}</div>}
                 {r.file_url && (
-                  <a href={r.file_url} target="_blank" rel="noopener noreferrer"
-                    style={{ color: colors.primary, fontSize: '11px', textDecoration: 'none' }}>
+                  <a href={r.file_url} target="_blank" rel="noopener noreferrer" className="text-primary-600 dark:text-primary-400 text-xs mt-1 inline-block hover:underline">
                     View Document
                   </a>
                 )}
@@ -646,97 +411,60 @@ function MessageBubble({ msg, colors, darkMode, currentStatus, statusMessages, c
 
         {/* Sources */}
         {!isUser && !msg.isStreaming && msg.metadata?.sources?.length > 0 && (
-          <div style={{ marginTop: '12px' }}>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: colors.textMuted, marginBottom: '6px', textTransform: 'uppercase' }}>
-              Sources
-            </div>
-            {msg.metadata.sources.slice(0, 3).map((s, i) => (
-              <SourceCard key={i} source={s} />
-            ))}
+          <div className="mt-3">
+            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Sources</div>
+            {msg.metadata.sources.slice(0, 3).map((s, i) => <SourceCard key={i} source={s} />)}
           </div>
         )}
 
         {/* Confidence */}
         {!isUser && !msg.isStreaming && msg.metadata?.confidenceLabel && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            marginTop: '8px', fontSize: '11px', color: colors.textMuted,
-          }}>
-            <span style={{
-              width: '8px', height: '8px', borderRadius: '50%',
-              backgroundColor: confidenceColors[msg.metadata.confidenceLabel],
-            }} />
+          <div className="flex items-center gap-1.5 mt-2 text-xs text-slate-400">
+            <span className={`w-2 h-2 rounded-full ${confidenceColors[msg.metadata.confidenceLabel] || 'bg-slate-400'}`} />
             {msg.metadata.confidenceLabel.charAt(0).toUpperCase() + msg.metadata.confidenceLabel.slice(1)} confidence
             {msg.metadata.confidence ? ` (${Math.round(msg.metadata.confidence * 100)}%)` : ''}
           </div>
         )}
 
-        {/* Copy + Doubt row */}
+        {/* Copy + Doubt */}
         {!isUser && !msg.isStreaming && msg.content && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
-            {/* Copy button */}
+          <div className="flex items-center gap-2 mt-3 flex-wrap">
             <button
               onClick={handleCopy}
-              title="Copy answer"
-              style={{
-                padding: '4px 10px',
-                backgroundColor: 'transparent',
-                border: `1px solid ${colors.border}`,
-                borderRadius: '12px',
-                color: copied ? '#22c55e' : colors.textMuted,
-                cursor: 'pointer',
-                fontSize: '11px',
-              }}
+              className={`px-2.5 py-1 border rounded-full text-xs transition-colors cursor-pointer ${
+                copied ? 'border-emerald-300 text-emerald-600' : 'border-slate-200 dark:border-slate-600 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+              }`}
             >
-              {copied ? '✓ Copied' : '⎘ Copy'}
+              {copied ? '✓ Copied' : 'Copy'}
             </button>
 
-            {/* Doubt button */}
             {msg.id && !msg.id.startsWith('temp-') && !msg.id.startsWith('stream-') && (
               !doubtedMessages.has(msg.id) ? (
                 <button
                   onClick={() => onDoubt(msg.id)}
-                  style={{
-                    padding: '4px 10px',
-                    backgroundColor: 'transparent',
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: '12px',
-                    color: colors.textMuted,
-                    cursor: 'pointer',
-                    fontSize: '11px',
-                  }}
+                  className="px-2.5 py-1 border border-slate-200 dark:border-slate-600 rounded-full text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
                 >
                   Still confused?
                 </button>
               ) : (
-                <span style={{ fontSize: '11px', color: '#f59e0b' }}>
-                  Marked as doubt ✓
-                </span>
+                <span className="text-xs text-amber-500">Marked as doubt ✓</span>
               )
             )}
           </div>
         )}
 
-        {/* Quick follow-up actions */}
+        {/* Quick actions */}
         {!isUser && !msg.isStreaming && msg.content && !msg.metadata?.questions && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+          <div className="flex flex-wrap gap-1.5 mt-2">
             {[
               { label: 'Explain simpler', text: 'Can you explain that more simply?', mode: 'explain' },
-              { label: 'Give an example', text: 'Can you give a concrete example of that?', mode: 'answer' },
-              { label: 'Quiz me on this', text: 'Quiz me on what you just explained', mode: 'quiz' },
+              { label: 'Give example', text: 'Can you give a concrete example of that?', mode: 'answer' },
+              { label: 'Quiz me', text: 'Quiz me on what you just explained', mode: 'quiz' },
             ].map((action) => (
               <button
                 key={action.label}
                 onClick={() => onQuickAction(action.text, action.mode)}
-                style={{
-                  padding: '4px 10px',
-                  backgroundColor: darkMode ? '#1e293b' : '#f8fafc',
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '12px',
-                  color: colors.textMuted,
-                  cursor: 'pointer',
-                  fontSize: '11px',
-                }}
+                className="px-2.5 py-1 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600 rounded-full text-xs text-slate-500 dark:text-slate-400 hover:border-primary-300 hover:text-primary-600 transition-colors cursor-pointer"
               >
                 {action.label}
               </button>
@@ -744,22 +472,14 @@ function MessageBubble({ msg, colors, darkMode, currentStatus, statusMessages, c
           </div>
         )}
 
-        {/* Follow-up suggestions from AI */}
+        {/* Suggested follow-ups */}
         {!isUser && !msg.isStreaming && msg.metadata?.suggestedFollowups?.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+          <div className="flex flex-wrap gap-1.5 mt-2">
             {msg.metadata.suggestedFollowups.map((s, i) => (
               <button
                 key={i}
                 onClick={() => onSuggestionClick(s)}
-                style={{
-                  padding: '4px 10px',
-                  backgroundColor: darkMode ? '#0f172a' : '#eff6ff',
-                  border: `1px solid ${darkMode ? '#1e3a5f' : '#bfdbfe'}`,
-                  borderRadius: '12px',
-                  color: colors.primary,
-                  cursor: 'pointer',
-                  fontSize: '11px',
-                }}
+                className="px-2.5 py-1 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-full text-xs text-primary-600 dark:text-primary-400 hover:bg-primary-100 transition-colors cursor-pointer"
               >
                 {s}
               </button>
@@ -774,11 +494,9 @@ function MessageBubble({ msg, colors, darkMode, currentStatus, statusMessages, c
 function formatContent(text) {
   if (!text) return '';
   return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/`([^`]+)`/g, '<code style="background:#334155;color:#e2e8f0;padding:1px 4px;border-radius:3px;font-size:12px">$1</code>')
+    .replace(/`([^`]+)`/g, '<code class="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 px-1 py-0.5 rounded text-xs font-mono">$1</code>')
     .replace(/\n/g, '<br/>');
 }
 

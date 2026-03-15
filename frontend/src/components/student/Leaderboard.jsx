@@ -28,14 +28,14 @@ function XPProgressBar({ currentXP, level }) {
     : 100;
   return (
     <div className="mt-2">
-      <div className="flex justify-between text-xs text-gray-500 mb-1">
+      <div className="flex justify-between text-xs text-slate-500 mb-1">
         <span>{currentXP} XP</span>
         {next && <span>{next.minXP} XP to Level {next.level}</span>}
         {!next && <span>Max Level!</span>}
       </div>
-      <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+      <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
         <div
-          className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500"
+          className="h-full bg-gradient-to-r from-primary-500 to-accent-500 rounded-full transition-all duration-500"
           style={{ width: `${progress}%` }}
         />
       </div>
@@ -46,10 +46,10 @@ function XPProgressBar({ currentXP, level }) {
 function LevelBadge({ level, title, small = false }) {
   const color = getLevelColor(level);
   const colorMap = {
-    gray:   'bg-gray-100 text-gray-700 border-gray-300',
+    gray:   'bg-slate-100 text-slate-700 border-slate-300',
     green:  'bg-green-100 text-green-700 border-green-300',
-    blue:   'bg-blue-100 text-blue-700 border-blue-300',
-    purple: 'bg-purple-100 text-purple-700 border-purple-300',
+    blue:   'bg-primary-100 text-primary-700 border-primary-300',
+    purple: 'bg-primary-100 text-primary-700 border-primary-300',
     yellow: 'bg-yellow-100 text-yellow-700 border-yellow-300',
     orange: 'bg-orange-100 text-orange-700 border-orange-300',
     red:    'bg-red-100 text-red-700 border-red-300'
@@ -66,7 +66,7 @@ function LevelBadge({ level, title, small = false }) {
 function TierBadge({ tier }) {
   const tiers = {
     bronze: 'bg-orange-100 text-orange-700 border-orange-300',
-    silver: 'bg-gray-100 text-gray-600 border-gray-300',
+    silver: 'bg-slate-100 text-slate-600 border-slate-300',
     gold:   'bg-yellow-100 text-yellow-700 border-yellow-300'
   };
   return (
@@ -78,9 +78,9 @@ function TierBadge({ tier }) {
 
 const getRankStyle = (rank) => {
   if (rank === 1) return 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400';
-  if (rank === 2) return 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-700 dark:text-gray-300';
+  if (rank === 2) return 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-700 dark:text-slate-300';
   if (rank === 3) return 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400';
-  return 'bg-white text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400';
+  return 'bg-white text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400';
 };
 
 const getRankIcon = (rank) => {
@@ -145,17 +145,9 @@ const Leaderboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-6 sm:py-8 px-4 sm:px-6">
-          <div className="max-w-4xl mx-auto space-y-3">
-            <div className="rounded-md h-4 w-36 bg-white/30" />
-            <div className="rounded-md h-8 w-28 bg-white/30" />
-          </div>
-        </div>
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-4">
-          <StatCardsSkeleton count={4} />
-          <LeaderboardSkeleton rows={8} />
-        </div>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-4">
+        <StatCardsSkeleton count={4} />
+        <LeaderboardSkeleton rows={8} />
       </div>
     );
   }
@@ -163,19 +155,12 @@ const Leaderboard = () => {
   const levelInfo = myXP?.level || myStats?.level;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
       {/* Header */}
-      <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-6 sm:py-8 px-4 sm:px-6">
-        <div className="max-w-4xl mx-auto">
-          <button
-            onClick={() => navigate('/student/dashboard')}
-            className="mb-3 sm:mb-4 flex items-center text-white/80 hover:text-white text-sm sm:text-base py-1"
-          >
-            <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back to Dashboard
-          </button>
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-accent-500 to-primary-700 text-white p-6 sm:p-8 mb-6 shadow-glow-accent">
+        <div className="absolute -top-8 -right-8 w-40 h-40 bg-white/10 rounded-full" />
+        <div className="absolute -bottom-6 -left-6 w-32 h-32 bg-white/5 rounded-full" />
+        <div className="relative">
           <div className="flex items-center gap-3">
             <span className="text-4xl">&#127942;</span>
             <div>
@@ -186,13 +171,13 @@ const Leaderboard = () => {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-4 sm:space-y-6">
+      <div className="space-y-4 sm:space-y-6">
 
         {/* My Stats Card */}
         {myStats && (
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+          <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-4 sm:p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">Your Stats</h2>
+              <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100">Your Stats</h2>
               {levelInfo && (
                 <LevelBadge level={levelInfo.level} title={levelInfo.title} />
               )}
@@ -200,38 +185,38 @@ const Leaderboard = () => {
 
             {/* XP Progress Bar */}
             {levelInfo && (
-              <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg">
+              <div className="mb-4 p-3 bg-gradient-to-r from-primary-50 to-accent-50 dark:from-primary-900/20 dark:to-accent-900/20 rounded-xl border border-primary-100/60 dark:border-primary-800/30">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{levelInfo.title}</span>
-                  <span className="text-xs text-gray-500">{levelInfo.currentXP} XP total</span>
+                  <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{levelInfo.title}</span>
+                  <span className="text-xs text-slate-500">{levelInfo.currentXP} XP total</span>
                 </div>
                 <XPProgressBar currentXP={levelInfo.currentXP} level={levelInfo.level} />
               </div>
             )}
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-              <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <p className="text-2xl sm:text-3xl font-bold text-blue-600 dark:text-blue-400">{myXP?.totalXP || 0}</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">Total XP</p>
+              <div className="text-center p-3 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
+                <p className="text-2xl sm:text-3xl font-bold text-primary-600 dark:text-primary-400">{myXP?.totalXP || 0}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400">Total XP</p>
               </div>
               <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                 <p className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400">#{myStats.rank}</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">Your Rank</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400">Your Rank</p>
               </div>
-              <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                <p className="text-2xl sm:text-3xl font-bold text-purple-600 dark:text-purple-400">{myStats.totalPoints || 0}</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">Session Pts</p>
+              <div className="text-center p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
+                <p className="text-2xl sm:text-3xl font-bold text-teal-600 dark:text-teal-400">{myStats.totalPoints || 0}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400">Session Pts</p>
               </div>
               <div className="text-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                 <p className="text-2xl sm:text-3xl font-bold text-orange-600 dark:text-orange-400">{myStats.totalStudents || 1}</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">Students</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400">Students</p>
               </div>
             </div>
 
             {/* Badges */}
             {myStats.badges && myStats.badges.length > 0 && (
               <div className="mt-4">
-                <h3 className="text-xs font-medium text-gray-700 dark:text-gray-400 mb-2">Your Badges</h3>
+                <h3 className="text-xs font-medium text-slate-700 dark:text-slate-400 mb-2">Your Badges</h3>
                 <div className="flex flex-wrap gap-2">
                   {myStats.badges.map((badge, i) => (
                     <div
@@ -252,14 +237,14 @@ const Leaderboard = () => {
 
         {/* View Toggle */}
         <div className="flex justify-center">
-          <div className="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-1">
+          <div className="inline-flex rounded-xl border border-slate-200/60 dark:border-slate-700/60 bg-white/75 dark:bg-slate-800/75 backdrop-blur-sm p-1 shadow-sm">
             {sessionId && (
               <button
                 onClick={() => setViewType('session')}
                 className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md transition-colors ${
                   viewType === 'session'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                    ? 'bg-primary-600 text-white'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
                 }`}
               >
                 This Session
@@ -269,8 +254,8 @@ const Leaderboard = () => {
               onClick={() => setViewType('allTime')}
               className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md transition-colors ${
                 viewType === 'allTime'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                  ? 'bg-primary-600 text-white'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
               }`}
             >
               XP Rankings
@@ -286,14 +271,14 @@ const Leaderboard = () => {
         )}
 
         {/* Leaderboard Table */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+        <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
               {viewType === 'session' ? 'Session Rankings' : 'XP Rankings (All Time)'}
             </h3>
           </div>
           {leaderboard.length > 0 ? (
-            <div className="divide-y divide-gray-100 dark:divide-gray-700">
+            <div className="divide-y divide-slate-100 dark:divide-slate-700">
               {leaderboard.map((entry) => {
                 const isMe = String(entry.studentId) === String(currentUser.id);
                 const entryLevel = entry.level;
@@ -301,7 +286,7 @@ const Leaderboard = () => {
                   <div
                     key={entry.studentId}
                     className={`flex items-center p-3 sm:p-4 transition-colors duration-150 ${
-                      isMe ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700/30'
+                      isMe ? 'bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'
                     }`}
                   >
                     {/* Rank */}
@@ -312,17 +297,17 @@ const Leaderboard = () => {
                     {/* Name + info */}
                     <div className="ml-3 sm:ml-4 flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm sm:text-base truncate">
+                        <p className="font-semibold text-slate-900 dark:text-slate-100 text-sm sm:text-base truncate">
                           {entry.studentName}
                         </p>
                         {isMe && (
-                          <span className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400 px-1.5 py-0.5 rounded-full">You</span>
+                          <span className="text-xs bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-400 px-1.5 py-0.5 rounded-full">You</span>
                         )}
                         {entryLevel && (
                           <LevelBadge level={entryLevel.level} title={entryLevel.title} small />
                         )}
                       </div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
                         {viewType === 'allTime'
                           ? `${entry.sessionsParticipated || 0} sessions · ${entry.avgAccuracy || 0}% accuracy`
                           : `${entry.correctAnswers || 0}/${entry.totalAnswers || 0} correct`
@@ -340,10 +325,10 @@ const Leaderboard = () => {
 
                     {/* Score */}
                     <div className="text-right flex-shrink-0 ml-2">
-                      <p className="text-lg sm:text-xl font-bold text-blue-600 dark:text-blue-400">
+                      <p className="text-lg sm:text-xl font-bold text-primary-600 dark:text-primary-400">
                         {viewType === 'allTime' ? (entry.totalXP || 0) : (entry.points || 0)}
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
                         {viewType === 'allTime' ? 'XP' : 'pts'}
                       </p>
                     </div>
@@ -352,7 +337,7 @@ const Leaderboard = () => {
               })}
             </div>
           ) : (
-            <div className="p-8 sm:p-12 text-center text-gray-500 dark:text-gray-400">
+            <div className="p-8 sm:p-12 text-center text-slate-500 dark:text-slate-400">
               <p className="text-3xl mb-3">&#127942;</p>
               <p className="text-sm">No rankings yet. Start answering polls to earn points!</p>
             </div>
@@ -360,14 +345,14 @@ const Leaderboard = () => {
         </div>
 
         {/* How to Earn Points (updated) */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
-          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-4">How to Earn Points & XP</h3>
+        <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-4 sm:p-6">
+          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-4">How to Earn Points & XP</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
-              { pts: '+3',  color: 'bg-gray-100 text-gray-700',   label: 'Participation',    desc: 'Answer any poll' },
+              { pts: '+3',  color: 'bg-slate-100 text-slate-700',   label: 'Participation',    desc: 'Answer any poll' },
               { pts: '+10', color: 'bg-green-100 text-green-700', label: 'Correct Answer',   desc: 'Get the right answer' },
               { pts: '+5–15', color: 'bg-yellow-100 text-yellow-700', label: 'Difficulty Bonus', desc: 'Harder questions = more points' },
-              { pts: '+5',  color: 'bg-blue-100 text-blue-700',   label: 'Improvement',      desc: 'Right after being wrong' },
+              { pts: '+5',  color: 'bg-primary-100 text-primary-700',   label: 'Improvement',      desc: 'Right after being wrong' },
               { pts: '+10', color: 'bg-purple-100 text-purple-700', label: 'All Polls Done', desc: 'Answer every poll in a session' },
               { pts: '+5',  color: 'bg-teal-100 text-teal-700',   label: 'Attendance',       desc: 'Show up to class' },
               { pts: '+20 XP', color: 'bg-indigo-100 text-indigo-700', label: 'Session XP',  desc: 'Per session participated' },
@@ -378,8 +363,8 @@ const Leaderboard = () => {
                   {item.pts}
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900 dark:text-gray-100 text-sm">{item.label}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{item.desc}</p>
+                  <p className="font-medium text-slate-900 dark:text-slate-100 text-sm">{item.label}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{item.desc}</p>
                 </div>
               </div>
             ))}

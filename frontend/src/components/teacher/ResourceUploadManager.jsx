@@ -197,7 +197,7 @@ const ResourceUploadManager = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="text-gray-600 dark:text-gray-400">Loading resources...</div>
+        <div className="text-slate-600 dark:text-slate-400">Loading resources...</div>
       </div>
     );
   }
@@ -208,12 +208,12 @@ const ResourceUploadManager = () => {
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Manage Resources</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">Session ID: {sessionId}</p>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Manage Resources</h1>
+            <p className="text-slate-600 dark:text-slate-400 mt-1">Session ID: {sessionId}</p>
           </div>
           <button
             onClick={() => navigate('/teacher/dashboard')}
-            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+            className="text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-blue-300"
           >
             ← Back to Dashboard
           </button>
@@ -227,7 +227,7 @@ const ResourceUploadManager = () => {
               setShowUrlForm(false);
               setError('');
             }}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition-colors duration-200 flex items-center gap-2"
+            className="bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-6 rounded-lg transition-colors duration-200 flex items-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -260,45 +260,45 @@ const ResourceUploadManager = () => {
 
       {/* File Upload Form */}
       {showUploadForm && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Upload New File</h2>
+        <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-6 mb-6">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Upload New File</h2>
           <form onSubmit={handleFileUpload}>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Select File (Max 50MB, No audio/video)
                 </label>
                 <input
                   type="file"
                   onChange={handleFileChange}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 dark:bg-gray-700 dark:text-white"
+                  className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2 dark:bg-slate-700 dark:text-white"
                   required
                 />
                 {fileData.file && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                     Selected: {fileData.file.name} ({utils.formatFileSize(fileData.file.size)})
                   </p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Title</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Title</label>
                 <input
                   type="text"
                   value={fileData.title}
                   onChange={(e) => setFileData({ ...fileData, title: e.target.value })}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 dark:bg-gray-700 dark:text-white"
+                  className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2 dark:bg-slate-700 dark:text-white"
                   placeholder="Resource title"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description (Optional)</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Description (Optional)</label>
                 <textarea
                   value={fileData.description}
                   onChange={(e) => setFileData({ ...fileData, description: e.target.value })}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 dark:bg-gray-700 dark:text-white"
+                  className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2 dark:bg-slate-700 dark:text-white"
                   rows="3"
                   placeholder="Add a description..."
                 />
@@ -312,7 +312,7 @@ const ResourceUploadManager = () => {
                   onChange={(e) => setFileData({ ...fileData, is_downloadable: e.target.checked })}
                   className="rounded"
                 />
-                <label htmlFor="file-downloadable" className="text-sm text-gray-700 dark:text-gray-300">
+                <label htmlFor="file-downloadable" className="text-sm text-slate-700 dark:text-slate-300">
                   Allow students to download
                 </label>
               </div>
@@ -321,14 +321,14 @@ const ResourceUploadManager = () => {
                 <button
                   type="submit"
                   disabled={uploading}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-2 px-6 rounded-lg"
+                  className="bg-primary-600 hover:bg-primary-700 disabled:bg-slate-400 text-white font-medium py-2 px-6 rounded-lg"
                 >
                   {uploading ? 'Uploading...' : 'Upload File'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowUploadForm(false)}
-                  className="bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-800 dark:text-gray-200 font-medium py-2 px-6 rounded-lg"
+                  className="bg-slate-300 dark:bg-slate-600 hover:bg-slate-400 dark:hover:bg-slate-500 text-slate-800 dark:text-slate-200 font-medium py-2 px-6 rounded-lg"
                 >
                   Cancel
                 </button>
@@ -340,40 +340,40 @@ const ResourceUploadManager = () => {
 
       {/* URL Form */}
       {showUrlForm && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Add URL Resource</h2>
+        <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-6 mb-6">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Add URL Resource</h2>
           <form onSubmit={handleUrlSubmit}>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Title</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Title</label>
                 <input
                   type="text"
                   value={urlData.title}
                   onChange={(e) => setUrlData({ ...urlData, title: e.target.value })}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 dark:bg-gray-700 dark:text-white"
+                  className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2 dark:bg-slate-700 dark:text-white"
                   placeholder="Resource title"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">URL</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">URL</label>
                 <input
                   type="url"
                   value={urlData.url}
                   onChange={(e) => setUrlData({ ...urlData, url: e.target.value })}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 dark:bg-gray-700 dark:text-white"
+                  className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2 dark:bg-slate-700 dark:text-white"
                   placeholder="https://example.com/resource"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description (Optional)</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Description (Optional)</label>
                 <textarea
                   value={urlData.description}
                   onChange={(e) => setUrlData({ ...urlData, description: e.target.value })}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 dark:bg-gray-700 dark:text-white"
+                  className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2 dark:bg-slate-700 dark:text-white"
                   rows="3"
                   placeholder="Add a description..."
                 />
@@ -383,14 +383,14 @@ const ResourceUploadManager = () => {
                 <button
                   type="submit"
                   disabled={uploading}
-                  className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium py-2 px-6 rounded-lg"
+                  className="bg-green-600 hover:bg-green-700 disabled:bg-slate-400 text-white font-medium py-2 px-6 rounded-lg"
                 >
                   {uploading ? 'Adding...' : 'Add URL'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowUrlForm(false)}
-                  className="bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-800 dark:text-gray-200 font-medium py-2 px-6 rounded-lg"
+                  className="bg-slate-300 dark:bg-slate-600 hover:bg-slate-400 dark:hover:bg-slate-500 text-slate-800 dark:text-slate-200 font-medium py-2 px-6 rounded-lg"
                 >
                   Cancel
                 </button>
@@ -401,30 +401,30 @@ const ResourceUploadManager = () => {
       )}
 
       {/* Resources List */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md border border-slate-200 dark:border-slate-700">
+        <div className="p-6 border-b border-slate-200 dark:border-slate-700">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">
             Uploaded Resources ({resources.length})
           </h2>
         </div>
 
         {resources.length === 0 ? (
           <div className="p-12 text-center">
-            <div className="text-gray-400 text-5xl mb-4">📂</div>
-            <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">No resources yet</h3>
-            <p className="text-gray-500 dark:text-gray-400">Upload files or add URLs to get started</p>
+            <div className="text-slate-400 text-5xl mb-4">📂</div>
+            <h3 className="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">No resources yet</h3>
+            <p className="text-slate-500 dark:text-slate-400">Upload files or add URLs to get started</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200 dark:divide-gray-700">
+          <div className="divide-y divide-slate-200 dark:divide-slate-700">
             {resources.map((resource) => (
-              <div key={resource.id} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+              <div key={resource.id} className="p-6 hover:bg-slate-50 dark:hover:bg-slate-700/50">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <span className="text-2xl">{getResourceIcon(resource.resource_type)}</span>
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{resource.title}</h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{resource.title}</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
                           {resource.resource_type} •
                           {resource.file_size ? ` ${utils.formatFileSize(resource.file_size)} • ` : ' '}
                           {new Date(resource.created_at).toLocaleDateString()}
@@ -432,9 +432,9 @@ const ResourceUploadManager = () => {
                       </div>
                     </div>
                     {resource.description && (
-                      <p className="text-gray-600 dark:text-gray-400 mb-2 ml-11">{resource.description}</p>
+                      <p className="text-slate-600 dark:text-slate-400 mb-2 ml-11">{resource.description}</p>
                     )}
-                    <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 ml-11">
+                    <div className="flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400 ml-11">
                       <span>👁️ {resource.view_count} views</span>
                       <span>⬇️ {resource.download_count} downloads</span>
                       {!resource.is_downloadable && (
@@ -448,7 +448,7 @@ const ResourceUploadManager = () => {
                       href={resource.file_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm"
+                      className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm"
                     >
                       View
                     </a>

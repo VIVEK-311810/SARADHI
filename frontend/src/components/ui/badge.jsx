@@ -9,7 +9,7 @@ const badgeVariants = cva(
       variant: {
         // ── Core ────────────────────────────────────────────────────────
         default:
-          "border-transparent bg-saradhi-700 text-white dark:bg-saradhi-600",
+          "border-transparent bg-primary-600 text-white dark:bg-primary-500",
         secondary:
           "border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300",
         destructive:
@@ -18,12 +18,17 @@ const badgeVariants = cva(
           "border-slate-200 text-slate-700 dark:border-slate-600 dark:text-slate-300",
 
         // ── Brand accents ────────────────────────────────────────────────
+        primary:
+          "border-primary-200 bg-primary-100 text-primary-700 dark:border-primary-800 dark:bg-primary-900/30 dark:text-primary-400",
+        accent:
+          "border-accent-200 bg-accent-100 text-accent-700 dark:border-accent-800 dark:bg-accent-900/30 dark:text-accent-400",
+        // legacy aliases
         coral:
-          "border-coral-200 bg-coral-100 text-coral-700 dark:border-coral-800 dark:bg-coral-900/30 dark:text-coral-400",
+          "border-accent-200 bg-accent-100 text-accent-700 dark:border-accent-800 dark:bg-accent-900/30 dark:text-accent-400",
         teal:
           "border-teal-200 bg-teal-100 text-teal-600 dark:border-teal-800 dark:bg-teal-900/30 dark:text-teal-400",
         saradhi:
-          "border-saradhi-200 bg-saradhi-100 text-saradhi-700 dark:border-saradhi-800 dark:bg-saradhi-900/30 dark:text-saradhi-400",
+          "border-primary-200 bg-primary-100 text-primary-700 dark:border-primary-800 dark:bg-primary-900/30 dark:text-primary-400",
 
         // ── Status ───────────────────────────────────────────────────────
         success:

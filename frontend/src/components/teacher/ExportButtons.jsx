@@ -73,7 +73,7 @@ const ExportButtons = ({ sessionId, pollId, studentId, type = 'session' }) => {
       <button
         onClick={() => handleExport('csv', 'poll-results')}
         disabled={exporting}
-        className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-sm transition-colors disabled:bg-gray-400"
+        className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-sm transition-colors disabled:bg-slate-400"
         title="Export poll results to CSV"
       >
         {exporting ? (
@@ -103,7 +103,7 @@ const ExportButtons = ({ sessionId, pollId, studentId, type = 'session' }) => {
         <button
           onClick={() => handleExport('csv', 'session-responses')}
           disabled={exporting}
-          className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors disabled:bg-gray-400 text-sm"
+          className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors disabled:bg-slate-400 text-sm"
           title="Export all poll responses to CSV"
         >
           {exporting ? <SpinIcon /> : (
@@ -116,7 +116,7 @@ const ExportButtons = ({ sessionId, pollId, studentId, type = 'session' }) => {
         <button
           onClick={() => handleExport('csv', 'gamification-summary')}
           disabled={exporting}
-          className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors disabled:bg-gray-400 text-sm"
+          className="flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors disabled:bg-slate-400 text-sm"
           title="Export gamification summary (points, badges, streaks) per student"
         >
           {exporting ? <SpinIcon /> : (
@@ -129,7 +129,7 @@ const ExportButtons = ({ sessionId, pollId, studentId, type = 'session' }) => {
         <button
           onClick={() => handleExport('csv', 'detailed-responses')}
           disabled={exporting}
-          className="flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors disabled:bg-gray-400 text-sm"
+          className="flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors disabled:bg-slate-400 text-sm"
           title="Export detailed per-response breakdown with points earned"
         >
           {exporting ? <SpinIcon /> : (
@@ -142,7 +142,7 @@ const ExportButtons = ({ sessionId, pollId, studentId, type = 'session' }) => {
         <button
           onClick={() => handleExport('pdf', 'session-report')}
           disabled={exporting}
-          className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors disabled:bg-gray-400 text-sm"
+          className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors disabled:bg-slate-400 text-sm"
           title="Export session report as PDF (includes gamification leaderboard)"
         >
           {exporting ? <SpinIcon /> : (
@@ -161,7 +161,7 @@ const ExportButtons = ({ sessionId, pollId, studentId, type = 'session' }) => {
       <button
         onClick={() => handleExport('csv', 'student-performance')}
         disabled={exporting}
-        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-sm transition-colors disabled:bg-gray-400"
+        className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-lg text-sm transition-colors disabled:bg-slate-400"
         title="Export student performance"
       >
         {exporting ? (

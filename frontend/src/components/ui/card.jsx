@@ -1,15 +1,16 @@
 import * as React from "react";
 import { cn } from "../../lib/utils";
 
-const Card = React.forwardRef(({ className, ...props }, ref) => (
+const cardVariants = {
+  default:  "rounded-2xl border border-slate-200/80 bg-white shadow-card dark:bg-slate-800 dark:border-slate-700/80 transition-all duration-200",
+  glass:    "rounded-2xl border border-white/30 dark:border-slate-700/30 backdrop-blur-xl shadow-glass transition-all duration-200 bg-white/75 dark:bg-slate-800/75",
+  elevated: "rounded-2xl border border-slate-200/60 bg-white shadow-card-hover dark:bg-slate-800 dark:border-slate-700/60 transition-all duration-200",
+};
+
+const Card = React.forwardRef(({ className, variant = "default", ...props }, ref) => (
   <div
     ref={ref}
-    className={cn(
-      "rounded-2xl border border-slate-200/80 bg-white shadow-card",
-      "dark:bg-slate-800 dark:border-slate-700/80",
-      "transition-all duration-200",
-      className
-    )}
+    className={cn(cardVariants[variant] ?? cardVariants.default, className)}
     {...props}
   />
 ));

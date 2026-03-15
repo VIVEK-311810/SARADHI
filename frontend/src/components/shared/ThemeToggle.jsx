@@ -11,8 +11,8 @@ const ThemeToggle = ({ className = '' }) => {
       onClick={toggleTheme}
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       className={`relative p-2 rounded-lg transition-colors duration-200
-        text-gray-500 hover:text-gray-700 hover:bg-gray-100
-        dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700
+        text-slate-500 hover:text-slate-700 hover:bg-slate-100
+        dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700
         ${className}`}
     >
       {/* Both icons always mounted; inactive one is opacity-0 + rotated */}

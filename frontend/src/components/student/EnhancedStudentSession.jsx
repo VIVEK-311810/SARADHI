@@ -590,13 +590,13 @@ const EnhancedStudentSession = () => {
       if (isSelected && !isCorrect) {
         return 'bg-red-100 border-red-500 text-red-900 border-l-4 dark:bg-red-900/20 dark:border-red-500 dark:text-red-100';
       }
-      return 'bg-gray-50 border-gray-300 text-gray-600 dark:bg-gray-700/50 dark:border-gray-600 dark:text-gray-400';
+      return 'bg-slate-50 border-slate-300 text-slate-600 dark:bg-slate-700/50 dark:border-slate-600 dark:text-slate-400';
     }
 
     // Before results are revealed
     return selectedOption === index
-      ? 'bg-blue-100 border-blue-500 text-blue-900 border-l-4 dark:bg-blue-900/30 dark:border-blue-400 dark:text-blue-100'
-      : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700';
+      ? 'bg-primary-100 border-primary-500 text-primary-900 border-l-4 dark:bg-primary-900/30 dark:border-primary-400 dark:text-primary-100'
+      : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700';
   };
 
   // Returns an icon providing a shape-based cue alongside the color cue (colour-blind accessible)
@@ -615,9 +615,9 @@ const EnhancedStudentSession = () => {
     }
     // Pre-reveal: filled circle if selected, hollow if not
     if (selectedOption === index) {
-      return <Circle className="w-4 h-4 flex-shrink-0 fill-blue-500 text-blue-500 dark:fill-blue-400 dark:text-blue-400" />;
+      return <Circle className="w-4 h-4 flex-shrink-0 fill-blue-500 text-primary-500 dark:fill-blue-400 dark:text-primary-400" />;
     }
-    return <Circle className="w-4 h-4 flex-shrink-0 text-gray-300 dark:text-gray-600" />;
+    return <Circle className="w-4 h-4 flex-shrink-0 text-slate-300 dark:text-slate-600" />;
   };
 
   if (loading) {
@@ -666,7 +666,7 @@ const EnhancedStudentSession = () => {
 
     {/* Live Leaderboard Panel — shown when teacher enables it */}
     {leaderboardVisible && liveLeaderboard && liveLeaderboard.length > 0 && (
-      <div className="fixed top-4 right-4 z-50 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="fixed top-4 right-4 z-50 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
         <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-3 py-2 flex items-center gap-2">
           <span>&#127942;</span>
           <span className="text-sm font-semibold">Live Rankings</span>
@@ -674,12 +674,12 @@ const EnhancedStudentSession = () => {
         <div className="p-2 space-y-1">
           {liveLeaderboard.slice(0, 5).map((entry, i) => (
             <div key={entry.studentId} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs
-              ${String(entry.studentId) === String(currentUser?.id) ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
-              <span className="w-5 font-bold text-gray-500">#{entry.rank}</span>
-              <span className="flex-1 truncate text-gray-800 dark:text-gray-200 font-medium">
+              ${String(entry.studentId) === String(currentUser?.id) ? 'bg-primary-50 dark:bg-primary-900/20' : ''}`}>
+              <span className="w-5 font-bold text-slate-500">#{entry.rank}</span>
+              <span className="flex-1 truncate text-slate-800 dark:text-slate-200 font-medium">
                 {String(entry.studentId) === String(currentUser?.id) ? 'You' : entry.studentName}
               </span>
-              <span className="font-bold text-blue-600 dark:text-blue-400">{entry.points}</span>
+              <span className="font-bold text-primary-600 dark:text-primary-400">{entry.points}</span>
             </div>
           ))}
         </div>
@@ -688,12 +688,12 @@ const EnhancedStudentSession = () => {
 
     <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 p-3 sm:p-4">
       {/* Session Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+      <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white truncate">{session.title}</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1 text-sm sm:text-base">{session.course_name}</p>
-            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-2">Teacher: {session.teacher_name || 'Loading...'}</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white truncate">{session.title}</h1>
+            <p className="text-slate-600 dark:text-slate-400 mt-1 text-sm sm:text-base">{session.course_name}</p>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2">Teacher: {session.teacher_name || 'Loading...'}</p>
           </div>
           <div className="flex items-center justify-start sm:justify-end gap-4 sm:gap-4">
             <div className="flex-shrink-0">
@@ -703,10 +703,10 @@ const EnhancedStudentSession = () => {
               }
             </div>
             <div className="text-center flex-shrink-0">
-              <div className="text-base sm:text-lg font-bold text-purple-600">
+              <div className="text-base sm:text-lg font-bold text-primary-600">
                 {Array.isArray(participants) ? participants.filter(p => p.is_active).length : 0}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Online</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">Online</div>
             </div>
           </div>
         </div>
@@ -714,24 +714,24 @@ const EnhancedStudentSession = () => {
 
       {/* Class Ended Notice */}
       {classEndedNotice && (
-        <div className="bg-gray-800 dark:bg-gray-900 rounded-lg shadow-md border border-gray-600 p-4 sm:p-6 text-center">
+        <div className="bg-slate-800 dark:bg-slate-900 rounded-lg shadow-md border border-slate-600 p-4 sm:p-6 text-center">
           <p className="text-white font-medium text-base sm:text-lg">The teacher has ended the class.</p>
-          <p className="text-gray-400 text-sm mt-1">Redirecting to dashboard...</p>
+          <p className="text-slate-400 text-sm mt-1">Redirecting to dashboard...</p>
         </div>
       )}
 
       {/* Attendance Banner */}
       {attendanceOpen && !attendanceMarked && (
-        <div className="bg-blue-600 dark:bg-blue-700 rounded-lg p-4 sm:p-6 text-white shadow-lg">
+        <div className="bg-primary-600 dark:bg-primary-700 rounded-lg p-4 sm:p-6 text-white shadow-lg">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h2 className="text-lg sm:text-xl font-bold">Attendance</h2>
-              <p className="text-sm text-blue-100">Teacher is taking attendance!</p>
-              <p className="text-blue-200 text-sm tabular-nums">Closes in: <b>{attendanceCountdown}s</b></p>
+              <p className="text-sm text-primary-100">Teacher is taking attendance!</p>
+              <p className="text-primary-200 text-sm tabular-nums">Closes in: <b>{attendanceCountdown}s</b></p>
             </div>
             <button
               onClick={markAttendance}
-              className="w-full sm:w-auto bg-white text-blue-700 hover:bg-blue-50 active:bg-blue-100 font-bold py-3 px-6 rounded-xl text-base sm:text-lg"
+              className="w-full sm:w-auto bg-white text-primary-700 hover:bg-primary-50 active:bg-primary-100 font-bold py-3 px-6 rounded-xl text-base sm:text-lg"
             >
               Mark Present ✓
             </button>
@@ -765,10 +765,10 @@ const EnhancedStudentSession = () => {
 
       {/* Active Poll */}
       {activePoll ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+        <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-4 sm:p-6">
           {/* Poll Header with Timer */}
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4 sm:mb-6">
-            <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100">Live Poll</h2>
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">Live Poll</h2>
             {!hasResponded && timeLeft > 0 && (
               <div className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg ${timeLeft <= 10 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-orange-100 dark:bg-orange-900/30'}`}>
                 <svg className={`w-5 h-5 sm:w-6 sm:h-6 ${timeLeft <= 10 ? 'text-red-600 animate-pulse' : 'text-orange-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -780,7 +780,7 @@ const EnhancedStudentSession = () => {
           </div>
 
           <div className="mb-4 sm:mb-6">
-            <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 mb-3 sm:mb-4">{activePoll.question}</h3>
+            <h3 className="text-base sm:text-lg font-medium text-slate-900 dark:text-slate-100 mb-3 sm:mb-4">{activePoll.question}</h3>
             <div className="space-y-2 sm:space-y-3">
               {activePoll.options && activePoll.options.map((option, index) => (
                 <button
@@ -804,7 +804,7 @@ const EnhancedStudentSession = () => {
               <button
                 onClick={submitResponse}
                 disabled={pollLoading}
-                className="w-full sm:w-auto sm:mx-auto sm:flex sm:px-8 py-3 sm:py-3 text-base sm:text-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium rounded-lg transition-colors duration-200 disabled:bg-blue-300"
+                className="w-full sm:w-auto sm:mx-auto sm:flex sm:px-8 py-3 sm:py-3 text-base sm:text-lg bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-medium rounded-lg transition-colors duration-200 disabled:bg-primary-300"
               >
                 {pollLoading ? 'Submitting...' : 'Submit Answer'}
               </button>
@@ -813,19 +813,19 @@ const EnhancedStudentSession = () => {
 
           {/* Submitting in progress */}
           {hasResponded && !submissionResult && (
-            <div className="text-center py-3 sm:py-4 text-blue-600">
+            <div className="text-center py-3 sm:py-4 text-primary-600">
               <p className="font-medium text-sm sm:text-base">Submitting answer...</p>
             </div>
           )}
 
           {/* Submitted — waiting for timer to end */}
           {hasResponded && submissionResult && !showResults && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 sm:p-4 mt-4">
+            <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg p-3 sm:p-4 mt-4">
               <div className="flex items-center justify-center gap-2">
-                <svg className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-5 w-5 sm:h-6 sm:w-6 text-primary-600 dark:text-primary-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="font-medium text-sm sm:text-base text-blue-800 dark:text-blue-300">
+                <span className="font-medium text-sm sm:text-base text-primary-800 dark:text-primary-300">
                   Answer submitted! Results will be revealed when the timer ends.
                 </span>
               </div>
@@ -881,21 +881,21 @@ const EnhancedStudentSession = () => {
 
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-6 sm:p-8 text-center">
-          <div className="text-gray-400 mb-4">
+        <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-6 sm:p-8 text-center">
+          <div className="text-slate-400 mb-4">
             <svg className="w-12 h-12 sm:w-16 sm:h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
           </div>
-          <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-2">Waiting for Poll</h3>
-          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Your teacher will start a poll soon. Stay connected!</p>
+          <h3 className="text-base sm:text-lg font-medium text-slate-900 dark:text-white mb-2">Waiting for Poll</h3>
+          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">Your teacher will start a poll soon. Stay connected!</p>
         </div>
       )}
 
       {/* Session Controls */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+      <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div>
-            <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white">Session Controls</h3>
-            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Manage your session participation</p>
+            <h3 className="text-base sm:text-lg font-medium text-slate-900 dark:text-white">Session Controls</h3>
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">Manage your session participation</p>
           </div>
           <div className="grid grid-cols-2 sm:flex gap-2 sm:gap-4">
             <button
@@ -948,16 +948,16 @@ const EnhancedStudentSession = () => {
     {/* Doubt Drawer — slides up from bottom-right */}
     {doubtDrawerOpen && (
       <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 z-50 w-full sm:w-96">
-        <div className="bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col animate-slide-up">
+        <div className="bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 flex flex-col animate-slide-up">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-700">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-indigo-500" />
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Post a Doubt</h3>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Post a Doubt</h3>
             </div>
             <button
               onClick={() => setDoubtDrawerOpen(false)}
-              className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+              className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -973,8 +973,8 @@ const EnhancedStudentSession = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <p className="text-sm font-medium text-gray-900 dark:text-white">Doubt posted!</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Your classmates can now see and answer it.</p>
+              <p className="text-sm font-medium text-slate-900 dark:text-white">Doubt posted!</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Your classmates can now see and answer it.</p>
             </div>
           ) : (
             <form onSubmit={submitDoubt} className="p-4 space-y-3">
@@ -986,7 +986,7 @@ const EnhancedStudentSession = () => {
                   placeholder="Short title, e.g. 'What is LIFO?'"
                   maxLength={255}
                   required
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-400"
+                  className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-white bg-white dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-400"
                 />
               </div>
               <div>
@@ -996,7 +996,7 @@ const EnhancedStudentSession = () => {
                   placeholder="Describe your doubt in detail..."
                   rows={4}
                   required
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none placeholder-gray-400"
+                  className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-white bg-white dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none placeholder-gray-400"
                 />
               </div>
               <div className="flex items-center gap-2 pt-1">

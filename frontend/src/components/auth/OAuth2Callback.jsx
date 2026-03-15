@@ -105,10 +105,10 @@ const OAuth2Callback = () => {
 
   if (status === 'processing') {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-80px)] bg-gray-50 dark:bg-gray-900">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="card p-8 w-full max-w-md text-center">
           <LoadingSpinner text="Processing authentication..." />
-          <p className="text-gray-600 dark:text-gray-300 mt-4">Please wait while we verify your SASTRA credentials.</p>
+          <p className="text-slate-600 dark:text-slate-300 mt-4">Please wait while we verify your SASTRA credentials.</p>
         </div>
       </div>
     );
@@ -116,16 +116,16 @@ const OAuth2Callback = () => {
 
   if (status === 'success') {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-80px)] bg-gray-50 dark:bg-gray-900">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="card p-8 w-full max-w-md text-center">
           <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Authentication Successful!</h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-4">Welcome to SARADHY-AI: SARA MODULE</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Redirecting to your dashboard...</p>
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">Authentication Successful!</h2>
+          <p className="text-slate-600 dark:text-slate-300 mb-4">Welcome to SARADHY-AI: SARA MODULE</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Redirecting to your dashboard...</p>
         </div>
       </div>
     );
@@ -133,14 +133,14 @@ const OAuth2Callback = () => {
 
   if (status === 'error') {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-80px)] bg-gray-50 dark:bg-gray-900">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="card p-8 w-full max-w-md text-center">
           <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Authentication Failed</h2>
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">Authentication Failed</h2>
           <p className="text-red-600 dark:text-red-400 mb-6">{error}</p>
           <button
             onClick={handleRetry}

@@ -558,33 +558,33 @@ const EnhancedSessionManagement = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-4 sm:space-y-6">
       {/* Session Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+      <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-1">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white truncate">{session.title}</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white truncate">{session.title}</h1>
               {session.is_active ? (
                 <Badge variant="live" dot>Active</Badge>
               ) : (
                 <Badge variant="ended" dot>Ended</Badge>
               )}
             </div>
-            <p className="text-gray-600 dark:text-gray-300 text-sm sm:text-base">{session.course_name}</p>
-            <p className="text-xs sm:text-sm text-gray-400 dark:text-gray-500 mt-1 line-clamp-1">{session.description}</p>
+            <p className="text-slate-600 dark:text-slate-300 text-sm sm:text-base">{session.course_name}</p>
+            <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 mt-1 line-clamp-1">{session.description}</p>
           </div>
           <div className="w-full sm:w-auto">
             <div className="grid grid-cols-3 sm:flex sm:items-center gap-2 sm:gap-4">
-              <div className="text-center p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg sm:bg-transparent dark:sm:bg-transparent sm:p-0">
-                <div className="text-lg sm:text-2xl font-bold text-blue-600">{session.session_id}</div>
-                <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Join Code</div>
+              <div className="text-center p-2 bg-primary-50 dark:bg-primary-900/20 rounded-lg sm:bg-transparent dark:sm:bg-transparent sm:p-0">
+                <div className="text-lg sm:text-2xl font-bold text-primary-600">{session.session_id}</div>
+                <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Join Code</div>
               </div>
               <div className="text-center p-2 bg-green-50 dark:bg-green-900/20 rounded-lg sm:bg-transparent dark:sm:bg-transparent sm:p-0">
                 <div className="text-lg sm:text-2xl font-bold text-green-600">{participants.filter(p => p.is_active).length}</div>
-                <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Active</div>
+                <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Active</div>
               </div>
-              <div className="text-center p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg sm:bg-transparent dark:sm:bg-transparent sm:p-0">
-                <div className="text-lg sm:text-2xl font-bold text-purple-600">{polls.length}</div>
-                <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Polls</div>
+              <div className="text-center p-2 bg-primary-50 dark:bg-primary-900/20 rounded-lg sm:bg-transparent dark:sm:bg-transparent sm:p-0">
+                <div className="text-lg sm:text-2xl font-bold text-primary-600">{polls.length}</div>
+                <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Polls</div>
               </div>
             </div>
             <div className="mt-2 text-center sm:text-right">
@@ -630,7 +630,7 @@ const EnhancedSessionManagement = () => {
       )}
 
       {/* Activity Status Bar */}
-      <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4 shadow-sm">
+      <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 sm:p-4 shadow-sm">
         <div className="flex items-center justify-between flex-wrap gap-2 sm:gap-4">
           {/* Recording Status */}
           <div className="flex items-center space-x-2">
@@ -646,8 +646,8 @@ const EnhancedSessionManagement = () => {
               </>
             ) : (
               <>
-                <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
-                <span className="text-sm text-gray-600 dark:text-gray-300">Recording Idle</span>
+                <div className="w-3 h-3 bg-slate-400 rounded-full"></div>
+                <span className="text-sm text-slate-600 dark:text-slate-300">Recording Idle</span>
               </>
             )}
           </div>
@@ -655,9 +655,9 @@ const EnhancedSessionManagement = () => {
           {/* Segments Sent Counter */}
           {segmentCount > 0 && (
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-700 dark:text-gray-300">
+              <span className="text-sm text-slate-700 dark:text-slate-300">
                 📝 Segments sent:
-                <span className="font-bold ml-1 text-blue-600">{segmentCount}</span>
+                <span className="font-bold ml-1 text-primary-600">{segmentCount}</span>
               </span>
             </div>
           )}
@@ -665,8 +665,8 @@ const EnhancedSessionManagement = () => {
           {/* Last Segment Sent Time */}
           {lastSegmentTime && (
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600 dark:text-gray-300">
-                Last: <span className="font-medium text-gray-800 dark:text-gray-200">{formatTimeAgo(lastSegmentTime)}</span>
+              <span className="text-sm text-slate-600 dark:text-slate-300">
+                Last: <span className="font-medium text-slate-800 dark:text-slate-200">{formatTimeAgo(lastSegmentTime)}</span>
               </span>
             </div>
           )}
@@ -692,8 +692,8 @@ const EnhancedSessionManagement = () => {
       </div>
 
       {/* Tab Navigation */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="border-b border-gray-200 dark:border-gray-700">
+      <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass">
+        <div className="border-b border-slate-200 dark:border-slate-700">
           <nav className="flex space-x-1 sm:space-x-2 px-3 sm:px-6 overflow-x-auto scrollbar-hide">
             {[
               { id: 'overview', name: 'Overview', icon: '📊' },
@@ -711,8 +711,8 @@ const EnhancedSessionManagement = () => {
                 key={tab.id}
                 className={`relative py-3 sm:py-4 px-1.5 sm:px-3 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition-colors ${
                   activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-200'
+                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                    : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-200'
                 }`}
                 onClick={() => {
                   setActiveTab(tab.id);
@@ -737,9 +737,9 @@ const EnhancedSessionManagement = () => {
           {activeTab === 'overview' && (
             <div className="space-y-4 sm:space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6">
-                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 sm:p-4">
-                  <h3 className="font-semibold text-blue-900 dark:text-blue-200 mb-1 sm:mb-2 text-sm sm:text-base">Session Status</h3>
-                  <p className="text-blue-700 dark:text-blue-300 text-sm sm:text-base">
+                <div className="bg-primary-50 dark:bg-primary-900/20 rounded-lg p-3 sm:p-4">
+                  <h3 className="font-semibold text-primary-900 dark:text-primary-200 mb-1 sm:mb-2 text-sm sm:text-base">Session Status</h3>
+                  <p className="text-primary-700 dark:text-primary-300 text-sm sm:text-base">
                     {session.is_active ? '🟢 Active' : '🔴 Inactive'}
                   </p>
                 </div>
@@ -747,19 +747,19 @@ const EnhancedSessionManagement = () => {
                   <h3 className="font-semibold text-green-900 dark:text-green-200 mb-1 sm:mb-2 text-sm sm:text-base">Participants</h3>
                   <p className="text-green-700 dark:text-green-300 text-sm sm:text-base">{participants.length} students joined</p>
                 </div>
-                <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 sm:p-4">
-                  <h3 className="font-semibold text-purple-900 dark:text-purple-200 mb-1 sm:mb-2 text-sm sm:text-base">Generated MCQs</h3>
-                  <p className="text-purple-700 dark:text-purple-300 text-sm sm:text-base">{generatedMCQs.length} available</p>
+                <div className="bg-primary-50 dark:bg-primary-900/20 rounded-lg p-3 sm:p-4">
+                  <h3 className="font-semibold text-primary-900 dark:text-primary-200 mb-1 sm:mb-2 text-sm sm:text-base">Generated MCQs</h3>
+                  <p className="text-primary-700 dark:text-primary-300 text-sm sm:text-base">{generatedMCQs.length} available</p>
                 </div>
               </div>
 
               {/* Live Class Control */}
-              <div className={`rounded-lg p-3 sm:p-4 border ${session.is_live ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600'}`}>
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-2 text-sm sm:text-base">Live Class Control</h3>
+              <div className={`rounded-lg p-3 sm:p-4 border ${session.is_live ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600'}`}>
+                <h3 className="font-semibold text-slate-900 dark:text-white mb-2 text-sm sm:text-base">Live Class Control</h3>
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                   <div className="flex items-center gap-2">
-                    <div className={`w-3 h-3 rounded-full ${session.is_live ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <div className={`w-3 h-3 rounded-full ${session.is_live ? 'bg-green-500 animate-pulse' : 'bg-slate-400'}`} />
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                       {session.is_live ? 'Class is Live — students can join' : 'Class not started — students cannot join yet'}
                     </span>
                   </div>
@@ -790,14 +790,14 @@ const EnhancedSessionManagement = () => {
                     ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-700'
                     : notesStatus === 'failed'
                       ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700'
-                      : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                      : 'bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800'
                 }`}>
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <div>
-                      <h3 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">Auto Notes Generation</h3>
+                      <h3 className="font-semibold text-slate-900 dark:text-white text-sm sm:text-base">Auto Notes Generation</h3>
                       {notesStatus === 'generating' && (
-                        <p className="text-xs text-blue-600 dark:text-blue-300 mt-1 flex items-center gap-2">
-                          <span className="inline-block w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                        <p className="text-xs text-primary-600 dark:text-primary-300 mt-1 flex items-center gap-2">
+                          <span className="inline-block w-3 h-3 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
                           Generating class notes from transcript + resources… (1–2 min)
                         </p>
                       )}
@@ -826,12 +826,12 @@ const EnhancedSessionManagement = () => {
                 </div>
               )}
 
-              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 sm:p-4">
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-2 text-sm sm:text-base">Quick Actions</h3>
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3 sm:p-4">
+                <h3 className="font-semibold text-slate-900 dark:text-white mb-2 text-sm sm:text-base">Quick Actions</h3>
                 <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 flex-wrap">
                   <button
                     onClick={() => setActiveTab('polls')}
-                    className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-4 py-2.5 sm:py-2 rounded-lg text-sm sm:text-base"
+                    className="bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white px-4 py-2.5 sm:py-2 rounded-lg text-sm sm:text-base"
                   >
                     Create Poll
                   </button>
@@ -843,7 +843,7 @@ const EnhancedSessionManagement = () => {
                   </button>
                   <button
                     onClick={() => setActiveTab('participants')}
-                    className="bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white px-4 py-2.5 sm:py-2 rounded-lg text-sm sm:text-base"
+                    className="bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white px-4 py-2.5 sm:py-2 rounded-lg text-sm sm:text-base"
                   >
                     Take Attendance
                   </button>
@@ -856,8 +856,8 @@ const EnhancedSessionManagement = () => {
                 </div>
               </div>
               
-              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">WebSocket Status</h3>
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
+                <h3 className="font-semibold text-slate-900 dark:text-white mb-2">WebSocket Status</h3>
                 <div className="flex items-center space-x-2">
                   <div className={`w-3 h-3 rounded-full ${wsConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
                   <span className={`text-sm font-medium ${wsConnected ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
@@ -877,27 +877,27 @@ const EnhancedSessionManagement = () => {
           {activeTab === 'polls' && (
             <div className="space-y-4 sm:space-y-6">
               {/* Live participant count banner */}
-              <div className="flex flex-wrap items-center gap-4 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg px-4 py-3">
+              <div className="flex flex-wrap items-center gap-4 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-lg px-4 py-3">
                 <div className="flex items-center gap-2">
                   <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
-                  <span className="text-sm sm:text-base font-medium text-gray-700 dark:text-gray-300">
+                  <span className="text-sm sm:text-base font-medium text-slate-700 dark:text-slate-300">
                     <span className="font-bold text-green-600 dark:text-green-400">{onlineCount}</span> student{onlineCount !== 1 ? 's' : ''} online
                   </span>
                 </div>
                 {presentCount > 0 && (
                   <>
-                    <span className="text-gray-300 dark:text-gray-600">|</span>
-                    <span className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-                      <span className="font-bold text-blue-600 dark:text-blue-400">{presentCount}</span> marked present
+                    <span className="text-slate-300 dark:text-slate-600">|</span>
+                    <span className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
+                      <span className="font-bold text-primary-600 dark:text-primary-400">{presentCount}</span> marked present
                     </span>
                   </>
                 )}
                 {stuckCount > 0 && (
                   <>
-                    <span className="text-gray-300 dark:text-gray-600">|</span>
+                    <span className="text-slate-300 dark:text-slate-600">|</span>
                     <span className="flex items-center gap-1.5 text-sm sm:text-base">
                       <span className="font-bold text-orange-600 dark:text-orange-400">✋ {stuckCount}</span>
-                      <span className="text-gray-600 dark:text-gray-400">student{stuckCount !== 1 ? 's' : ''} stuck</span>
+                      <span className="text-slate-600 dark:text-slate-400">student{stuckCount !== 1 ? 's' : ''} stuck</span>
                       <button
                         onClick={() => wsRef.current?.send(JSON.stringify({ type: 'stuck-reset', sessionId }))}
                         className="text-xs text-orange-600 dark:text-orange-400 border border-orange-300 dark:border-orange-600 rounded px-1.5 py-0.5 hover:bg-orange-50 dark:hover:bg-orange-900/20"
@@ -910,17 +910,17 @@ const EnhancedSessionManagement = () => {
               </div>
 
               {/* Create New Poll Form */}
-              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 sm:p-6">
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4 sm:p-6">
                 <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 dark:text-white">Create New Poll</h3>
                 <form onSubmit={handleCreatePoll} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                       Question *
                     </label>
                     <textarea
                       value={newPoll.question}
                       onChange={(e) => setNewPoll({ ...newPoll, question: e.target.value })}
-                      className="w-full p-2.5 sm:p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base bg-white dark:bg-gray-700 dark:text-white"
+                      className="w-full p-2.5 sm:p-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm sm:text-base bg-white dark:bg-slate-700 dark:text-white"
                       rows="3"
                       placeholder="Enter your poll question..."
                       required
@@ -928,7 +928,7 @@ const EnhancedSessionManagement = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                       Options *
                     </label>
                     {newPoll.options.map((option, index) => (
@@ -938,52 +938,52 @@ const EnhancedSessionManagement = () => {
                           name="correctAnswer"
                           checked={newPoll.correctAnswer === index}
                           onChange={() => setNewPoll({ ...newPoll, correctAnswer: index })}
-                          className="text-blue-600 w-4 h-4"
+                          className="text-primary-600 w-4 h-4"
                         />
                         <input
                           type="text"
                           value={option}
                           onChange={(e) => updatePollOption(index, e.target.value)}
-                          className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base bg-white dark:bg-gray-700 dark:text-white"
+                          className="flex-1 p-2 border border-slate-300 dark:border-slate-600 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm sm:text-base bg-white dark:bg-slate-700 dark:text-white"
                           placeholder={`Option ${index + 1}`}
                           required={index < 2}
                         />
                       </div>
                     ))}
-                    <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
                       Select the correct answer by clicking the radio button
                     </p>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                         Justification
                       </label>
                       <textarea
                         value={newPoll.justification}
                         onChange={(e) => setNewPoll({ ...newPoll, justification: e.target.value })}
-                        className="w-full p-2.5 sm:p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base bg-white dark:bg-gray-700 dark:text-white"
+                        className="w-full p-2.5 sm:p-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm sm:text-base bg-white dark:bg-slate-700 dark:text-white"
                         rows="2"
                         placeholder="Explain why this is the correct answer..."
                       />
                     </div>
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                           Time Limit (seconds)
                         </label>
                         <input
                           type="number"
                           value={newPoll.timeLimit}
                           onChange={(e) => setNewPoll({ ...newPoll, timeLimit: parseInt(e.target.value) })}
-                          className="w-full p-2.5 sm:p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base bg-white dark:bg-gray-700 dark:text-white"
+                          className="w-full p-2.5 sm:p-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm sm:text-base bg-white dark:bg-slate-700 dark:text-white"
                           min="10"
                           max="300"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                           Difficulty
                         </label>
                         <div className="flex gap-2">
@@ -995,7 +995,7 @@ const EnhancedSessionManagement = () => {
                               type="button"
                               onClick={() => setNewPoll({ ...newPoll, difficulty: d.v })}
                               className={`flex-1 py-1.5 text-xs font-medium rounded-lg border-2 transition-all
-                                ${newPoll.difficulty === d.v ? `${d.color} border-current` : 'border-gray-200 text-gray-400 dark:border-gray-600'}`}
+                                ${newPoll.difficulty === d.v ? `${d.color} border-current` : 'border-slate-200 text-slate-400 dark:border-slate-600'}`}
                             >
                               {d.label}
                             </button>
@@ -1007,7 +1007,7 @@ const EnhancedSessionManagement = () => {
 
                   <button
                     type="submit"
-                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-6 py-2.5 sm:py-3 rounded-lg font-medium text-sm sm:text-base"
+                    className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white px-6 py-2.5 sm:py-3 rounded-lg font-medium text-sm sm:text-base"
                   >
                     Create Poll
                   </button>
@@ -1017,31 +1017,31 @@ const EnhancedSessionManagement = () => {
               {/* Active Polls */}
               <div>
                 {polls.length === 0 ? (
-                  <p className="text-gray-500 dark:text-gray-400">No polls created yet.</p>
+                  <p className="text-slate-500 dark:text-slate-400">No polls created yet.</p>
                 ) : (
                   <div className="space-y-4">
                     {polls
                     .filter(poll => poll.isActive)
                     .map((poll) => (
-                      <div key={poll.id} className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                      <div key={poll.id} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-4">
                         <div className="flex justify-between items-start">
                           <div className="flex-1">
-                            <h4 className="font-medium text-gray-900 dark:text-white mb-2">{poll.question}</h4>
+                            <h4 className="font-medium text-slate-900 dark:text-white mb-2">{poll.question}</h4>
                             <div className="space-y-1">
                               {poll.options.map((option, index) => (
                                 <div key={index} className="flex items-center space-x-2">
                                   <span className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
-                                    index === poll.correctAnswer ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-400'
+                                    index === poll.correctAnswer ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-slate-100 dark:bg-slate-600 text-slate-600 dark:text-slate-400'
                                   }`}>
                                     {String.fromCharCode(65 + index)}
                                   </span>
-                                  <span className={index === poll.correctAnswer ? 'font-medium text-green-800 dark:text-green-300' : 'text-gray-700 dark:text-gray-300'}>
+                                  <span className={index === poll.correctAnswer ? 'font-medium text-green-800 dark:text-green-300' : 'text-slate-700 dark:text-slate-300'}>
                                     {option}
                                   </span>
                                 </div>
                               ))}
                             </div>
-                            <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                            <div className="mt-2 text-sm text-slate-500 dark:text-slate-400">
                               Responses: {poll.responses} • Created: {formatTimeAgo(poll.createdAt)}
                             </div>
                           </div>
@@ -1078,15 +1078,15 @@ const EnhancedSessionManagement = () => {
           {activeTab === 'participants' && (
             <div className="space-y-4 sm:space-y-6">
               {/* Attendance Controls */}
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <h3 className="text-base sm:text-lg font-semibold text-blue-900 dark:text-blue-200 mb-3">Attendance</h3>
+              <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg p-4">
+                <h3 className="text-base sm:text-lg font-semibold text-primary-900 dark:text-primary-200 mb-3">Attendance</h3>
                 {attendanceWindowOpen ? (
                   <div className="space-y-3">
                     <div className="flex flex-wrap items-center gap-3">
-                      <div className="text-2xl font-bold text-blue-700 dark:text-blue-300 tabular-nums w-12">
+                      <div className="text-2xl font-bold text-primary-700 dark:text-primary-300 tabular-nums w-12">
                         {attendanceCountdown}s
                       </div>
-                      <div className="text-sm text-blue-600 dark:text-blue-400">window open</div>
+                      <div className="text-sm text-primary-600 dark:text-primary-400">window open</div>
                       <div className="flex flex-wrap gap-2 ml-auto">
                         <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-3 py-1 rounded-full text-sm font-medium">
                           {attendanceCounts.present} Present
@@ -1109,14 +1109,14 @@ const EnhancedSessionManagement = () => {
                 ) : (
                   <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
                     <div>
-                      <label className="block text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">
+                      <label className="block text-xs font-medium text-primary-700 dark:text-primary-300 mb-1">
                         Duration (seconds)
                       </label>
                       <input
                         type="number"
                         value={attendanceDuration}
                         onChange={(e) => setAttendanceDuration(Math.min(300, Math.max(10, parseInt(e.target.value) || 60)))}
-                        className="w-24 p-2 border border-blue-300 dark:border-blue-700 rounded-lg text-sm bg-white dark:bg-gray-700 dark:text-white"
+                        className="w-24 p-2 border border-primary-300 dark:border-primary-700 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-white"
                         min="10"
                         max="300"
                       />
@@ -1124,7 +1124,7 @@ const EnhancedSessionManagement = () => {
                     <button
                       onClick={handleOpenAttendance}
                       disabled={!wsConnected}
-                      className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg text-sm font-medium w-full sm:w-auto"
+                      className="bg-primary-600 hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg text-sm font-medium w-full sm:w-auto"
                     >
                       Take Attendance
                     </button>
@@ -1151,61 +1151,61 @@ const EnhancedSessionManagement = () => {
               {/* Participants Header */}
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold dark:text-white">Session Participants</h3>
-                <div className="text-sm text-gray-500 dark:text-gray-400">
+                <div className="text-sm text-slate-500 dark:text-slate-400">
                   {participants.length} participant{participants.length !== 1 ? 's' : ''}
                 </div>
               </div>
 
               {participants.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-500 dark:text-gray-400 mb-2">No participants yet.</p>
-                  <p className="text-sm text-gray-400 dark:text-gray-500">
+                  <p className="text-slate-500 dark:text-slate-400 mb-2">No participants yet.</p>
+                  <p className="text-sm text-slate-400 dark:text-slate-500">
                     Share session ID <strong>{session.session_id}</strong> with students to join.
                   </p>
                 </div>
               ) : (
-                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead className="bg-gray-50 dark:bg-gray-700/50">
+                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                    <thead className="bg-slate-50 dark:bg-slate-700/50">
                       <tr>
-                        <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                           Student
                         </th>
-                        <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">
+                        <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden sm:table-cell">
                           Email
                         </th>
-                        <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">
+                        <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden sm:table-cell">
                           Joined At
                         </th>
-                        <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                           {attendanceList.length > 0 ? 'Attendance' : 'Status'}
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
                       {(attendanceList.length > 0 ? attendanceList : participants).map((participant) => {
                         const attendanceStatus = participant.attendance_status;
                         const attendanceBadge = {
                           present: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400',
                           late:    'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400',
                           absent:  'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400',
-                        }[attendanceStatus] || 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300';
+                        }[attendanceStatus] || 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-300';
 
                         return (
                           <tr key={participant.id}>
                             <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">
+                              <div className="text-sm font-medium text-slate-900 dark:text-white">
                                 {participant.full_name || participant.name}
                               </div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 sm:hidden">{participant.email}</div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400 sm:hidden">{participant.email}</div>
                             </td>
                             <td className="px-4 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                              <div className="text-sm text-gray-500 dark:text-gray-400">
+                              <div className="text-sm text-slate-500 dark:text-slate-400">
                                 {participant.email}
                               </div>
                             </td>
                             <td className="px-4 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                              <div className="text-sm text-gray-500 dark:text-gray-400">
+                              <div className="text-sm text-slate-500 dark:text-slate-400">
                                 {formatTimeAgo(participant.joined_at)}
                               </div>
                             </td>
@@ -1218,7 +1218,7 @@ const EnhancedSessionManagement = () => {
                                 <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                                   participant.is_active
                                     ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400'
-                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300'
+                                    : 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-300'
                                 }`}>
                                   {participant.is_active ? 'Active' : 'Inactive'}
                                 </span>
@@ -1239,17 +1239,17 @@ const EnhancedSessionManagement = () => {
             <div className="space-y-4 sm:space-y-6">
               <h3 className="text-base sm:text-lg font-semibold dark:text-white">Session Analytics</h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6">
-                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 sm:p-4">
-                  <h4 className="font-semibold text-blue-900 dark:text-blue-200 mb-1 sm:mb-2 text-xs sm:text-sm">Participants</h4>
-                  <p className="text-xl sm:text-2xl font-bold text-blue-700 dark:text-blue-300">{participants.length}</p>
+                <div className="bg-primary-50 dark:bg-primary-900/20 rounded-lg p-3 sm:p-4">
+                  <h4 className="font-semibold text-primary-900 dark:text-primary-200 mb-1 sm:mb-2 text-xs sm:text-sm">Participants</h4>
+                  <p className="text-xl sm:text-2xl font-bold text-primary-700 dark:text-primary-300">{participants.length}</p>
                 </div>
                 <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 sm:p-4">
                   <h4 className="font-semibold text-green-900 dark:text-green-200 mb-1 sm:mb-2 text-xs sm:text-sm">Active Polls</h4>
                   <p className="text-xl sm:text-2xl font-bold text-green-700 dark:text-green-300">{polls.filter(p => p.isActive).length}</p>
                 </div>
-                <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 sm:p-4">
-                  <h4 className="font-semibold text-purple-900 dark:text-purple-200 mb-1 sm:mb-2 text-xs sm:text-sm">Total Polls</h4>
-                  <p className="text-xl sm:text-2xl font-bold text-purple-700 dark:text-purple-300">{polls.length}</p>
+                <div className="bg-primary-50 dark:bg-primary-900/20 rounded-lg p-3 sm:p-4">
+                  <h4 className="font-semibold text-primary-900 dark:text-primary-200 mb-1 sm:mb-2 text-xs sm:text-sm">Total Polls</h4>
+                  <p className="text-xl sm:text-2xl font-bold text-primary-700 dark:text-primary-300">{polls.length}</p>
                 </div>
                 <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-3 sm:p-4">
                   <h4 className="font-semibold text-orange-900 dark:text-orange-200 mb-1 sm:mb-2 text-xs sm:text-sm">MCQs</h4>
@@ -1257,8 +1257,8 @@ const EnhancedSessionManagement = () => {
                 </div>
               </div>
 
-              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-                <p className="text-gray-600 dark:text-gray-300">
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
+                <p className="text-slate-600 dark:text-slate-300">
                   Detailed analytics and reporting features would be implemented here in a full application.
                 </p>
               </div>
@@ -1271,34 +1271,34 @@ const EnhancedSessionManagement = () => {
               <h3 className="text-lg font-semibold dark:text-white">All Polls & Stats</h3>
 
               {polls.length === 0 ? (
-                <p className="text-gray-500 dark:text-gray-400">No polls available.</p>
+                <p className="text-slate-500 dark:text-slate-400">No polls available.</p>
               ) : (
                 <div className="space-y-4">
                   {polls.map(poll => (
-                  <div key={poll.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm">
-                    <h4 className="font-medium text-gray-900 dark:text-white mb-2">{poll.question}</h4>
+                  <div key={poll.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4 shadow-sm">
+                    <h4 className="font-medium text-slate-900 dark:text-white mb-2">{poll.question}</h4>
 
                     <div className="space-y-1">
                       {poll.options.map((option, index) => (
                         <div key={index} className="flex items-center space-x-2">
                           <span className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
-                            index === poll.correctAnswer ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                            index === poll.correctAnswer ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
                           }`}>
                             {String.fromCharCode(65 + index)}
                           </span>
-                          <span className={index === poll.correctAnswer ? 'font-medium text-green-800 dark:text-green-300' : 'text-gray-700 dark:text-gray-300'}>
+                          <span className={index === poll.correctAnswer ? 'font-medium text-green-800 dark:text-green-300' : 'text-slate-700 dark:text-slate-300'}>
                             {option}
                           </span>
                         </div>
                       ))}
                     </div>
                     {poll.justification &&
-                      <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                         Justification: {poll.justification}
                       </div>}
 
                     {pollStats[poll.id] && (
-                      <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-700/50 rounded text-sm text-gray-700 dark:text-gray-300">
+                      <div className="mt-2 p-2 bg-slate-50 dark:bg-slate-700/50 rounded text-sm text-slate-700 dark:text-slate-300">
                         <div>Answered: {pollStats[poll.id].answered}</div>
                         <div>Not Answered: {pollStats[poll.id].not_answered}</div>
                         <div>Correct Percentage: {isNaN(pollStats[poll.id].correct_percentage) ? 0 : pollStats[poll.id].correct_percentage}%</div>
@@ -1340,25 +1340,25 @@ const EnhancedSessionManagement = () => {
       {/* Edit MCQ Modal */}
       {showEditModal && editingMCQ && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-4 sm:p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4 dark:text-white">Edit MCQ</h3>
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Question *
                 </label>
                 <textarea
                   value={editingMCQ.question}
                   onChange={(e) => setEditingMCQ({ ...editingMCQ, question: e.target.value })}
-                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-white"
+                  className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-slate-700 dark:text-white"
                   rows="3"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Options *
                 </label>
                 {editingMCQ.options.map((option, index) => (
@@ -1368,7 +1368,7 @@ const EnhancedSessionManagement = () => {
                       name="editCorrectAnswer"
                       checked={editingMCQ.correctAnswer === index}
                       onChange={() => setEditingMCQ({ ...editingMCQ, correctAnswer: index })}
-                      className="text-blue-600"
+                      className="text-primary-600"
                     />
                     <input
                       type="text"
@@ -1379,7 +1379,7 @@ const EnhancedSessionManagement = () => {
                         updatedOptions[index] = e.target.value;
                         setEditingMCQ({ ...editingMCQ, options: updatedOptions });
                       }}
-                      className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-white"
+                      className="flex-1 p-2 border border-slate-300 dark:border-slate-600 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-slate-700 dark:text-white"
                       placeholder={`Option ${index + 1}`}
                       required
                     />
@@ -1388,26 +1388,26 @@ const EnhancedSessionManagement = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Justification
                 </label>
                 <textarea
                   value={editingMCQ.justification}
                   onChange={(e) => setEditingMCQ({ ...editingMCQ, justification: e.target.value })}
-                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-white"
+                  className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-slate-700 dark:text-white"
                   rows="2"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Time Limit (seconds)
                 </label>
                 <input
                   type="number"
                   value={editingMCQ.timeLimit}
                   onChange={(e) => setEditingMCQ({ ...editingMCQ, timeLimit: parseInt(e.target.value) })}
-                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 dark:text-white"
+                  className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-slate-700 dark:text-white"
                   min="10"
                   max="300"
                 />
@@ -1420,13 +1420,13 @@ const EnhancedSessionManagement = () => {
                   setShowEditModal(false);
                   setEditingMCQ(null);
                 }}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+                className="px-4 py-2 text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
               >
                 Cancel
               </button>
               <button
                 onClick={handleUpdateMCQ}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+                className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg"
               >
                 Update MCQ
               </button>
@@ -1460,24 +1460,24 @@ const GamificationRecap = ({ sessionId, wsRef }) => {
   };
 
   if (loading) {
-    return <div className="py-8 text-center text-gray-400 text-sm">Loading gamification data...</div>;
+    return <div className="py-8 text-center text-slate-400 text-sm">Loading gamification data...</div>;
   }
 
   if (!recap) {
-    return <div className="py-8 text-center text-gray-400 text-sm">No gamification data yet. Create polls to start tracking.</div>;
+    return <div className="py-8 text-center text-slate-400 text-sm">No gamification data yet. Create polls to start tracking.</div>;
   }
 
   return (
     <div className="space-y-6">
       {/* Controls */}
       <div className="flex items-center justify-between">
-        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">&#127942; Session Gamification</h3>
+        <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">&#127942; Session Gamification</h3>
         <button
           onClick={toggleLeaderboard}
           className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors
             ${leaderboardVisible
-              ? 'bg-blue-600 text-white border-blue-600'
-              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600'}`}
+              ? 'bg-primary-600 text-white border-primary-600'
+              : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600'}`}
         >
           {leaderboardVisible ? '&#128065; Leaderboard Visible' : '&#128100; Show Leaderboard to Students'}
         </button>
@@ -1486,9 +1486,9 @@ const GamificationRecap = ({ sessionId, wsRef }) => {
       {/* Class Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Participants', value: recap.totalParticipants, color: 'bg-blue-50 text-blue-700' },
+          { label: 'Participants', value: recap.totalParticipants, color: 'bg-primary-50 text-primary-700' },
           { label: 'Avg Accuracy', value: `${recap.classAvgAccuracy}%`, color: 'bg-green-50 text-green-700' },
-          { label: 'Engagement', value: `${recap.engagementRate}%`, color: 'bg-purple-50 text-purple-700' },
+          { label: 'Engagement', value: `${recap.engagementRate}%`, color: 'bg-primary-50 text-primary-700' },
           { label: 'Total Polls', value: recap.totalPolls, color: 'bg-orange-50 text-orange-700' }
         ].map(s => (
           <div key={s.label} className={`rounded-xl p-3 text-center ${s.color} dark:bg-opacity-20`}>
@@ -1500,17 +1500,17 @@ const GamificationRecap = ({ sessionId, wsRef }) => {
 
       {/* Top 5 */}
       {recap.top5 && recap.top5.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-            <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Top Students</h4>
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Top Students</h4>
           </div>
-          <div className="divide-y divide-gray-100 dark:divide-gray-700">
+          <div className="divide-y divide-slate-100 dark:divide-slate-700">
             {recap.top5.map(s => (
               <div key={s.studentId} className="flex items-center px-4 py-2.5 gap-3">
-                <span className="w-6 text-center font-bold text-gray-400 text-sm">#{s.rank}</span>
-                <span className="flex-1 text-sm font-medium text-gray-800 dark:text-gray-200">{s.studentName}</span>
-                <span className="text-xs text-gray-500">{s.correctAnswers}/{s.totalAnswers} correct</span>
-                <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{s.points} pts</span>
+                <span className="w-6 text-center font-bold text-slate-400 text-sm">#{s.rank}</span>
+                <span className="flex-1 text-sm font-medium text-slate-800 dark:text-slate-200">{s.studentName}</span>
+                <span className="text-xs text-slate-500">{s.correctAnswers}/{s.totalAnswers} correct</span>
+                <span className="text-sm font-bold text-primary-600 dark:text-primary-400">{s.points} pts</span>
               </div>
             ))}
           </div>

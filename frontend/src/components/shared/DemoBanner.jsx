@@ -13,7 +13,7 @@ const DemoBanner = () => {
   };
 
   return (
-    <div className="bg-gradient-to-r from-saradhi-700 to-saradhi-500 text-white px-4 py-2 flex items-center justify-between gap-3 text-sm">
+    <div className="bg-gradient-to-r from-primary-700 to-primary-500 text-white px-4 py-2 flex items-center justify-between gap-3 text-sm">
       <div className="flex items-center gap-2 min-w-0">
         <span className="text-yellow-300 text-base flex-shrink-0">⚡</span>
         <span className="font-medium truncate">
@@ -25,7 +25,7 @@ const DemoBanner = () => {
       <div className="flex items-center gap-2 flex-shrink-0">
         <button
           onClick={handleExit}
-          className="bg-white text-saradhi-700 hover:bg-saradhi-50 active:bg-saradhi-100 font-semibold px-3 py-1 rounded-md text-xs transition-colors"
+          className="bg-white text-primary-700 hover:bg-primary-50 active:bg-primary-100 font-semibold px-3 py-1 rounded-md text-xs transition-colors"
         >
           <span className="hidden sm:inline">Sign in with SASTRA</span>
           <span className="sm:hidden">Sign In</span>

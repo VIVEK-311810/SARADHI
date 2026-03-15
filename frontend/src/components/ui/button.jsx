@@ -4,17 +4,20 @@ import { cva } from "class-variance-authority";
 import { cn } from "../../lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saradhi-400 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.97]",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.97]",
   {
     variants: {
       variant: {
-        // Primary — saradhi violet
+        // Primary — indigo
         default:
-          "bg-saradhi-700 text-white hover:bg-saradhi-600 active:bg-saradhi-800 shadow-sm hover:shadow-glow-saradhi dark:bg-saradhi-600 dark:hover:bg-saradhi-500 dark:active:bg-saradhi-700",
-        // Student CTA — coral
+          "bg-primary-600 text-white hover:bg-primary-500 active:bg-primary-700 shadow-sm hover:shadow-glow-primary dark:bg-primary-600 dark:hover:bg-primary-500 dark:active:bg-primary-700",
+        // CTA — orange accent
+        accent:
+          "bg-accent-500 text-white hover:bg-accent-400 active:bg-accent-600 shadow-sm hover:shadow-glow-accent",
+        // legacy alias → orange
         coral:
-          "bg-coral-500 text-white hover:bg-coral-400 active:bg-coral-600 shadow-sm hover:shadow-glow-coral",
-        // AI accent — teal
+          "bg-accent-500 text-white hover:bg-accent-400 active:bg-accent-600 shadow-sm hover:shadow-glow-accent",
+        // AI — teal
         teal:
           "bg-teal-500 text-white hover:bg-teal-400 active:bg-teal-600 shadow-sm hover:shadow-glow-teal",
         // Destructive
@@ -22,16 +25,19 @@ const buttonVariants = cva(
           "bg-red-600 text-white hover:bg-red-500 active:bg-red-700 dark:bg-red-500 dark:hover:bg-red-400",
         // Outline
         outline:
-          "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:border-saradhi-300 active:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700",
+          "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:border-primary-300 active:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:hover:border-primary-500",
         // Secondary
         secondary:
           "bg-slate-100 text-slate-800 hover:bg-slate-200 active:bg-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600",
         // Ghost
         ghost:
           "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-100",
+        // Glass — frosted glassmorphism
+        glass:
+          "bg-white/70 dark:bg-slate-800/70 backdrop-blur-md border border-white/30 dark:border-slate-700/30 text-slate-700 dark:text-slate-200 hover:bg-white/90 dark:hover:bg-slate-700/70 shadow-glass",
         // Link
         link:
-          "text-saradhi-600 underline-offset-4 hover:underline dark:text-saradhi-400",
+          "text-primary-600 underline-offset-4 hover:underline dark:text-primary-400",
         // Success
         success:
           "bg-emerald-600 text-white hover:bg-emerald-500 active:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500",
