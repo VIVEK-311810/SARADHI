@@ -22,6 +22,10 @@ const GROQ_TIMEOUT_MS = 30000;
 const sessionTimers = new Map();
 const activeSessions = new Map(); // Store { session_id: database_id }
 
+// Log webhook/provider config once at startup (visible in Render boot logs)
+console.log('[AudioProcessor] Config — TRANSCRIPT_WEBHOOK_URL:', TRANSCRIPT_WEBHOOK_URL ? TRANSCRIPT_WEBHOOK_URL.replace(/\/[^/]+$/, '/***') : 'NOT SET');
+console.log('[AudioProcessor] Config — GPU_ENABLED:', GPU_ENABLED, '| GROQ_API_KEY:', GROQ_API_KEY ? 'set' : 'NOT SET');
+
 /**
  * Transcribe audio using Groq's Whisper API (fallback provider)
  * @param {Buffer} audioBuffer - Audio file buffer
@@ -266,8 +270,12 @@ async function sendTranscriptSegment(sessionId) {
     });
 
     if (!response.ok) {
-      throw new Error(`Webhook error: ${response.status} ${response.statusText}`);
+      const errBody = await response.text().catch(() => '(unreadable)');
+      throw new Error(`Webhook error: ${response.status} ${response.statusText} — ${errBody.substring(0, 300)}`);
     }
+
+    const respBody = await response.text().catch(() => '');
+    console.log(`[AudioProcessor] Webhook response body: ${respBody.substring(0, 200)}`);
 
     // Mark transcripts as sent
     const transcriptIds = result.rows.map(row => row.id);
@@ -402,6 +410,13 @@ function stopSegmentTimer(sessionId) {
 
 function hasSegmentTimer(sessionId) {
   return sessionTimers.has(sessionId);
+}
+
+function getDebugState() {
+  return {
+    timerKeys: Array.from(sessionTimers.keys()),
+    activeSessionKeys: Array.from(activeSessions.keys())
+  };
 }
 
 /**
@@ -575,6 +590,7 @@ module.exports = {
   startSegmentTimer,
   stopSegmentTimer,
   hasSegmentTimer,
+  getDebugState,
   sendTranscriptSegment,
   sendFinalNotes,
   uploadPDFToWebhook,

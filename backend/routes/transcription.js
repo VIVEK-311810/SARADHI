@@ -359,13 +359,60 @@ router.get('/session/:sessionId', authenticate, authorize('teacher'), async (req
         COUNT(*) as total_transcripts,
         COUNT(*) FILTER (WHERE sent_to_webhook = true) as sent_count,
         COUNT(*) FILTER (WHERE sent_to_webhook = false) as unsent_count
-      FROM transcripts WHERE session_id = $1
+      FROM transcripts WHERE session_db_id = $1
     `, [session.id]);
 
     res.json({ success: true, session, statistics: countResult.rows[0] });
   } catch (error) {
     logger.error('Error fetching transcription session', { error: error.message });
     res.status(500).json({ error: 'Failed to fetch session details', details: error.message });
+  }
+});
+
+// GET /api/transcription/debug — Timer + webhook diagnostic (teacher only)
+router.get('/debug', authenticate, authorize('teacher'), async (req, res) => {
+  try {
+    const timerState = audioProcessor.getDebugState();
+    const webhookConfigured = !!(process.env.TRANSCRIPT_WEBHOOK_URL);
+
+    const recentSessions = await pool.query(
+      `SELECT ts.session_id, ts.status, ts.segment_interval, ts.start_time,
+              (SELECT COUNT(*) FROM transcripts WHERE session_db_id = ts.id) AS transcript_count,
+              (SELECT COUNT(*) FROM transcripts WHERE session_db_id = ts.id AND sent_to_webhook = false) AS unsent_count
+       FROM transcription_sessions ts
+       ORDER BY ts.start_time DESC LIMIT 5`
+    );
+
+    res.json({
+      timer_sessions: timerState.timerKeys,
+      active_sessions_map: timerState.activeSessionKeys,
+      transcript_webhook_configured: webhookConfigured,
+      recent_db_sessions: recentSessions.rows
+    });
+  } catch (error) {
+    logger.error('Error fetching debug state', { error: error.message });
+    res.status(500).json({ error: 'Failed to fetch debug state', details: error.message });
+  }
+});
+
+// POST /api/transcription/trigger-segment — Manually fire webhook for a session (teacher only)
+router.post('/trigger-segment', authenticate, authorize('teacher'), async (req, res) => {
+  try {
+    const { session_id } = req.body;
+    if (!session_id) return res.status(400).json({ error: 'session_id required' });
+    if (!(await verifySessionOwnership(session_id, req.user.id))) {
+      return res.status(403).json({ error: 'Session not found or access denied' });
+    }
+
+    const sent = await audioProcessor.sendTranscriptSegment(session_id);
+    res.json({
+      success: sent,
+      session_id,
+      message: sent ? 'Webhook triggered successfully' : 'No unsent transcripts or webhook not configured'
+    });
+  } catch (error) {
+    logger.error('Error triggering segment webhook', { error: error.message });
+    res.status(500).json({ error: 'Failed to trigger webhook', details: error.message });
   }
 });
 
