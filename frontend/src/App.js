@@ -44,6 +44,21 @@ const Quiz                     = lazy(() => import('./components/student/Quiz'))
 const CommunityBoard = lazy(() => import('./components/community/CommunityBoard'));
 const TicketDetail   = lazy(() => import('./components/community/TicketDetail'));
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function getAuth() {
+  const token  = localStorage.getItem('authToken');
+  const isDemo = localStorage.getItem('isDemo') === 'true';
+  const authenticated = !!(token || isDemo);
+
+  let role = null;
+  try {
+    const raw = localStorage.getItem('currentUser');
+    if (raw) role = JSON.parse(raw)?.role ?? null;
+  } catch { /* ignore */ }
+
+  return { authenticated, role };
+}
+
 // ── Auth pages (no sidebar) ───────────────────────────────────────────────────
 function AuthShell() {
   const location = useLocation();
@@ -66,17 +81,17 @@ function TeacherRoutes() {
     <AppLayout role="teacher">
       <Suspense fallback={<LoadingSpinner text="Loading..." />}>
         <Routes>
-          <Route path="/teacher/dashboard"                       element={<EnhancedTeacherDashboard />} />
-          <Route path="/teacher/create-session"                  element={<CreateSession />} />
-          <Route path="/teacher/session/:sessionId"             element={<EnhancedSessionManagement />} />
-          <Route path="/teacher/session/:sessionId/upload"      element={<ResourceUpload />} />
-          <Route path="/teacher/analytics"                      element={<TeacherAnalytics />} />
-          <Route path="/community"                              element={<CommunityBoard />} />
-          <Route path="/community/session/:sessionId"           element={<CommunityBoard />} />
-          <Route path="/community/tickets/:ticketId"            element={<TicketDetail />} />
-          <Route path="/session-history"                        element={<SessionHistory />} />
-          <Route path="/session/:sessionId/resources"           element={<SessionResourcesShared />} />
-          <Route path="*"                                        element={<Navigate to="/teacher/dashboard" replace />} />
+          <Route path="/teacher/dashboard"                  element={<EnhancedTeacherDashboard />} />
+          <Route path="/teacher/create-session"             element={<CreateSession />} />
+          <Route path="/teacher/session/:sessionId"         element={<EnhancedSessionManagement />} />
+          <Route path="/teacher/session/:sessionId/upload"  element={<ResourceUpload />} />
+          <Route path="/teacher/analytics"                  element={<TeacherAnalytics />} />
+          <Route path="/community"                          element={<CommunityBoard />} />
+          <Route path="/community/session/:sessionId"       element={<CommunityBoard />} />
+          <Route path="/community/tickets/:ticketId"        element={<TicketDetail />} />
+          <Route path="/session-history"                    element={<SessionHistory />} />
+          <Route path="/session/:sessionId/resources"       element={<SessionResourcesShared />} />
+          <Route path="*"                                   element={<Navigate to="/teacher/dashboard" replace />} />
         </Routes>
       </Suspense>
     </AppLayout>
@@ -89,22 +104,22 @@ function StudentRoutes() {
     <AppLayout role="student">
       <Suspense fallback={<LoadingSpinner text="Loading..." />}>
         <Routes>
-          <Route path="/student/dashboard"                        element={<EnhancedStudentDashboard />} />
-          <Route path="/student/join"                             element={<JoinSession />} />
-          <Route path="/student/session/:sessionId"              element={<EnhancedStudentSession />} />
-          <Route path="/student/session/:sessionId/resources"    element={<SessionResources />} />
-          <Route path="/student/session/:sessionId/search"       element={<AIResourceSearch />} />
-          <Route path="/student/ai-assistant/:sessionId"        element={<AIAssistant />} />
-          <Route path="/student/session/:sessionId/history"     element={<VisitSession />} />
-          <Route path="/student/session/:sessionId/quiz"        element={<Quiz />} />
-          <Route path="/student/leaderboard"                    element={<Leaderboard />} />
-          <Route path="/student/leaderboard/:sessionId"         element={<Leaderboard />} />
-          <Route path="/community"                              element={<CommunityBoard />} />
-          <Route path="/community/session/:sessionId"           element={<CommunityBoard />} />
-          <Route path="/community/tickets/:ticketId"            element={<TicketDetail />} />
-          <Route path="/session-history"                        element={<SessionHistory />} />
-          <Route path="/session/:sessionId/resources"           element={<SessionResourcesShared />} />
-          <Route path="*"                                        element={<Navigate to="/student/dashboard" replace />} />
+          <Route path="/student/dashboard"                     element={<EnhancedStudentDashboard />} />
+          <Route path="/student/join"                          element={<JoinSession />} />
+          <Route path="/student/session/:sessionId"            element={<EnhancedStudentSession />} />
+          <Route path="/student/session/:sessionId/resources"  element={<SessionResources />} />
+          <Route path="/student/session/:sessionId/search"     element={<AIResourceSearch />} />
+          <Route path="/student/ai-assistant/:sessionId"       element={<AIAssistant />} />
+          <Route path="/student/session/:sessionId/history"    element={<VisitSession />} />
+          <Route path="/student/session/:sessionId/quiz"       element={<Quiz />} />
+          <Route path="/student/leaderboard"                   element={<Leaderboard />} />
+          <Route path="/student/leaderboard/:sessionId"        element={<Leaderboard />} />
+          <Route path="/community"                             element={<CommunityBoard />} />
+          <Route path="/community/session/:sessionId"          element={<CommunityBoard />} />
+          <Route path="/community/tickets/:ticketId"           element={<TicketDetail />} />
+          <Route path="/session-history"                       element={<SessionHistory />} />
+          <Route path="/session/:sessionId/resources"          element={<SessionResourcesShared />} />
+          <Route path="*"                                      element={<Navigate to="/student/dashboard" replace />} />
         </Routes>
       </Suspense>
     </AppLayout>
@@ -114,37 +129,34 @@ function StudentRoutes() {
 // ── Root router — determines which shell to render ───────────────────────────
 function RootRouter() {
   const location = useLocation();
-  const role = localStorage.getItem('role');
-  const token = localStorage.getItem('token');
-  const isDemo = localStorage.getItem('isDemo');
+  const { authenticated, role } = getAuth();
 
-  // Auth routes — no sidebar
+  // Auth routes — always accessible (no sidebar)
   if (location.pathname.startsWith('/auth')) {
     return <AuthShell />;
   }
 
-  // Default redirect
-  if (location.pathname === '/') {
-    if ((token || isDemo) && role === 'teacher') return <Navigate to="/teacher/dashboard" replace />;
-    if ((token || isDemo) && role === 'student')  return <Navigate to="/student/dashboard" replace />;
+  // Not authenticated → send to login
+  if (!authenticated) {
     return <Navigate to="/auth" replace />;
   }
 
-  // Teacher routes
-  if (location.pathname.startsWith('/teacher') || (role === 'teacher' && !location.pathname.startsWith('/student'))) {
+  // Root redirect → role dashboard
+  if (location.pathname === '/') {
+    return <Navigate to={role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard'} replace />;
+  }
+
+  // Teacher shell
+  if (role === 'teacher') {
     return <TeacherRoutes />;
   }
 
-  // Student routes
-  if (location.pathname.startsWith('/student') || (role === 'student' && !location.pathname.startsWith('/teacher'))) {
+  // Student shell
+  if (role === 'student') {
     return <StudentRoutes />;
   }
 
-  // Community and shared — use role-based layout
-  if (role === 'teacher') return <TeacherRoutes />;
-  if (role === 'student') return <StudentRoutes />;
-
-  // No role — send to auth
+  // Unknown role → re-auth
   return <Navigate to="/auth" replace />;
 }
 
