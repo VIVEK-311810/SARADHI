@@ -159,9 +159,15 @@ const EnhancedSessionManagement = () => {
         switch (data.type) {
           case 'participant-count-updated':
             fetchParticipants();
+            if ((data.count || 0) > 0) {
+              window.dispatchEvent(new CustomEvent('saradhi:notification', { detail: { type: 'student', title: 'Student joined', body: `${data.count} student${data.count !== 1 ? 's' : ''} online` } }));
+            }
             setOnlineCount(data.count || 0);
             break;
           case 'stuck-update':
+            if ((data.count || 0) > 0) {
+              window.dispatchEvent(new CustomEvent('saradhi:notification', { detail: { type: 'stuck', title: `${data.count} student${data.count !== 1 ? 's' : ''} confused`, body: 'Check in with your class.' } }));
+            }
             setStuckCount(data.count || 0);
             break;
           case 'attendance-count-updated':
@@ -169,6 +175,12 @@ const EnhancedSessionManagement = () => {
             setPresentCount((parseInt(data.counts?.present) || 0) + (parseInt(data.counts?.late) || 0));
             break;
           case 'attendance-closed':
+            {
+              const total = (parseInt(data.counts?.present) || 0) + (parseInt(data.counts?.late) || 0);
+              if (total > 0) {
+                window.dispatchEvent(new CustomEvent('saradhi:notification', { detail: { type: 'attendance', title: 'Attendance closed', body: `${total} student${total !== 1 ? 's' : ''} marked attendance.` } }));
+              }
+            }
             setAttendanceWindowOpen(false);
             if (attendanceTimerRef.current) clearInterval(attendanceTimerRef.current);
             if (data.counts) setAttendanceCounts(data.counts);
@@ -194,6 +206,7 @@ const EnhancedSessionManagement = () => {
             break;
           case 'poll-response-update':
             if (isCurrentSession(data.sessionId)) {
+              window.dispatchEvent(new CustomEvent('saradhi:notification', { detail: { type: 'poll', title: 'Poll response received', body: `${data.responseCount} response${data.responseCount !== 1 ? 's' : ''} so far` } }));
               setLiveResponseCount(data.responseCount);
             }
             break;
@@ -207,6 +220,7 @@ const EnhancedSessionManagement = () => {
             break;
           case 'mcqs-generated':
             if (isCurrentSession(data.sessionId)) {
+              window.dispatchEvent(new CustomEvent('saradhi:notification', { detail: { type: 'quiz', title: 'MCQs generated', body: `${data.count} question${data.count !== 1 ? 's' : ''} ready to send.` } }));
               setNewMCQsCount(prev => prev + data.count);
               setActivityPulse(true);
               setTimeout(() => setActivityPulse(false), 2000);
@@ -221,6 +235,7 @@ const EnhancedSessionManagement = () => {
             break;
           case 'notes-ready':
             if (isCurrentSession(data.sessionId)) {
+              window.dispatchEvent(new CustomEvent('saradhi:notification', { detail: { type: 'notes', title: 'Session notes ready', body: 'Students can now view the notes.' } }));
               setNotesStatus('ready');
               setNotesUrl(data.notesUrl);
               if (notesPollingRef.current) clearInterval(notesPollingRef.current);

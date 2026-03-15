@@ -1,8 +1,42 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bell, ChevronDown, LogOut, Moon, Sun, Menu, User } from 'lucide-react';
+import { Bell, ChevronDown, LogOut, Moon, Sun, Menu, User, BarChart2, CheckSquare, BookOpen, HelpCircle, GraduationCap, FileText, Trophy, Users, AlertCircle, Upload } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useNotifications } from '../../context/NotificationContext';
 import { cn } from '../../lib/utils';
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function timeAgo(date) {
+  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+const TYPE_ICON_MAP = {
+  poll:        { Icon: BarChart2,      cls: 'text-primary-500' },
+  attendance:  { Icon: CheckSquare,    cls: 'text-green-500' },
+  cards:       { Icon: BookOpen,       cls: 'text-teal-500' },
+  quiz:        { Icon: HelpCircle,     cls: 'text-orange-500' },
+  class:       { Icon: GraduationCap,  cls: 'text-primary-500' },
+  notes:       { Icon: FileText,       cls: 'text-slate-500' },
+  gamification:{ Icon: Trophy,         cls: 'text-yellow-500' },
+  student:     { Icon: Users,          cls: 'text-slate-500' },
+  stuck:       { Icon: AlertCircle,    cls: 'text-red-500' },
+  resource:    { Icon: Upload,         cls: 'text-teal-500' },
+};
+
+function NotifIcon({ type }) {
+  const { Icon, cls } = TYPE_ICON_MAP[type] || { Icon: Bell, cls: 'text-slate-400' };
+  return (
+    <span className={cn('flex-shrink-0 mt-0.5', cls)}>
+      <Icon className="w-4 h-4" />
+    </span>
+  );
+}
 
 // ── Route → page title ────────────────────────────────────────────────────────
 const ROUTE_TITLES = [
@@ -31,9 +65,12 @@ export default function TopBar({ collapsed, onMobileMenuClick }) {
   const location  = useLocation();
   const navigate  = useNavigate();
   const { theme, toggleTheme } = useTheme();
+  const { notifications, unreadCount, markAllRead } = useNotifications();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const notifRef = useRef(null);
 
   const pageTitle = getPageTitle(location.pathname);
 
@@ -46,20 +83,24 @@ export default function TopBar({ collapsed, onMobileMenuClick }) {
   const avatar      = user?.picture || null;
   const initials    = displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
-  // Close dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setDropdownOpen(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setNotifOpen(false);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Close dropdown on route change
+  // Close dropdowns on route change
   useEffect(() => {
     setDropdownOpen(false);
+    setNotifOpen(false);
   }, [location.pathname]);
 
   const handleLogout = () => {
@@ -111,13 +152,68 @@ export default function TopBar({ collapsed, onMobileMenuClick }) {
         </button>
 
         {/* Notifications */}
-        <button
-          className="relative flex items-center justify-center w-9 h-9 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 hover:text-slate-700 dark:hover:text-white transition-colors"
-          aria-label="Notifications"
-        >
-          <Bell className="w-[18px] h-[18px]" />
-          <span className="absolute top-2 right-2 w-[7px] h-[7px] bg-accent-500 rounded-full border-2 border-white dark:border-slate-900" />
-        </button>
+        <div className="relative" ref={notifRef}>
+          <button
+            onClick={() => { setNotifOpen(o => !o); if (!notifOpen) markAllRead(); }}
+            className={cn(
+              'relative flex items-center justify-center w-9 h-9 rounded-lg transition-colors',
+              'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 hover:text-slate-700 dark:hover:text-white',
+              notifOpen && 'bg-slate-100 dark:bg-slate-700/60',
+            )}
+            aria-label="Notifications"
+          >
+            <Bell className="w-[18px] h-[18px]" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-accent-500 rounded-full text-[10px] text-white font-bold flex items-center justify-center px-0.5 border-2 border-white dark:border-slate-900">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
+
+          {notifOpen && (
+            <div className={cn(
+              'absolute right-0 top-full mt-2 w-80 z-50',
+              'rounded-2xl bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl',
+              'border border-slate-200/60 dark:border-slate-700/60',
+              'shadow-card-hover overflow-hidden animate-fade-up',
+            )}>
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-700/60">
+                <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                  Notifications
+                </span>
+                <button
+                  onClick={markAllRead}
+                  className="text-xs text-primary-600 dark:text-primary-400 hover:underline"
+                >
+                  Mark all read
+                </button>
+              </div>
+
+              {/* List */}
+              <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700/40">
+                {notifications.length === 0 ? (
+                  <p className="text-sm text-slate-400 text-center py-8">No notifications yet</p>
+                ) : notifications.map(n => (
+                  <div
+                    key={n.id}
+                    className={cn(
+                      'flex gap-3 px-4 py-3 text-sm',
+                      !n.read && 'bg-primary-50/60 dark:bg-primary-900/10',
+                    )}
+                  >
+                    <NotifIcon type={n.type} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-slate-800 dark:text-slate-200 truncate">{n.title}</p>
+                      {n.body && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2">{n.body}</p>}
+                      <p className="text-[10px] text-slate-400 mt-1">{timeAgo(n.timestamp)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Divider */}
         <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1" />

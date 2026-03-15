@@ -304,6 +304,7 @@ const EnhancedStudentSession = () => {
         case 'poll-activated':
           {
             if (!data.poll) break;
+            window.dispatchEvent(new CustomEvent('saradhi:notification', { detail: { type: 'poll', title: 'New poll — answer now!', body: data.poll.question } }));
             setActivePoll(data.poll);
             setHasResponded(false);
             setSelectedOption(null);
@@ -361,11 +362,13 @@ const EnhancedStudentSession = () => {
           fetchParticipants();
           break;
         case 'class-ended':
+          window.dispatchEvent(new CustomEvent('saradhi:notification', { detail: { type: 'class', title: 'Class ended', body: 'Check your session summary.' } }));
           setClassEndedNotice(true);
           setTimeout(() => navigate('/student/dashboard'), 2000);
           break;
         case 'attendance-opened':
           {
+            window.dispatchEvent(new CustomEvent('saradhi:notification', { detail: { type: 'attendance', title: 'Mark your attendance', body: 'Attendance window is now open.' } }));
             const closesAt = data.closesAt;
             const remaining = Math.max(0, Math.floor((closesAt - Date.now()) / 1000));
             setAttendanceCountdown(remaining);
@@ -383,6 +386,7 @@ const EnhancedStudentSession = () => {
           }
           break;
         case 'attendance-closed':
+          window.dispatchEvent(new CustomEvent('saradhi:notification', { detail: { type: 'attendance', title: 'Attendance window closed' } }));
           if (attendanceTimerRef.current) clearInterval(attendanceTimerRef.current);
           setAttendanceOpen(false);
           break;
@@ -399,6 +403,7 @@ const EnhancedStudentSession = () => {
         // ── Knowledge Cards ──────────────────────────────────────────────
         case 'cards-distribute':
           if (data.card) {
+            window.dispatchEvent(new CustomEvent('saradhi:notification', { detail: { type: 'cards', title: 'Knowledge cards ready', body: 'Review your knowledge cards.' } }));
             setKnowledgeCard(data.card);
             setCardActivityActive(true);
             setCardActiveState(null);
@@ -425,6 +430,7 @@ const EnhancedStudentSession = () => {
         case 'notes-ready':
           // Class notes are ready — student can find them in the Resources page
           if (data.sessionId && data.sessionId.toUpperCase() === sessionId?.toUpperCase()) {
+            window.dispatchEvent(new CustomEvent('saradhi:notification', { detail: { type: 'notes', title: 'Session notes ready', body: 'View them in Resources.' } }));
             toast?.success?.('Class notes are ready! View them in Resources.');
           }
           break;
@@ -443,6 +449,7 @@ const EnhancedStudentSession = () => {
           setLiveLeaderboard(data.leaderboard);
           break;
         case 'leaderboard-visibility':
+          if (data.visible) window.dispatchEvent(new CustomEvent('saradhi:notification', { detail: { type: 'gamification', title: 'Leaderboard visible', body: 'Check your rank!' } }));
           setLeaderboardVisible(!!data.visible);
           break;
 

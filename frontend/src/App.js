@@ -5,6 +5,7 @@ import './index.css';
 
 // Providers
 import { ThemeProvider } from './context/ThemeContext';
+import { NotificationProvider } from './context/NotificationContext';
 
 // Eager shared components
 import ErrorBoundary from './components/shared/ErrorBoundary';
@@ -165,13 +166,15 @@ function RootRouter() {
 function App() {
   return (
     <ThemeProvider>
-      <ErrorBoundary>
-        <Router>
-          <Toaster position="bottom-right" richColors closeButton />
-          <DemoBanner />
-          <RootRouter />
-        </Router>
-      </ErrorBoundary>
+      <NotificationProvider>
+        <ErrorBoundary>
+          <Router>
+            <Toaster position="bottom-right" richColors closeButton />
+            <DemoBanner />
+            <RootRouter />
+          </Router>
+        </ErrorBoundary>
+      </NotificationProvider>
     </ThemeProvider>
   );
 }
