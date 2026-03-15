@@ -30,6 +30,7 @@ const GeneratedMCQs = ({ sessionId, generatedMCQs, onMCQsSent }) => {
   const wsRef = useRef(null);
   const mountedRef = useRef(true);
   const activeIntervalsRef = useRef([]);
+  const bulkRevealResolveRef = useRef(null); // Resolved when server sends reveal-answers during bulk send
 
   useEffect(() => {
     mountedRef.current = true;
@@ -62,6 +63,22 @@ const GeneratedMCQs = ({ sessionId, generatedMCQs, onMCQsSent }) => {
     }
   }, [generatedMCQs]);
 
+  // Listen for reveal-answers to unblock bulk send waiting on server confirmation
+  useEffect(() => {
+    const handleWsMessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'reveal-answers' && bulkRevealResolveRef.current) {
+          bulkRevealResolveRef.current();
+          bulkRevealResolveRef.current = null;
+        }
+      } catch {}
+    };
+    const ws = wsRef.current;
+    if (ws) ws.addEventListener('message', handleWsMessage);
+    return () => { if (ws) ws.removeEventListener('message', handleWsMessage); };
+  }, [wsConnected]);
+
 
   const handleMCQSelection = (tempId) => {
     const newSelected = new Set(selectedMCQs);
@@ -87,7 +104,30 @@ const GeneratedMCQs = ({ sessionId, generatedMCQs, onMCQsSent }) => {
     setEditingMCQ({ ...mcq });
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
+    // Persist edit to backend so it survives page refresh
+    try {
+      const token = localStorage.getItem('authToken');
+      const options = Array.isArray(editingMCQ.options) ? editingMCQ.options : JSON.parse(editingMCQ.options);
+      await fetch(`${API_BASE_URL}/generated-mcqs/${editingMCQ.tempId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          question: editingMCQ.question,
+          options,
+          correct_answer: editingMCQ.correct_answer,
+          justification: editingMCQ.justification || '',
+          time_limit: editingMCQ.time_limit || 60,
+        }),
+      });
+    } catch (error) {
+      console.error('Error persisting MCQ edit:', error);
+      toast.warning('Edit saved locally but failed to sync with server');
+    }
+
     setMcqs(mcqs.map(mcq =>
       mcq.tempId === editingMCQ.tempId
         ? { ...editingMCQ, isEdited: true }
@@ -102,18 +142,18 @@ const GeneratedMCQs = ({ sessionId, generatedMCQs, onMCQsSent }) => {
 
   const deleteMCQ = async (mcqId) => {
     try {
+      const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_BASE_URL}/generated-mcqs/${mcqId}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
       });
 
       if (!response.ok) {
         throw new Error("Failed to delete MCQ");
       }
-
-      // Optional: Update your state (remove the deleted MCQ from UI)
     } catch (error) {
       console.error("Error deleting MCQ:", error);
     }
@@ -239,8 +279,19 @@ const GeneratedMCQs = ({ sessionId, generatedMCQs, onMCQsSent }) => {
 
       if (mountedRef.current) setBulkSentIds(prev => new Set(prev).add(mcq.tempId));
 
-      const waitTime = (mcq.time_limit || 60) * 1000 + 3000;
-      await new Promise(resolve => setTimeout(resolve, waitTime));
+      // Wait for server reveal-answers WS message, with timeout fallback
+      const maxWait = (mcq.time_limit || 60) * 1000 + 5000;
+      await new Promise(resolve => {
+        const fallback = setTimeout(() => {
+          bulkRevealResolveRef.current = null;
+          resolve();
+        }, maxWait);
+        bulkRevealResolveRef.current = () => {
+          clearTimeout(fallback);
+          // Small buffer after reveal before activating next poll
+          setTimeout(resolve, 2000);
+        };
+      });
       if (!mountedRef.current) break;
 
       if (mountedRef.current) setMcqs(prev => prev.filter(m => m.tempId !== mcq.tempId));

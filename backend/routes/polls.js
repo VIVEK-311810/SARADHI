@@ -331,15 +331,30 @@ async function triggerAnswerReveal(sessionId, pollId) {
       if (global.clearPollTimer) global.clearPollTimer(sessionIdString);
       logger.info('Answer reveal broadcast (all responded)', { pollId, sessionId: sessionIdString });
     }
+
+    // Deactivate poll in DB so late-joiners don't see a finished poll as active
+    await pool.query('UPDATE polls SET is_active = FALSE WHERE id = $1', [pollId]);
   } catch (error) {
     logger.error('Error triggering answer reveal', { error: error.message });
   }
 }
 
-// GET /:pollId/responses — Get poll responses with stats
-router.get('/:pollId/responses', authenticate, async (req, res) => {
+// GET /:pollId/responses — Get poll responses with stats (teacher who owns session only)
+router.get('/:pollId/responses', authenticate, authorize('teacher'), async (req, res) => {
   try {
     const { pollId } = req.params;
+
+    // Verify teacher owns this poll's session — prevents IDOR (PII leak of student names)
+    const ownerCheck = await pool.query(
+      `SELECT s.teacher_id FROM polls p JOIN sessions s ON p.session_id = s.id WHERE p.id = $1`,
+      [pollId]
+    );
+    if (ownerCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Poll not found' });
+    }
+    if (String(ownerCheck.rows[0].teacher_id) !== String(req.user.id)) {
+      return res.status(403).json({ error: 'Access denied: you do not own this session' });
+    }
 
     const result = await pool.query(`
       SELECT pr.*, u.full_name as student_name, u.register_number

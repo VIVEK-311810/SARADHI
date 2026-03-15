@@ -32,16 +32,18 @@ class RequestQueue {
     this.stats.totalQueued++;
 
     return new Promise((resolve, reject) => {
+      const entryId = Date.now() + Math.random();
+
       const timeoutId = setTimeout(() => {
         // Remove from queue on timeout
-        const idx = this.queue.findIndex(item => item.id === entry.id);
+        const idx = this.queue.findIndex(item => item.id === entryId);
         if (idx !== -1) this.queue.splice(idx, 1);
         this.stats.totalTimedOut++;
         reject(new Error('AI service is busy. Please try again in a few seconds.'));
       }, timeoutMs);
 
       const entry = {
-        id: Date.now() + Math.random(),
+        id: entryId,
         fn,
         resolve,
         reject,

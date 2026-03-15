@@ -370,13 +370,16 @@ const EnhancedStudentSession = () => {
           {
             window.dispatchEvent(new CustomEvent('saradhi:notification', { detail: { type: 'attendance', title: 'Mark your attendance', body: 'Attendance window is now open.' } }));
             const closesAt = data.closesAt;
-            const remaining = Math.max(0, Math.floor((closesAt - Date.now()) / 1000));
+            // Use clock offset for accurate countdown (closesAt is a server timestamp)
+            const adjustedNowAtt = Date.now() + clockOffsetRef.current;
+            const remaining = Math.max(0, Math.floor((closesAt - adjustedNowAtt) / 1000));
             setAttendanceCountdown(remaining);
             setAttendanceOpen(true);
             setAttendanceMarked(false);
             if (attendanceTimerRef.current) clearInterval(attendanceTimerRef.current);
             attendanceTimerRef.current = setInterval(() => {
-              const rem = Math.max(0, Math.floor((closesAt - Date.now()) / 1000));
+              const adjNow = Date.now() + clockOffsetRef.current;
+              const rem = Math.max(0, Math.floor((closesAt - adjNow) / 1000));
               setAttendanceCountdown(rem);
               if (rem <= 0) {
                 clearInterval(attendanceTimerRef.current);

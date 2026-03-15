@@ -353,6 +353,11 @@ async function sendFinalNotes(sessionId) {
       return false;
     }
 
+    if (!FINAL_NOTES_WEBHOOK_URL) {
+      console.log(`[AudioProcessor] FINAL_NOTES_WEBHOOK_URL not set — skipping webhook for session: ${sessionId}`);
+      return false;
+    }
+
     // Send to final notes webhook
     const payload = {
       final_notes: finalNotes,

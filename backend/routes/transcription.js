@@ -335,10 +335,15 @@ router.post('/send-notes', authenticate, authorize('teacher'), async (req, res) 
   }
 });
 
-// GET /api/transcription/session/:sessionId — Get session status (teacher only)
+// GET /api/transcription/session/:sessionId — Get session status (teacher only, must own session)
 router.get('/session/:sessionId', authenticate, authorize('teacher'), async (req, res) => {
   try {
     const { sessionId } = req.params;
+
+    // Verify teacher owns this session — prevents IDOR
+    if (!(await verifySessionOwnership(sessionId, req.user.id))) {
+      return res.status(403).json({ error: 'Session not found or access denied' });
+    }
 
     const sessionResult = await pool.query(
       'SELECT * FROM transcription_sessions WHERE session_id = $1',
