@@ -230,7 +230,7 @@ async function handleJoinSession(ws, data) {
     ).catch(err => logger.error('Error upserting session participant on WS join', { error: err.message }));
   }
 
-  logger.info('Student joined session', { studentId, sessionId: normalizedSessionId });
+  logger.info('User joined session', { userId: studentId, role: ws.userRole, sessionId: normalizedSessionId });
 
   ws.send(JSON.stringify({
     type: 'session-joined',
