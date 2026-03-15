@@ -7,6 +7,7 @@ const vectorStore = require('../services/vectorStore');
 const embeddingService = require('../services/embeddingService');
 const mistralClient = require('../services/mistralClient');
 const { awardXP } = require('./gamification');
+const { supabase } = require('../config/supabase');
 
 // ─── AI Generation ───────────────────────────────────────────────────────────
 
@@ -17,6 +18,20 @@ async function generateQAPairs(sessionId, count = 10, topic = '') {
   const chunks = await vectorStore.searchSimilar(queryEmbedding, sessionId, Math.min(count * 2, 20));
 
   if (!chunks || chunks.length === 0) {
+    // Check if resources exist in DB but just aren't vectorized yet
+    const { data: resources } = await supabase
+      .from('resources')
+      .select('id, title, vectorization_status')
+      .eq('session_id', sessionId)
+      .limit(5);
+
+    if (resources && resources.length > 0) {
+      const unprocessed = resources.filter(r => r.vectorization_status !== 'completed');
+      if (unprocessed.length > 0) {
+        throw new Error('Session resources are still being processed. Please wait a moment and try again.');
+      }
+      throw new Error('Session resources could not be searched. Please re-upload your materials and try again.');
+    }
     throw new Error('No session material found to generate cards from. Please upload resources first.');
   }
 

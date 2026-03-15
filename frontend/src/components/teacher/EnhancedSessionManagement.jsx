@@ -1337,7 +1337,7 @@ const EnhancedSessionManagement = () => {
           {/* Knowledge Cards Tab */}
           {activeTab === 'knowledge-cards' && (
             <KnowledgeCards
-              sessionId={session?.id || sessionId}
+              sessionId={session?.session_id || sessionId}
               onlineCount={onlineCount}
             />
           )}
