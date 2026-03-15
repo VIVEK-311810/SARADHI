@@ -316,14 +316,16 @@ router.post('/rounds/:roundId/distribute', authenticate, authorize('teacher'), a
     );
     if (pairsResult.rows.length < 2) return res.status(400).json({ error: 'Need at least 2 pairs to distribute' });
 
-    // Resolve 6-char session code — round.session_id may be numeric or 6-char depending on when it was created
+    // Resolve session — get both numeric id (for session_participants) and 6-char code (for WS broadcast)
     const sessionMeta = await resolveSession(round.session_id);
-    const sessionCode = sessionMeta?.session_id || round.session_id;
+    if (!sessionMeta) return res.status(404).json({ error: 'Session not found' });
+    const sessionNumericId = sessionMeta.id;
+    const sessionCode = sessionMeta.session_id;
 
-    // Get online students from session_participants
+    // Get online students from session_participants (uses numeric session FK)
     const studentsResult = await pool.query(
       'SELECT student_id FROM session_participants WHERE session_id = $1 AND is_active = true',
-      [sessionCode]
+      [sessionNumericId]
     );
     if (studentsResult.rows.length < 2) {
       return res.status(400).json({ error: 'Need at least 2 online students to distribute cards' });
@@ -565,14 +567,15 @@ router.post('/vote', authenticate, authorize('student'), async (req, res) => {
 
     const pair = pairCheck.rows[0];
 
-    // Resolve 6-char session code from numeric FK
+    // pair.session_id is the numeric FK — use it directly for session_participants (also numeric)
+    // Also look up 6-char code for WS broadcast
     const sessionLookup = await pool.query('SELECT session_id FROM sessions WHERE id = $1', [pair.session_id]);
     const sessionCodeStr = sessionLookup.rows[0]?.session_id;
 
-    // Verify student is in this session
+    // Verify student is in this session (session_participants.session_id is numeric)
     const participantCheck = await pool.query(
       'SELECT 1 FROM session_participants WHERE session_id = $1 AND student_id = $2',
-      [sessionCodeStr, req.user.id]
+      [pair.session_id, req.user.id]
     );
     if (participantCheck.rows.length === 0) {
       return res.status(403).json({ error: 'Not a participant in this session' });
