@@ -79,7 +79,7 @@ const KnowledgeCard = ({ card, activeState, currentUserId, onVote, onClose }) =>
   const allMyAnswers = card?.answers || [];
 
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className={`w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border-2 transition-all duration-300
         ${isMyQuestionTurn ? 'border-primary-500 shadow-blue-200 dark:shadow-blue-900/40' : ''}
         ${isMyAnswerTurn ? 'border-green-500 shadow-green-200 dark:shadow-green-900/40' : ''}
