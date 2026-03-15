@@ -328,7 +328,9 @@ router.post('/rounds/:roundId/distribute', authenticate, authorize('teacher'), a
       [sessionNumericId]
     );
     if (studentsResult.rows.length < 2) {
-      return res.status(400).json({ error: 'Need at least 2 online students to distribute cards' });
+      return res.status(400).json({
+        error: `Need at least 2 online students to distribute cards (currently ${studentsResult.rows.length} active)`
+      });
     }
 
     const studentIds = studentsResult.rows.map(r => r.student_id);

@@ -218,6 +218,15 @@ async function handleJoinSession(ws, data) {
   ws.sessionId = normalizedSessionId;
   ws.studentId = studentId;
 
+  // Mark student as active in session_participants (handles reconnects after WS close)
+  pool.query(
+    `INSERT INTO session_participants (session_id, student_id, connection_status, is_active)
+     VALUES ((SELECT id FROM sessions WHERE session_id = $1), $2, 'online', true)
+     ON CONFLICT (session_id, student_id)
+     DO UPDATE SET connection_status = 'online', is_active = true, last_activity = CURRENT_TIMESTAMP`,
+    [normalizedSessionId, studentId]
+  ).catch(err => logger.error('Error upserting session participant on WS join', { error: err.message }));
+
   logger.info('Student joined session', { studentId, sessionId: normalizedSessionId });
 
   ws.send(JSON.stringify({
