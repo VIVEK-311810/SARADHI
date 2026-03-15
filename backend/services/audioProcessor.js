@@ -264,7 +264,11 @@ async function sendTranscriptSegment(sessionId) {
 
     const response = await fetch(TRANSCRIPT_WEBHOOK_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'SASEduAI-Webhook/1.0',
+        'Accept': 'application/json'
+      },
       body: JSON.stringify(payload),
       timeout: 15000
     });
@@ -378,7 +382,11 @@ async function sendFinalNotes(sessionId) {
 
     const response = await fetch(FINAL_NOTES_WEBHOOK_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'SASEduAI-Webhook/1.0',
+        'Accept': 'application/json'
+      },
       body: JSON.stringify(payload),
       timeout: 30000
     });
