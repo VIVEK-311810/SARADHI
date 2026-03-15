@@ -45,19 +45,8 @@ router.post('/start', authenticate, authorize('teacher'), upload.single('pdf'), 
       return res.status(403).json({ error: 'Session not found or access denied' });
     }
 
-    let pdfUploaded = false;
-    let pdfFilename = null;
-
-    if (req.file) {
-      try {
-        await audioProcessor.uploadPDFToWebhook(req.file.buffer, req.file.originalname, session_id);
-        pdfUploaded = true;
-        pdfFilename = req.file.originalname;
-      } catch (error) {
-        logger.error('PDF upload failed', { error: error.message, session_id });
-        return res.status(500).json({ error: 'Failed to upload PDF to webhook', details: error.message });
-      }
-    }
+    const pdfUploaded = !!req.file;
+    const pdfFilename = req.file ? req.file.originalname : null;
 
     const session = await audioProcessor.createSession(session_id, intervalMinutes, pdfUploaded, pdfFilename);
     audioProcessor.startSegmentTimer(session_id, intervalMinutes);
@@ -304,34 +293,26 @@ router.post('/generate-notes', authenticate, authorize('teacher'), async (req, r
   }
 });
 
-// POST /api/transcription/send-notes — Send manual notes (teacher only)
+// POST /api/transcription/send-notes — Generate notes via LangGraph agent (teacher only)
 router.post('/send-notes', authenticate, authorize('teacher'), async (req, res) => {
   try {
-    const { session_id, notes } = req.body;
-    if (!session_id || !notes) {
-      return res.status(400).json({ error: 'session_id and notes are required' });
+    const { session_id } = req.body;
+    if (!session_id) {
+      return res.status(400).json({ error: 'session_id is required' });
     }
     if (!(await verifySessionOwnership(session_id, req.user.id))) {
       return res.status(403).json({ error: 'Session not found or access denied' });
     }
 
-    if (!process.env.FINAL_NOTES_WEBHOOK_URL) {
-      return res.status(503).json({ error: 'Notes webhook not configured' });
+    const success = await audioProcessor.sendFinalNotes(session_id);
+    if (!success) {
+      return res.status(404).json({ error: 'No transcripts found for this session', session_id });
     }
 
-    const response = await fetch(process.env.FINAL_NOTES_WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ manual_notes: notes, session_id, timestamp: new Date().toISOString() }),
-      timeout: 15000
-    });
-
-    if (!response.ok) throw new Error(`Webhook error: ${response.status}`);
-
-    res.json({ success: true, session_id, message: 'Manual notes sent to webhook successfully' });
+    res.json({ success: true, session_id, message: 'Notes generated successfully' });
   } catch (error) {
-    logger.error('Error sending manual notes', { error: error.message });
-    res.status(500).json({ error: 'Failed to send manual notes', details: error.message });
+    logger.error('Error generating notes', { error: error.message });
+    res.status(500).json({ error: 'Failed to generate notes', details: error.message });
   }
 });
 

@@ -456,4 +456,10 @@ async function generateNotesAsync(session) {
   }
 }
 
-module.exports = { generateNotesAsync };
+module.exports = {
+  generateNotesAsync,
+  // Exposed for notesAgent.js reuse
+  _fetchTranscript: fetchTranscript,
+  _fetchResourceTexts: fetchResourceTexts,
+  _buildContentBudget: buildContentBudget,
+};

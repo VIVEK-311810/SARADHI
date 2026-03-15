@@ -3,14 +3,14 @@ const fetch = require('node-fetch');
 require('dotenv').config();
 const pool = require('../db');
 const { runMCQAgent } = require('./mcqAgent');
+const { runKeyPointsAgent } = require('./keyPointsAgent');
+const { runNotesAgent } = require('./notesAgent');
 
 // Configuration
 const GPU_TRANSCRIPTION_URL = process.env.GPU_TRANSCRIPTION_URL || 'http://localhost:5000';
 // Skip GPU when the URL is still the default (localhost) — avoids pointless ECONNREFUSED on Render
 const GPU_ENABLED = !!(process.env.GPU_TRANSCRIPTION_URL && !process.env.GPU_TRANSCRIPTION_URL.includes('localhost'));
 const TRANSCRIPT_WEBHOOK_URL = process.env.TRANSCRIPT_WEBHOOK_URL;
-const FINAL_NOTES_WEBHOOK_URL = process.env.FINAL_NOTES_WEBHOOK_URL;
-const SESSION_START_WEBHOOK_URL = process.env.SESSION_START_WEBHOOK_URL;
 
 // Groq fallback configuration
 const GROQ_API_KEY   = process.env.GROQ_API_KEY;
@@ -265,6 +265,11 @@ async function sendTranscriptSegment(sessionId) {
       .then(mcqs => console.log(`[AudioProcessor] MCQ agent completed: ${mcqs?.length || 0} MCQs for session: ${sessionId}`))
       .catch(err => console.error(`[AudioProcessor] MCQ agent error (non-fatal): ${err.message}`));
 
+    // Trigger key-points extraction via LangGraph agent (fire-and-forget — non-blocking)
+    runKeyPointsAgent(transcriptSegment, sessionId)
+      .then(points => console.log(`[AudioProcessor] Key points agent completed: ${points?.length || 0} for session: ${sessionId}`))
+      .catch(err => console.error(`[AudioProcessor] Key points agent error (non-fatal): ${err.message}`));
+
     // Broadcast segment sent notification only to clients in this session
     if (global.broadcastToSession) {
       global.broadcastToSession(sessionId.toUpperCase(), {
@@ -292,86 +297,12 @@ async function sendTranscriptSegment(sessionId) {
  */
 async function sendFinalNotes(sessionId) {
   try {
-    console.log(`[AudioProcessor] Sending final notes for session: ${sessionId}`);
-
-    // Get database ID for most recent session
-    let dbId = activeSessions.get(sessionId);
-    if (!dbId) {
-      const sessionQuery = `
-        SELECT id FROM transcription_sessions
-        WHERE session_id = $1
-        ORDER BY start_time DESC
-        LIMIT 1
-      `;
-      const sessionResult = await pool.query(sessionQuery, [sessionId]);
-      if (sessionResult.rows.length === 0) {
-        console.log(`[AudioProcessor] No session found for: ${sessionId}`);
-        return false;
-      }
-      dbId = sessionResult.rows[0].id;
-    }
-
-    // Get ALL transcripts for this session (sent and unsent)
-    const query = `
-      SELECT segment_text
-      FROM transcripts
-      WHERE session_db_id = $1
-      ORDER BY timestamp ASC
-    `;
-
-    const result = await pool.query(query, [dbId]);
-
-    if (result.rows.length === 0) {
-      console.log(`[AudioProcessor] No transcripts found for session: ${sessionId}`);
-      return false;
-    }
-
-    // Join all transcripts into final notes
-    const finalNotes = result.rows
-      .map(row => row.segment_text)
-      .join(' ')
-      .trim();
-
-    if (!finalNotes) {
-      console.log(`[AudioProcessor] Empty final notes for session: ${sessionId}`);
-      return false;
-    }
-
-    if (!FINAL_NOTES_WEBHOOK_URL) {
-      console.log(`[AudioProcessor] FINAL_NOTES_WEBHOOK_URL not set — skipping webhook for session: ${sessionId}`);
-      return false;
-    }
-
-    // Send to final notes webhook
-    const payload = {
-      final_notes: finalNotes,
-      session_id: sessionId,
-      timestamp: new Date().toISOString(),
-      total_segments: result.rows.length
-    };
-
-    console.log(`[AudioProcessor] Posting final notes to webhook: ${FINAL_NOTES_WEBHOOK_URL}`);
-
-    const response = await fetch(FINAL_NOTES_WEBHOOK_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'SASEduAI-Webhook/1.0',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(payload),
-      timeout: 30000
-    });
-
-    if (!response.ok) {
-      throw new Error(`Webhook error: ${response.status} ${response.statusText}`);
-    }
-
-    console.log(`[AudioProcessor] ✓ Final notes sent successfully for session: ${sessionId}`);
+    console.log(`[AudioProcessor] Generating final notes via LangGraph agent for session: ${sessionId}`);
+    await runNotesAgent(sessionId);
+    console.log(`[AudioProcessor] ✓ Notes agent completed for session: ${sessionId}`);
     return true;
-
   } catch (error) {
-    console.error(`[AudioProcessor] Error sending final notes:`, error.message);
+    console.error(`[AudioProcessor] Notes agent error:`, error.message);
     throw error;
   }
 }
@@ -399,43 +330,6 @@ function getDebugState() {
   };
 }
 
-/**
- * Upload PDF to session start webhook
- * @param {Buffer} pdfBuffer - PDF file buffer
- * @param {string} filename - PDF filename
- * @param {string} sessionId - Session identifier
- * @returns {Promise<boolean>} Success status
- */
-async function uploadPDFToWebhook(pdfBuffer, filename, sessionId) {
-  try {
-    console.log(`[AudioProcessor] Uploading PDF for session: ${sessionId}`);
-
-    const formData = new FormData();
-    formData.append('Resource', pdfBuffer, {
-      filename: filename,
-      contentType: 'application/pdf'
-    });
-    formData.append('Session_ID', sessionId);
-
-    const response = await fetch(SESSION_START_WEBHOOK_URL, {
-      method: 'POST',
-      body: formData,
-      headers: formData.getHeaders(),
-      timeout: 30000
-    });
-
-    if (!response.ok) {
-      throw new Error(`PDF upload error: ${response.status} ${response.statusText}`);
-    }
-
-    console.log(`[AudioProcessor] ✓ PDF uploaded successfully for session: ${sessionId}`);
-    return true;
-
-  } catch (error) {
-    console.error(`[AudioProcessor] Error uploading PDF:`, error.message);
-    throw error;
-  }
-}
 
 /**
  * Create new transcription session in database
@@ -573,7 +467,6 @@ module.exports = {
   getDebugState,
   sendTranscriptSegment,
   sendFinalNotes,
-  uploadPDFToWebhook,
   createSession,
   updateSessionStatus,
   endSession

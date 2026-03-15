@@ -70,6 +70,10 @@ const EnhancedStudentSession = () => {
   // "I'm stuck" state
   const [stuckSent, setStuckSent] = useState(false);
 
+  // Live key points from AI
+  const [keyPoints, setKeyPoints] = useState([]);
+  const [keyPointsExpanded, setKeyPointsExpanded] = useState(true);
+
   // Doubt drawer state
   const [doubtDrawerOpen, setDoubtDrawerOpen] = useState(false);
   const [doubtTitle, setDoubtTitle] = useState('');
@@ -430,6 +434,15 @@ const EnhancedStudentSession = () => {
           setCardActiveState(null);
           break;
 
+        case 'key-points-update':
+          if (data.keyPoints && Array.isArray(data.keyPoints)) {
+            setKeyPoints(prev => [...data.keyPoints, ...prev]);
+            window.dispatchEvent(new CustomEvent('saradhi:notification', {
+              detail: { type: 'keypoints', title: 'New key points', body: data.keyPoints[0] }
+            }));
+          }
+          break;
+
         case 'notes-ready':
           // Class notes are ready — student can find them in the Resources page
           if (data.sessionId && data.sessionId.toUpperCase() === sessionId?.toUpperCase()) {
@@ -775,6 +788,39 @@ const EnhancedStudentSession = () => {
             </svg>
             <span className="text-sm sm:text-base font-medium text-yellow-800 dark:text-yellow-300">You joined after attendance was taken. Marked as Late.</span>
           </div>
+        </div>
+      )}
+
+      {/* Live Key Points */}
+      {keyPoints.length > 0 && (
+        <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass overflow-hidden">
+          <button
+            onClick={() => setKeyPointsExpanded(prev => !prev)}
+            className="w-full flex items-center justify-between px-4 sm:px-6 py-3 text-left"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <h3 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white">
+                Key Takeaways ({keyPoints.length})
+              </h3>
+            </div>
+            <svg
+              className={`w-4 h-4 text-slate-400 transition-transform ${keyPointsExpanded ? 'rotate-180' : ''}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {keyPointsExpanded && (
+            <div className="px-4 sm:px-6 pb-4 space-y-2">
+              {keyPoints.map((point, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                  <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300">{point}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
