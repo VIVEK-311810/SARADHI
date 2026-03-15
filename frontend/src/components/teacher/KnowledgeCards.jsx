@@ -321,7 +321,7 @@ const KnowledgeCards = ({ sessionId, onlineCount = 0 }) => {
                             >&#128465;</button>
                           </>
                         )}
-                        {['distributed'].includes(activeRound.status) && pair.status === 'pending' && (
+                        {['distributed', 'active'].includes(activeRound.status) && pair.status === 'pending' && (
                           <button
                             onClick={() => handleActivate(pair.id)}
                             disabled={activatingPairId === pair.id}
