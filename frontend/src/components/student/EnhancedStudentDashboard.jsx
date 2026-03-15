@@ -19,7 +19,6 @@ const EnhancedStudentDashboard = () => {
     level: { level: 1, title: 'Newcomer', currentXP: 0, nextLevelXP: 100, xpToNextLevel: 100 },
     badges: []
   });
-  const [weakTopics, setWeakTopics] = useState([]);
 
   const currentUser = safeParseUser();
   const dashboardWsRef = useRef(null);
@@ -88,9 +87,6 @@ const EnhancedStudentDashboard = () => {
         activeSessions: data.stats.active_sessions
       });
 
-      apiRequest(`/students/${studentId}/weak-topics`)
-        .then(d => setWeakTopics(d.weakTopics || []))
-        .catch(() => {});
 
       try {
         if (isDemoMode()) {
@@ -286,43 +282,6 @@ const EnhancedStudentDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Weak Topics */}
-      {weakTopics.length > 0 && (
-        <Card variant="glass" className="border-warning-500/30 dark:border-warning-500/20">
-          <CardHeader className="border-b border-slate-200/60 dark:border-slate-700/60">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-warning-100 dark:bg-warning-900/30">
-                <svg className="w-5 h-5 text-warning-600 dark:text-warning-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <div>
-                <CardTitle>Needs Revision</CardTitle>
-                <CardDescription>Topics where you've answered incorrectly</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-6 space-y-3">
-            {weakTopics.map((topic, i) => (
-              <div key={i} className="rounded-xl border border-warning-200/60 dark:border-warning-800/40 bg-warning-50/60 dark:bg-warning-900/10 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm">{topic.course}</span>
-                  <Badge variant="warning">{topic.wrongCount} wrong</Badge>
-                </div>
-                <div className="space-y-2">
-                  {topic.questions.map((q, j) => (
-                    <div key={j} className="text-xs bg-white/80 dark:bg-slate-800/80 rounded-lg p-2.5 border border-warning-100 dark:border-warning-800/30">
-                      <p className="font-medium text-slate-700 dark:text-slate-300 mb-1">{q.question}</p>
-                      <p className="text-error-500">Your answer: {q.yourAnswer}</p>
-                      <p className="text-success-600 dark:text-success-400">Correct: {q.correctAnswer}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
 
       {/* Sessions */}
       <Card variant="glass">
