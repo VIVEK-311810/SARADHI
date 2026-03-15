@@ -102,6 +102,23 @@ router.post('/audio-chunk', authenticate, authorize('teacher'), upload.single('a
       }
     }
 
+    // Restart segment timer if it was lost (server restart wipes in-memory timers)
+    if (!audioProcessor.hasSegmentTimer(session_id)) {
+      try {
+        const sessionRow = await pool.query(
+          'SELECT segment_interval FROM transcription_sessions WHERE session_id = $1 AND status = $2 ORDER BY start_time DESC LIMIT 1',
+          [session_id, 'active']
+        );
+        if (sessionRow.rows.length > 0) {
+          const interval = sessionRow.rows[0].segment_interval;
+          logger.info('Restarting lost segment timer', { session_id, interval });
+          audioProcessor.startSegmentTimer(session_id, interval);
+        }
+      } catch (timerErr) {
+        logger.warn('Could not restart segment timer', { error: timerErr.message, session_id });
+      }
+    }
+
     res.json({ success: true, transcript, detected_language: detectedLanguage, session_id });
   } catch (error) {
     logger.error('Error processing audio chunk', { error: error.message });

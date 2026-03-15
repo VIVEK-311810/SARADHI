@@ -395,6 +395,10 @@ function stopSegmentTimer(sessionId) {
   }
 }
 
+function hasSegmentTimer(sessionId) {
+  return sessionTimers.has(sessionId);
+}
+
 /**
  * Upload PDF to session start webhook
  * @param {Buffer} pdfBuffer - PDF file buffer
@@ -565,6 +569,7 @@ module.exports = {
   saveTranscript,
   startSegmentTimer,
   stopSegmentTimer,
+  hasSegmentTimer,
   sendTranscriptSegment,
   sendFinalNotes,
   uploadPDFToWebhook,

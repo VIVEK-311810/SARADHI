@@ -34,7 +34,7 @@ const useAudioRecorder = (initialSessionId = '') => {
     }
   }, [initialSessionId]);
 
-  // WebSocket connection (kept for future broadcast events)
+  // WebSocket connection — opened once on mount, not per-sessionId change
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     const ws = new WebSocket(`${WS_BASE_URL}?token=${token}`);
@@ -49,7 +49,7 @@ const useAudioRecorder = (initialSessionId = '') => {
         ws.close();
       }
     };
-  }, [sessionId]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePdfChange = (e) => {
     const file = e.target.files[0];
@@ -232,6 +232,7 @@ const useAudioRecorder = (initialSessionId = '') => {
 
   const stopRecording = async () => {
     clearTimeout(chunkTimerRef.current);
+    const wasActive = statusRef.current !== 'idle'; // Capture BEFORE setting idle
     statusRef.current = 'idle'; // Set before stop so onstop doesn't restart
 
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -244,7 +245,7 @@ const useAudioRecorder = (initialSessionId = '') => {
       streamRef.current = null;
     }
 
-    if (sessionId && statusRef.current !== 'idle') {
+    if (sessionId && wasActive) {
       try {
         const token = localStorage.getItem('authToken');
         await fetch(`${API_URL}/transcription/stop`, {
@@ -261,7 +262,7 @@ const useAudioRecorder = (initialSessionId = '') => {
   };
 
   const generateNotes = async () => {
-    if (!sessionId) return;
+    if (!sessionId || transcripts.length === 0) return;
     try {
       setIsProcessing(true);
       const token = localStorage.getItem('authToken');

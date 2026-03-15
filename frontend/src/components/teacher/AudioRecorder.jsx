@@ -147,7 +147,7 @@ const AudioRecorder = ({ audioRecorder, sessionId: propSessionId }) => {
 
         <button
           onClick={generateNotes}
-          disabled={status === 'idle' || isProcessing}
+          disabled={!fullTranscript || isProcessing}
           className="px-4 sm:px-6 py-2.5 sm:py-3 bg-primary-600 text-white rounded-lg font-bold hover:bg-primary-700 active:bg-primary-800 disabled:bg-slate-300 dark:disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors text-sm sm:text-base"
         >
           📝 Notes
