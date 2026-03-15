@@ -70,13 +70,25 @@ export default function Sidebar({ role, mobileOpen = false, setMobileOpen }) {
 
   const location = useLocation();
   const navigate  = useNavigate();
+
+  // Resolve session-aware href for nav items that need a sessionId in the URL
+  const resolveHref = (item) => {
+    if (item.href === '/student/ai-assistant') {
+      // If currently inside a session context, link directly to that session's AI Assistant
+      const sessionMatch = location.pathname.match(/\/student\/(?:session|ai-assistant)\/([^/]+)/);
+      if (sessionMatch) return `/student/ai-assistant/${sessionMatch[1]}`;
+      return '/student/dashboard'; // fallback: send to dashboard to pick a session
+    }
+    return item.href;
+  };
+
   const navItems  = role === 'teacher' ? TEACHER_NAV : STUDENT_NAV;
 
   // Get user info for profile card
   const user = (() => {
-    try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; }
+    try { return JSON.parse(localStorage.getItem('currentUser') || '{}'); } catch { return {}; }
   })();
-  const displayName = user?.name || user?.email?.split('@')[0] || 'User';
+  const displayName = user?.fullName || user?.name || user?.email?.split('@')[0] || 'User';
   const avatar      = user?.picture || null;
   const initials    = displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
@@ -97,9 +109,9 @@ export default function Sidebar({ role, mobileOpen = false, setMobileOpen }) {
   }, [mobileOpen]);
 
   const handleLogout = useCallback(() => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('role');
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('isDemo');
     navigate('/auth');
   }, [navigate]);
 
@@ -172,10 +184,11 @@ export default function Sidebar({ role, mobileOpen = false, setMobileOpen }) {
               const active = isActive(item);
               const Icon   = item.icon;
 
+              const resolvedHref = resolveHref(item);
               const linkEl = (
                 <NavLink
                   key={item.href}
-                  to={item.href}
+                  to={resolvedHref}
                   className={cn(
                     'group relative flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-150',
                     'px-3 py-2.5',

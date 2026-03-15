@@ -110,6 +110,7 @@ function StudentRoutes() {
           <Route path="/student/session/:sessionId/resources"  element={<SessionResources />} />
           <Route path="/student/session/:sessionId/search"     element={<AIResourceSearch />} />
           <Route path="/student/ai-assistant/:sessionId"       element={<AIAssistant />} />
+          <Route path="/student/ai-assistant"                  element={<Navigate to="/student/dashboard" replace />} />
           <Route path="/student/session/:sessionId/history"    element={<VisitSession />} />
           <Route path="/student/session/:sessionId/quiz"       element={<Quiz />} />
           <Route path="/student/leaderboard"                   element={<Leaderboard />} />

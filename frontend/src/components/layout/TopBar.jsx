@@ -38,10 +38,10 @@ export default function TopBar({ collapsed, onMobileMenuClick }) {
   const pageTitle = getPageTitle(location.pathname);
 
   const user = (() => {
-    try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; }
+    try { return JSON.parse(localStorage.getItem('currentUser') || '{}'); } catch { return {}; }
   })();
-  const role        = localStorage.getItem('role') || 'student';
-  const displayName = user?.name || user?.email?.split('@')[0] || 'User';
+  const role        = user?.role || 'student';
+  const displayName = user?.fullName || user?.name || user?.email?.split('@')[0] || 'User';
   const email       = user?.email || '';
   const avatar      = user?.picture || null;
   const initials    = displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
@@ -63,9 +63,9 @@ export default function TopBar({ collapsed, onMobileMenuClick }) {
   }, [location.pathname]);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('role');
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('isDemo');
     navigate('/auth');
   };
 
