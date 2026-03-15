@@ -10,8 +10,6 @@ const { runNotesAgent } = require('./notesAgent');
 const GPU_TRANSCRIPTION_URL = process.env.GPU_TRANSCRIPTION_URL || 'http://localhost:5000';
 // Skip GPU when the URL is still the default (localhost) — avoids pointless ECONNREFUSED on Render
 const GPU_ENABLED = !!(process.env.GPU_TRANSCRIPTION_URL && !process.env.GPU_TRANSCRIPTION_URL.includes('localhost'));
-const TRANSCRIPT_WEBHOOK_URL = process.env.TRANSCRIPT_WEBHOOK_URL;
-
 // Groq fallback configuration
 const GROQ_API_KEY   = process.env.GROQ_API_KEY;
 const GROQ_API_URL   = 'https://api.groq.com/openai/v1/audio/transcriptions';
@@ -23,8 +21,7 @@ const GROQ_TIMEOUT_MS = 30000;
 const sessionTimers = new Map();
 const activeSessions = new Map(); // Store { session_id: database_id }
 
-// Log webhook/provider config once at startup (visible in Render boot logs)
-console.log('[AudioProcessor] Config — TRANSCRIPT_WEBHOOK_URL:', TRANSCRIPT_WEBHOOK_URL ? TRANSCRIPT_WEBHOOK_URL.replace(/\/[^/]+$/, '/***') : 'NOT SET');
+// Log provider config once at startup (visible in Render boot logs)
 console.log('[AudioProcessor] Config — GPU_ENABLED:', GPU_ENABLED, '| GROQ_API_KEY:', GROQ_API_KEY ? 'set' : 'NOT SET');
 
 /**

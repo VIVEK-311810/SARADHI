@@ -106,16 +106,27 @@ const graph = new StateGraph(StateAnnotation)
   .compile();
 
 // ── Public API ────────────────────────────────────────────────────────────────
-async function runKeyPointsAgent(transcript, sessionId) {
+async function runKeyPointsAgent(transcript, sessionId, { retries = 1 } = {}) {
   console.log(`[KeyPointsAgent] Starting for session: ${sessionId} (${transcript.length} chars)`);
 
-  const result = await graph.invoke({
-    transcript,
-    sessionId,
-    keyPoints: '[]',
-  });
-
-  return JSON.parse(result.keyPoints);
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const result = await graph.invoke({
+        transcript,
+        sessionId,
+        keyPoints: '[]',
+      });
+      return JSON.parse(result.keyPoints);
+    } catch (err) {
+      if (attempt < retries) {
+        const delay = 2000 * (attempt + 1);
+        console.warn(`[KeyPointsAgent] Attempt ${attempt + 1} failed, retrying in ${delay}ms: ${err.message}`);
+        await new Promise(r => setTimeout(r, delay));
+      } else {
+        throw err;
+      }
+    }
+  }
 }
 
 module.exports = { runKeyPointsAgent };

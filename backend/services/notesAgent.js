@@ -80,21 +80,29 @@ const graph = new StateGraph(StateAnnotation)
   .compile();
 
 // ── Public API ────────────────────────────────────────────────────────────────
-async function runNotesAgent(sessionId) {
+async function runNotesAgent(sessionId, { retries = 1 } = {}) {
   console.log(`[NotesAgent] Starting for session: ${sessionId}`);
 
-  try {
-    const result = await graph.invoke({
-      sessionId,
-      session: '',
-      success: 'false',
-      error:   '',
-    });
-    console.log(`[NotesAgent] Completed for session: ${sessionId}`);
-    return result;
-  } catch (err) {
-    logger.error('NotesAgent pipeline failed', { error: err.message, sessionId });
-    throw err;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const result = await graph.invoke({
+        sessionId,
+        session: '',
+        success: 'false',
+        error:   '',
+      });
+      console.log(`[NotesAgent] Completed for session: ${sessionId}`);
+      return result;
+    } catch (err) {
+      if (attempt < retries) {
+        const delay = 5000 * (attempt + 1);
+        logger.warn(`NotesAgent attempt ${attempt + 1} failed, retrying in ${delay}ms`, { error: err.message, sessionId });
+        await new Promise(r => setTimeout(r, delay));
+      } else {
+        logger.error('NotesAgent pipeline failed after retries', { error: err.message, sessionId, attempts: attempt + 1 });
+        throw err;
+      }
+    }
   }
 }
 

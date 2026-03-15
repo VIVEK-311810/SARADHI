@@ -74,6 +74,10 @@ const EnhancedStudentSession = () => {
   const [keyPoints, setKeyPoints] = useState([]);
   const [keyPointsExpanded, setKeyPointsExpanded] = useState(true);
 
+  // Live auto-generated MCQs
+  const [liveMcqs, setLiveMcqs] = useState([]);
+  const [mcqsExpanded, setMcqsExpanded] = useState(false);
+
   // Doubt drawer state
   const [doubtDrawerOpen, setDoubtDrawerOpen] = useState(false);
   const [doubtTitle, setDoubtTitle] = useState('');
@@ -439,6 +443,16 @@ const EnhancedStudentSession = () => {
             setKeyPoints(prev => [...data.keyPoints, ...prev]);
             window.dispatchEvent(new CustomEvent('saradhi:notification', {
               detail: { type: 'keypoints', title: 'New key points', body: data.keyPoints[0] }
+            }));
+          }
+          break;
+
+        case 'mcqs-generated':
+          if (data.mcqs && Array.isArray(data.mcqs) && data.mcqs.length > 0) {
+            setLiveMcqs(prev => [...data.mcqs, ...prev]);
+            setMcqsExpanded(true);
+            window.dispatchEvent(new CustomEvent('saradhi:notification', {
+              detail: { type: 'mcq', title: 'Practice questions ready', body: `${data.mcqs.length} new MCQs available` }
             }));
           }
           break;
@@ -819,6 +833,58 @@ const EnhancedStudentSession = () => {
                   <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300">{point}</p>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Live Auto-Generated MCQs */}
+      {liveMcqs.length > 0 && (
+        <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass overflow-hidden">
+          <button
+            onClick={() => setMcqsExpanded(prev => !prev)}
+            className="w-full flex items-center justify-between px-4 sm:px-6 py-3 text-left"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-violet-500 animate-pulse" />
+              <h3 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white">
+                Practice Questions ({liveMcqs.length})
+              </h3>
+            </div>
+            <svg
+              className={`w-4 h-4 text-slate-400 transition-transform ${mcqsExpanded ? 'rotate-180' : ''}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {mcqsExpanded && (
+            <div className="px-4 sm:px-6 pb-4 space-y-4">
+              {liveMcqs.map((mcq, i) => {
+                const options = typeof mcq.options === 'string' ? JSON.parse(mcq.options) : mcq.options;
+                return (
+                  <div key={mcq.id || i} className="border border-slate-200 dark:border-slate-700 rounded-lg p-3">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white mb-2">{mcq.question}</p>
+                    <div className="space-y-1">
+                      {options.map((opt, j) => (
+                        <div
+                          key={j}
+                          className={`text-xs px-2.5 py-1.5 rounded ${
+                            j === mcq.correct_answer
+                              ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 font-medium'
+                              : 'text-slate-600 dark:text-slate-400'
+                          }`}
+                        >
+                          {String.fromCharCode(65 + j)}. {opt}
+                        </div>
+                      ))}
+                    </div>
+                    {mcq.justification && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 italic">{mcq.justification}</p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

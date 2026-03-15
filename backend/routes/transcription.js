@@ -272,34 +272,11 @@ router.post('/stop', authenticate, authorize('teacher'), async (req, res) => {
   }
 });
 
-// POST /api/transcription/generate-notes — Generate complete notes (teacher only)
-router.post('/generate-notes', authenticate, authorize('teacher'), async (req, res) => {
+// Shared handler for notes generation (used by both routes below)
+async function handleGenerateNotes(req, res) {
   try {
     const { session_id } = req.body;
     if (!session_id) return res.status(400).json({ error: 'session_id is required' });
-    if (!(await verifySessionOwnership(session_id, req.user.id))) {
-      return res.status(403).json({ error: 'Session not found or access denied' });
-    }
-
-    const success = await audioProcessor.sendFinalNotes(session_id);
-    if (!success) {
-      return res.status(404).json({ error: 'No transcripts found for this session', session_id });
-    }
-
-    res.json({ success: true, session_id, message: 'Complete notes sent to webhook successfully' });
-  } catch (error) {
-    logger.error('Error generating notes', { error: error.message });
-    res.status(500).json({ error: 'Failed to generate notes', details: error.message });
-  }
-});
-
-// POST /api/transcription/send-notes — Generate notes via LangGraph agent (teacher only)
-router.post('/send-notes', authenticate, authorize('teacher'), async (req, res) => {
-  try {
-    const { session_id } = req.body;
-    if (!session_id) {
-      return res.status(400).json({ error: 'session_id is required' });
-    }
     if (!(await verifySessionOwnership(session_id, req.user.id))) {
       return res.status(403).json({ error: 'Session not found or access denied' });
     }
@@ -314,7 +291,13 @@ router.post('/send-notes', authenticate, authorize('teacher'), async (req, res) 
     logger.error('Error generating notes', { error: error.message });
     res.status(500).json({ error: 'Failed to generate notes', details: error.message });
   }
-});
+}
+
+// POST /api/transcription/generate-notes — Generate notes via LangGraph agent (teacher only)
+router.post('/generate-notes', authenticate, authorize('teacher'), handleGenerateNotes);
+
+// POST /api/transcription/send-notes — Alias for generate-notes (backwards compat)
+router.post('/send-notes', authenticate, authorize('teacher'), handleGenerateNotes);
 
 // GET /api/transcription/session/:sessionId — Get session status (teacher only, must own session)
 router.get('/session/:sessionId', authenticate, authorize('teacher'), async (req, res) => {
@@ -354,7 +337,6 @@ router.get('/session/:sessionId', authenticate, authorize('teacher'), async (req
 router.get('/debug', authenticate, authorize('teacher'), async (req, res) => {
   try {
     const timerState = audioProcessor.getDebugState();
-    const webhookConfigured = !!(process.env.TRANSCRIPT_WEBHOOK_URL);
 
     const recentSessions = await pool.query(
       `SELECT ts.session_id, ts.status, ts.segment_interval, ts.start_time,
@@ -367,7 +349,6 @@ router.get('/debug', authenticate, authorize('teacher'), async (req, res) => {
     res.json({
       timer_sessions: timerState.timerKeys,
       active_sessions_map: timerState.activeSessionKeys,
-      transcript_webhook_configured: webhookConfigured,
       recent_db_sessions: recentSessions.rows
     });
   } catch (error) {
