@@ -2,6 +2,7 @@ const FormData = require('form-data');
 const fetch = require('node-fetch');
 require('dotenv').config();
 const pool = require('../db');
+const { runMCQAgent } = require('./mcqAgent');
 
 // Configuration
 const GPU_TRANSCRIPTION_URL = process.env.GPU_TRANSCRIPTION_URL || 'http://localhost:5000';
@@ -247,40 +248,6 @@ async function sendTranscriptSegment(sessionId) {
       return false;
     }
 
-    if (!TRANSCRIPT_WEBHOOK_URL) {
-      console.log(`[AudioProcessor] TRANSCRIPT_WEBHOOK_URL not set — skipping webhook for session: ${sessionId}`);
-      return false;
-    }
-
-    // Send to webhook
-    const payload = {
-      transcript_segment: transcriptSegment,
-      session_id: sessionId,
-      timestamp: new Date().toISOString(),
-      segment_count: result.rows.length
-    };
-
-    console.log(`[AudioProcessor] Posting to webhook: ${TRANSCRIPT_WEBHOOK_URL}`);
-
-    const response = await fetch(TRANSCRIPT_WEBHOOK_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'SASEduAI-Webhook/1.0',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(payload),
-      timeout: 15000
-    });
-
-    if (!response.ok) {
-      const errBody = await response.text().catch(() => '(unreadable)');
-      throw new Error(`Webhook error: ${response.status} ${response.statusText} — ${errBody.substring(0, 300)}`);
-    }
-
-    const respBody = await response.text().catch(() => '');
-    console.log(`[AudioProcessor] Webhook response body: ${respBody.substring(0, 200)}`);
-
     // Mark transcripts as sent
     const transcriptIds = result.rows.map(row => row.id);
     const updateQuery = `
@@ -291,7 +258,12 @@ async function sendTranscriptSegment(sessionId) {
 
     await pool.query(updateQuery, [transcriptIds]);
 
-    console.log(`[AudioProcessor] ✓ Segment sent successfully for session: ${sessionId} (${result.rows.length} transcripts)`);
+    console.log(`[AudioProcessor] ✓ Transcripts marked sent for session: ${sessionId} (${result.rows.length} segments)`);
+
+    // Trigger MCQ generation via LangGraph agent (fire-and-forget — non-blocking)
+    runMCQAgent(transcriptSegment, sessionId)
+      .then(mcqs => console.log(`[AudioProcessor] MCQ agent completed: ${mcqs?.length || 0} MCQs for session: ${sessionId}`))
+      .catch(err => console.error(`[AudioProcessor] MCQ agent error (non-fatal): ${err.message}`));
 
     // Broadcast segment sent notification only to clients in this session
     if (global.broadcastToSession) {
