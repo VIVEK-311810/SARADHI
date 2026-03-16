@@ -264,6 +264,18 @@ module.exports = {
           "0%, 100%": { opacity: "1" },
           "50%":      { opacity: "0.6" },
         },
+        "draw-line": {
+          "0%":   { width: "0%" },
+          "100%": { width: "100%" },
+        },
+        "count-up": {
+          "0%":   { opacity: "0", transform: "translateY(8px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        "bar-grow": {
+          "0%":   { width: "0%" },
+          "100%": { width: "var(--bar-width, 70%)" },
+        },
       },
 
       animation: {
@@ -279,6 +291,9 @@ module.exports = {
         "score-pop":       "score-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both",
         float:             "float 3s ease-in-out infinite",
         "pulse-glow":      "pulse-glow 2s ease-in-out infinite",
+        "draw-line":       "draw-line 1.2s ease-out both",
+        "count-up":        "count-up 0.5s ease-out both",
+        "bar-grow":        "bar-grow 1s ease-out both",
       },
     },
   },

@@ -314,6 +314,71 @@ button, a, input, select, textarea {
   .dark select {
     color-scheme: dark;
   }
+
+  /* ── Landing page section backgrounds ── */
+  .bg-section-dark {
+    background-color: #0a0f1e;
+    background-image:
+      radial-gradient(at 20% 50%, rgba(79, 70, 229, 0.12) 0px, transparent 50%),
+      radial-gradient(at 80% 20%, rgba(20, 184, 166, 0.06) 0px, transparent 50%);
+  }
+  .bg-section-alt {
+    background-color: #111827;
+    background-image:
+      radial-gradient(at 70% 80%, rgba(79, 70, 229, 0.10) 0px, transparent 50%),
+      radial-gradient(at 10% 10%, rgba(249, 115, 22, 0.06) 0px, transparent 50%);
+  }
+  .bg-section-light {
+    background-color: #f8fafc;
+    background-image:
+      radial-gradient(at 30% 20%, rgba(79, 70, 229, 0.07) 0px, transparent 50%),
+      radial-gradient(at 80% 70%, rgba(20, 184, 166, 0.05) 0px, transparent 50%);
+  }
+  .dark .bg-section-light {
+    background-color: #0f172a;
+    background-image:
+      radial-gradient(at 30% 20%, rgba(79, 70, 229, 0.12) 0px, transparent 50%),
+      radial-gradient(at 80% 70%, rgba(20, 184, 166, 0.08) 0px, transparent 50%);
+  }
+
+  /* ── Landing page smooth scroll ── */
+  .landing-scroll {
+    scroll-behavior: smooth;
+  }
+
+  /* ── Glass card dark variant for dark sections ── */
+  .card-glass-dark {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.30);
+    @apply rounded-2xl p-6;
+  }
+  .card-glass-dark:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+
+  /* ── Chat bubble styles for AI section ── */
+  .chat-bubble-user {
+    background: rgba(79, 70, 229, 0.20);
+    border: 1px solid rgba(79, 70, 229, 0.30);
+    @apply rounded-2xl rounded-tr-sm px-4 py-3 text-sm text-white max-w-xs ml-auto;
+  }
+  .chat-bubble-ai {
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    @apply rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-slate-200 max-w-sm;
+  }
+
+  /* ── Typing indicator dots ── */
+  .typing-dot {
+    @apply w-2 h-2 rounded-full bg-teal-400 inline-block;
+    animation: pulse-glow 1.2s ease-in-out infinite;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
 }
 
 /* ── Mobile responsive fixes ─────────────────────────────────────────── */

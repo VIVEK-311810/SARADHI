@@ -23,6 +23,11 @@ import SessionResourcesShared from './components/shared/SessionResources';
 const RoleSelection   = lazy(() => import('./components/auth/RoleSelection'));
 const OAuth2Callback  = lazy(() => import('./components/auth/OAuth2Callback'));
 
+// Landing + Demo
+const LandingPage  = lazy(() => import('./components/landing/LandingPage'));
+const TeacherDemo  = lazy(() => import('./components/demo/TeacherDemo'));
+const StudentDemo  = lazy(() => import('./components/demo/StudentDemo'));
+
 // Teacher Components
 const EnhancedTeacherDashboard  = lazy(() => import('./components/teacher/EnhancedTeacherDashboard'));
 const CreateSession             = lazy(() => import('./components/teacher/CreateSession'));
@@ -138,9 +143,32 @@ function RootRouter() {
     return <AuthShell />;
   }
 
-  // Not authenticated → send to login
+  // Demo pages — accessible without auth
+  if (location.pathname === '/demo/teacher') {
+    return (
+      <Suspense fallback={<LoadingSpinner text="Loading..." />}>
+        <TeacherDemo />
+      </Suspense>
+    );
+  }
+  if (location.pathname === '/demo/student') {
+    return (
+      <Suspense fallback={<LoadingSpinner text="Loading..." />}>
+        <StudentDemo />
+      </Suspense>
+    );
+  }
+
+  // Not authenticated → show landing page at root, redirect elsewhere to landing
   if (!authenticated) {
-    return <Navigate to="/auth" replace />;
+    if (location.pathname === '/') {
+      return (
+        <Suspense fallback={<LoadingSpinner text="Loading..." />}>
+          <LandingPage />
+        </Suspense>
+      );
+    }
+    return <Navigate to="/" replace />;
   }
 
   // Root redirect → role dashboard
