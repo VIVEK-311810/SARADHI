@@ -3,8 +3,12 @@ import Particles, { initParticlesEngine } from '@tsparticles/react';
 import { loadSlim } from '@tsparticles/slim';
 import { useTheme } from '../../context/ThemeContext';
 
+// Module-level singleton — engine must only be initialized once
+let engineInitialized = false;
+let engineInitPromise = null;
+
 const ParticleBackground = () => {
-  const [engineReady, setEngineReady] = useState(false);
+  const [engineReady, setEngineReady] = useState(engineInitialized);
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
@@ -24,9 +28,16 @@ const ParticleBackground = () => {
 
   useEffect(() => {
     if (prefersReducedMotion) return;
-    initParticlesEngine(async (engine) => {
-      await loadSlim(engine);
-    }).then(() => setEngineReady(true));
+    if (engineInitialized) { setEngineReady(true); return; }
+    if (!engineInitPromise) {
+      engineInitPromise = initParticlesEngine(async (engine) => {
+        await loadSlim(engine);
+      });
+    }
+    engineInitPromise.then(() => {
+      engineInitialized = true;
+      setEngineReady(true);
+    });
   }, [prefersReducedMotion]);
 
   const particlesLoaded = useCallback(() => {}, []);

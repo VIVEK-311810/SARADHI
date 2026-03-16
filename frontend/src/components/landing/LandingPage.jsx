@@ -38,7 +38,7 @@ const LandingPage = () => {
 
   return (
     <div className="relative">
-      <LandingNavbar onSignInClick={() => scrollToSection('get-started')} />
+      <LandingNavbar />
 
       <main>
         <HeroSection

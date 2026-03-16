@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Moon, Sun } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { cn } from '../../lib/utils';
 
-const LandingNavbar = ({ onSignInClick }) => {
+const LandingNavbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const { theme, toggleTheme } = useTheme();
-  const navigate = useNavigate();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 30);
@@ -52,7 +50,14 @@ const LandingNavbar = ({ onSignInClick }) => {
           </button>
 
           <button
-            onClick={onSignInClick}
+            onClick={() => {
+              const ctaEl = document.getElementById('get-started');
+              if (ctaEl) {
+                ctaEl.scrollIntoView({ behavior: 'smooth' });
+              } else {
+                window.location.href = '/auth';
+              }
+            }}
             className="px-4 py-2 text-sm font-medium text-white border border-white/20 rounded-xl hover:bg-white/10 hover:border-white/30 transition-all duration-150 min-h-0 backdrop-blur-sm"
           >
             Sign In

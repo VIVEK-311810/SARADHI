@@ -143,28 +143,26 @@ function RootRouter() {
     return <AuthShell />;
   }
 
-  // Demo pages — accessible without auth
-  if (location.pathname === '/demo/teacher') {
-    return (
-      <Suspense fallback={<LoadingSpinner text="Loading..." />}>
-        <TeacherDemo />
-      </Suspense>
-    );
-  }
-  if (location.pathname === '/demo/student') {
-    return (
-      <Suspense fallback={<LoadingSpinner text="Loading..." />}>
-        <StudentDemo />
-      </Suspense>
-    );
-  }
-
-  // Not authenticated → show landing page at root, redirect elsewhere to landing
+  // Not authenticated → landing page at root, demo pages, or redirect to landing
   if (!authenticated) {
     if (location.pathname === '/') {
       return (
         <Suspense fallback={<LoadingSpinner text="Loading..." />}>
           <LandingPage />
+        </Suspense>
+      );
+    }
+    if (location.pathname === '/demo/teacher') {
+      return (
+        <Suspense fallback={<LoadingSpinner text="Loading..." />}>
+          <TeacherDemo />
+        </Suspense>
+      );
+    }
+    if (location.pathname === '/demo/student') {
+      return (
+        <Suspense fallback={<LoadingSpinner text="Loading..." />}>
+          <StudentDemo />
         </Suspense>
       );
     }
