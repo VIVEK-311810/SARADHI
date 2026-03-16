@@ -285,20 +285,22 @@ const TeacherAnalytics = () => {
             <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-3 sm:mb-4">Poll Performance (Last 20 Polls)</h3>
             {pollPerformance.length > 0 ? (
               <>
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={pollPerformance.slice(0, 10)} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" domain={[0, 100]} />
-                    <YAxis
-                      type="category"
-                      dataKey="question"
-                      width={200}
-                      tick={{ fontSize: 12 }}
-                    />
-                    <Tooltip formatter={(value) => [`${value}%`, 'Accuracy']} />
-                    <Bar dataKey="accuracyRate" name="Accuracy Rate" fill="#4F46E5" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="hidden sm:block">
+                  <ResponsiveContainer width="100%" height={400}>
+                    <BarChart data={pollPerformance.slice(0, 10)} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" domain={[0, 100]} />
+                      <YAxis
+                        type="category"
+                        dataKey="question"
+                        width={120}
+                        tick={{ fontSize: 11 }}
+                      />
+                      <Tooltip formatter={(value) => [`${value}%`, 'Accuracy']} />
+                      <Bar dataKey="accuracyRate" name="Accuracy Rate" fill="#4F46E5" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
 
                 {/* Mobile: Cards view */}
                 <div className="block sm:hidden mt-4 space-y-3">

@@ -245,7 +245,7 @@ const EnhancedStudentDashboard = () => {
                   Lv{gamificationStats.level?.level} · {gamificationStats.level?.title}
                 </span>
               </div>
-              <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4">
                 {[
                   { v: gamificationStats.totalXP || 0, l: 'Total XP' },
                   { v: `#${gamificationStats.rank}`, l: 'Rank' },

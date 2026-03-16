@@ -58,14 +58,14 @@ const AnalyticsSection = () => {
               </div>
 
               {/* Stat pills */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-2 sm:gap-3">
                 {stats.map((s, i) => (
                   <div
                     key={i}
-                    className={`border rounded-xl p-3 text-center ${s.bg}`}
+                    className={`border rounded-xl p-2 sm:p-3 text-center ${s.bg}`}
                   >
-                    <p className={`text-lg font-bold font-display ${s.color}`}>{s.value}</p>
-                    <p className="text-xs text-slate-400 mt-0.5 leading-tight">{s.label}</p>
+                    <p className={`text-base sm:text-lg font-bold font-display ${s.color}`}>{s.value}</p>
+                    <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 leading-tight">{s.label}</p>
                   </div>
                 ))}
               </div>

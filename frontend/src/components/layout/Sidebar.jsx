@@ -273,7 +273,7 @@ export default function Sidebar({ role, mobileOpen = false, setMobileOpen }) {
       {/* ── Mobile slide-out sidebar ── */}
       <aside
         className={cn(
-          'flex md:hidden flex-col fixed left-0 top-0 bottom-0 z-50 w-[280px]',
+          'flex md:hidden flex-col fixed left-0 top-0 bottom-0 z-50 w-[min(280px,calc(100vw-48px))]',
           'bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl',
           'border-r border-white/30 dark:border-slate-700/50',
           'shadow-2xl shadow-primary-500/10',

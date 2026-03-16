@@ -166,7 +166,7 @@ const ResourceUpload = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className="max-w-6xl mx-auto p-4 sm:p-6">
       <div className="mb-6">
         <button
           onClick={() => navigate(-1)}
@@ -185,7 +185,7 @@ const ResourceUpload = () => {
 
           {/* Drag & Drop Zone */}
           <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center mb-4 transition-colors ${
+            className={`border-2 border-dashed rounded-lg p-5 sm:p-8 text-center mb-4 transition-colors ${
               dragActive ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-slate-300 dark:border-slate-600'
             }`}
             onDragEnter={handleDrag}

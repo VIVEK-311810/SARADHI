@@ -87,7 +87,7 @@ const JoinSession = () => {
                 type="text"
                 value={sessionId}
                 onChange={(e) => setSessionId(e.target.value.toUpperCase())}
-                className="text-center text-2xl sm:text-3xl font-mono tracking-[0.3em] h-16 border-2 border-slate-300 dark:border-slate-600 focus:border-primary-400"
+                className="text-center text-xl sm:text-3xl font-mono tracking-[0.15em] sm:tracking-[0.3em] h-14 sm:h-16 border-2 border-slate-300 dark:border-slate-600 focus:border-primary-400"
                 placeholder="ABC123"
                 maxLength="6"
                 required

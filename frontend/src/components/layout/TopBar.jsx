@@ -125,7 +125,7 @@ export default function TopBar({ collapsed, onMobileMenuClick }) {
       {/* ── Mobile hamburger ── */}
       <button
         onClick={onMobileMenuClick}
-        className="md:hidden flex items-center justify-center w-9 h-9 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 hover:text-slate-700 dark:hover:text-white transition-colors flex-shrink-0"
+        className="md:hidden flex items-center justify-center w-10 h-10 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 hover:text-slate-700 dark:hover:text-white transition-colors flex-shrink-0"
         aria-label="Open navigation"
       >
         <Menu className="w-5 h-5" />
@@ -137,7 +137,7 @@ export default function TopBar({ collapsed, onMobileMenuClick }) {
       </h1>
 
       {/* ── Right actions ── */}
-      <div className="flex items-center gap-0.5 flex-shrink-0">
+      <div className="flex items-center gap-1 flex-shrink-0">
 
         {/* Theme toggle */}
         <button
@@ -172,7 +172,7 @@ export default function TopBar({ collapsed, onMobileMenuClick }) {
 
           {notifOpen && (
             <div className={cn(
-              'absolute right-0 top-full mt-2 w-80 z-50',
+              'absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-80 z-50',
               'rounded-2xl bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl',
               'border border-slate-200/60 dark:border-slate-700/60',
               'shadow-card-hover overflow-hidden animate-fade-up',
@@ -262,7 +262,7 @@ export default function TopBar({ collapsed, onMobileMenuClick }) {
           {/* Dropdown */}
           {dropdownOpen && (
             <div className={cn(
-              'absolute right-0 top-full mt-2 w-52 z-50',
+              'absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-52 z-50',
               'rounded-xl bg-white dark:bg-slate-800',
               'border border-slate-200 dark:border-slate-700',
               'shadow-card-hover',
