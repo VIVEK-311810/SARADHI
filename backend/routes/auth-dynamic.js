@@ -252,6 +252,12 @@ router.get('/me', async (req, res) => {
     const token = authHeader.substring(7);
     const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
 
+    // Check revocation list
+    if (redis && decoded.jti) {
+      const isRevoked = await redis.sismember('revoked:tokens', decoded.jti).catch(() => 0);
+      if (isRevoked) return res.status(401).json({ error: 'Token has been revoked.' });
+    }
+
     const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [decoded.userId]);
 
     if (userResult.rows.length === 0) {
@@ -319,9 +325,14 @@ router.get('/status', async (req, res) => {
 
     const token = authHeader.substring(7);
     const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
-    
+
+    if (redis && decoded.jti) {
+      const isRevoked = await redis.sismember('revoked:tokens', decoded.jti).catch(() => 0);
+      if (isRevoked) return res.json({ authenticated: false });
+    }
+
     const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [decoded.userId]);
-    
+
     if (userResult.rows.length === 0) {
       return res.json({ authenticated: false });
     }
