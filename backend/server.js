@@ -449,7 +449,7 @@ setInterval(async () => {
         `UPDATE session_participants
          SET last_activity = CURRENT_TIMESTAMP
          WHERE session_id = (SELECT id FROM sessions WHERE session_id = $1)
-         AND student_id = ANY($2::int[])`,
+         AND student_id = ANY($2::text[])`,
         [sessionId, studentIds]
       );
     }));
