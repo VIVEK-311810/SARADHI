@@ -99,19 +99,16 @@ async function handleListAll(req, res, sessionId) {
 
     if (error) throw error;
 
-    // Log access
+    // Log access — single batch insert instead of per-resource fire-and-forget
     if (resources && resources.length > 0) {
-      resources.forEach(async (resource) => {
-        await supabase
-          .from('resource_access_logs')
-          .insert({
-            resource_id: resource.id,
-            student_id: req.user.id,
-            action: 'list_view',
-            search_query: 'list all resources'
-          })
-          .catch(err => logger.warn('Error logging resource access', { error: err.message }));
-      });
+      const logEntries = resources.map(resource => ({
+        resource_id: resource.id,
+        student_id: req.user.id,
+        action: 'list_view',
+        search_query: 'list all resources'
+      }));
+      supabase.from('resource_access_logs').insert(logEntries)
+        .then(({ error }) => { if (error) logger.warn('Error logging resource access', { error: error.message }); });
     }
 
     res.json({
@@ -379,19 +376,18 @@ async function handleGeneralQuestion(req, res, sessionId, query, top_k) {
     // Generate RAG answer
     const result = await ragService.generateAnswer(query, enrichedChunks, 'general');
 
-    // Log search (async, don't wait)
-    enrichedChunks.forEach(async (chunk) => {
-      const { error } = await supabase
-        .from('resource_access_logs')
-        .insert({
-          resource_id: chunk.resourceId,
-          student_id: req.user.id,
-          action: 'search_result',
-          search_query: query,
-          similarity_score: chunk.similarityScore
-        });
-      if (error) logger.warn('Error logging search access', { error: error.message });
-    });
+    // Log search — single batch insert, non-blocking
+    if (enrichedChunks.length > 0) {
+      const logEntries = enrichedChunks.map(chunk => ({
+        resource_id: chunk.resourceId,
+        student_id: req.user.id,
+        action: 'search_result',
+        search_query: query,
+        similarity_score: chunk.similarityScore
+      }));
+      supabase.from('resource_access_logs').insert(logEntries)
+        .then(({ error }) => { if (error) logger.warn('Error logging search access', { error: error.message }); });
+    }
 
     res.json({
       type: 'rag_answer',

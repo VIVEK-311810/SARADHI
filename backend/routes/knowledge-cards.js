@@ -215,18 +215,21 @@ router.get('/session/:sessionId', authenticate, authorize('teacher'), async (req
     if (!owns) return res.status(403).json({ error: 'Access denied' });
 
     // knowledge_card_rounds.session_id is the numeric FK (sessions.id)
-    const roundsResult = await pool.query(
-      'SELECT * FROM knowledge_card_rounds WHERE session_id = $1 ORDER BY created_at DESC',
-      [sessionMeta.id]
-    );
-    const rounds = [];
-    for (const round of roundsResult.rows) {
-      const pairsResult = await pool.query(
-        'SELECT * FROM knowledge_card_pairs WHERE round_id = $1 ORDER BY order_index ASC',
-        [round.id]
-      );
-      rounds.push({ ...round, pairs: pairsResult.rows });
-    }
+    // Single query with LEFT JOIN instead of N queries (one per round)
+    const result = await pool.query(`
+      SELECT
+        r.*,
+        json_agg(
+          p ORDER BY p.order_index ASC
+        ) FILTER (WHERE p.id IS NOT NULL) AS pairs
+      FROM knowledge_card_rounds r
+      LEFT JOIN knowledge_card_pairs p ON p.round_id = r.id
+      WHERE r.session_id = $1
+      GROUP BY r.id
+      ORDER BY r.created_at DESC
+    `, [sessionMeta.id]);
+
+    const rounds = result.rows.map(row => ({ ...row, pairs: row.pairs || [] }));
     res.json({ success: true, data: rounds });
   } catch (error) {
     logger.error('Get knowledge cards error', { error: error.message });

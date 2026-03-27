@@ -33,8 +33,9 @@ global.wss = wss;
 // Store active connections by session
 const sessionConnections = new Map();
 
-// Throttle heartbeat DB writes — track last update per student (key: sessionId:studentId)
-const heartbeatLastUpdate = new Map();
+// Pending heartbeat updates — key: "sessionId:studentId", value: timestamp ms
+// Flushed to DB in a single batch every 30s instead of one write per student
+const pendingHeartbeats = new Map();
 
 // Track in-progress reveals to prevent race condition double-broadcasts
 const revealInProgress = new Set();
@@ -178,8 +179,8 @@ wss.on('connection', (ws, req) => {
          AND student_id = $2`,
         [ws.sessionId, ws.studentId]
       ).catch(err => logger.error('Error updating disconnect status', { error: err.message }));
-      // Clean up heartbeat tracking for this student
-      heartbeatLastUpdate.delete(`${ws.sessionId}:${ws.studentId}`);
+      // Clean up pending heartbeat for this student
+      pendingHeartbeats.delete(`${ws.sessionId}:${ws.studentId}`);
     }
 
     // Clean up dashboard connection
@@ -405,23 +406,48 @@ async function triggerAnswerRevealFromTimer(sessionId, pollId) {
   }
 }
 
-async function handleHeartbeat(data) {
-  const key = `${data.sessionId}:${data.studentId}`;
-  const now = Date.now();
-  if (now - (heartbeatLastUpdate.get(key) || 0) < 30000) return; // Throttle: max 1 DB write per 30s
-  heartbeatLastUpdate.set(key, now);
-  try {
-    await pool.query(
-      `UPDATE session_participants
-       SET last_activity = CURRENT_TIMESTAMP
-       WHERE session_id = (SELECT id FROM sessions WHERE session_id = $1)
-       AND student_id = $2`,
-      [data.sessionId, data.studentId]
-    );
-  } catch (error) {
-    logger.error('Error updating heartbeat', { error: error.message });
-  }
+function handleHeartbeat(data) {
+  if (!data.sessionId || !data.studentId) return;
+  // Just record the timestamp — the batch flush interval handles the DB write
+  pendingHeartbeats.set(`${data.sessionId}:${data.studentId}`, Date.now());
 }
+
+// Flush all pending heartbeats to DB in a single batch every 30s
+// 500 students → 1 DB write per 30s instead of 500 individual writes
+setInterval(async () => {
+  if (pendingHeartbeats.size === 0) return;
+
+  const entries = [...pendingHeartbeats.entries()];
+  pendingHeartbeats.clear();
+
+  try {
+    // Build VALUES list: (sessionCode, studentId, timestamp)
+    const values = entries.map(([key, ts]) => {
+      const [sessionId, studentId] = key.split(':');
+      return { sessionId, studentId, ts };
+    });
+
+    // One UPDATE per unique session to keep the query simple with the subselect
+    const sessionGroups = new Map();
+    for (const { sessionId, studentId, ts } of values) {
+      if (!sessionGroups.has(sessionId)) sessionGroups.set(sessionId, []);
+      sessionGroups.get(sessionId).push({ studentId, ts });
+    }
+
+    await Promise.all([...sessionGroups.entries()].map(([sessionId, students]) => {
+      const studentIds = students.map(s => s.studentId);
+      return pool.query(
+        `UPDATE session_participants
+         SET last_activity = CURRENT_TIMESTAMP
+         WHERE session_id = (SELECT id FROM sessions WHERE session_id = $1)
+         AND student_id = ANY($2::int[])`,
+        [sessionId, studentIds]
+      );
+    }));
+  } catch (error) {
+    logger.error('Heartbeat batch flush failed', { error: error.message });
+  }
+}, 30000);
 
 function broadcastToSession(sessionId, message) {
   const connections = sessionConnections.get(sessionId);
@@ -781,6 +807,7 @@ const gamificationRouter = require('./routes/gamification');
 const communityRouter = require('./routes/community');
 const aiAssistantRouter = require('./routes/ai-assistant');
 const knowledgeCardsRouter = require('./routes/knowledge-cards');
+const healthRouter = require('./routes/health');
 
 // Mount routes
 app.use('/auth', authRouter);
@@ -797,6 +824,7 @@ app.use('/api/gamification', gamificationRouter);
 app.use('/api/community', communityRouter);
 app.use('/api/ai-assistant', aiAssistantRouter);
 app.use('/api/knowledge-cards', knowledgeCardsRouter);
+app.use('/health', healthRouter);
 
 // Attendance REST endpoint — get attendance list and counts for a session
 app.get('/api/sessions/:sessionId/attendance', authenticate, async (req, res) => {
@@ -1411,12 +1439,61 @@ async function autoMigrate() {
   client.release();
 }
 
+// Re-hydrate attendance windows from DB on startup so mark-attendance works after a restart
+async function restoreAttendanceWindows() {
+  try {
+    const result = await pool.query(`
+      SELECT saw.id as window_id, s.session_id as session_code,
+             saw.opened_at, saw.duration_seconds
+      FROM session_attendance_windows saw
+      JOIN sessions s ON s.id = saw.session_id
+      WHERE saw.is_active = TRUE
+    `);
+
+    let restored = 0;
+    for (const row of result.rows) {
+      const closesAt = new Date(row.opened_at).getTime() + row.duration_seconds * 1000;
+      if (closesAt <= Date.now()) {
+        // Window already expired — close it in DB
+        await pool.query(
+          'UPDATE session_attendance_windows SET is_active = FALSE, closed_at = CURRENT_TIMESTAMP WHERE id = $1',
+          [row.window_id]
+        );
+        continue;
+      }
+      const normalizedCode = row.session_code.toUpperCase();
+      attendanceWindows.set(normalizedCode, {
+        windowId: row.window_id,
+        closesAt,
+        markedStudentIds: new Set()
+      });
+      // Re-arm auto-close timer
+      const msRemaining = closesAt - Date.now();
+      const sessionResult = await pool.query('SELECT id FROM sessions WHERE session_id = $1', [normalizedCode]);
+      if (sessionResult.rows.length > 0) {
+        const numericId = sessionResult.rows[0].id;
+        setTimeout(async () => {
+          const current = attendanceWindows.get(normalizedCode);
+          if (current && current.windowId === row.window_id) {
+            await closeAttendanceWindow(normalizedCode, numericId);
+          }
+        }, msRemaining);
+      }
+      restored++;
+    }
+    if (restored > 0) logger.info(`Restored ${restored} active attendance window(s) from DB`);
+  } catch (err) {
+    logger.warn('Failed to restore attendance windows (non-fatal)', { error: err.message });
+  }
+}
+
 // Start server
 server.listen(PORT, async () => {
   logger.info(`Server running on port ${PORT}`);
   logger.info(`WebSocket server ready`);
   await autoMigrate();
   await restoreActivePolls();
+  await restoreAttendanceWindows();
 });
 
 // Graceful shutdown — notify WebSocket clients, drain pool
