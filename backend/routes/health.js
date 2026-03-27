@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const logger = require('../logger');
+const { redis } = require('../redis');
 
 router.get('/', async (req, res) => {
   const checks = {
@@ -9,7 +10,7 @@ router.get('/', async (req, res) => {
     uptime: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
     db: 'unknown',
-    redis: 'not_configured',
+    redis: redis ? 'unknown' : 'not_configured',
   };
 
   try {
@@ -18,6 +19,16 @@ router.get('/', async (req, res) => {
   } catch (err) {
     checks.db = 'unhealthy';
     logger.warn('Health check: DB unhealthy', { error: err.message });
+  }
+
+  if (redis) {
+    try {
+      await redis.ping();
+      checks.redis = 'connected';
+    } catch (err) {
+      checks.redis = 'degraded';
+      logger.warn('Health check: Redis degraded', { error: err.message });
+    }
   }
 
   const allHealthy = checks.db === 'healthy';
