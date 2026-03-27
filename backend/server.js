@@ -17,6 +17,7 @@ const logger = require('./logger');
 const { apiLimiter, aiLimiter, aiStudentLimiter, authLimiter } = require('./middleware/rateLimiter');
 const { authenticate } = require('./middleware/auth');
 const compression = require('compression');
+const { redis, redisPub, redisSub } = require('./redis');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -37,8 +38,9 @@ const sessionConnections = new Map();
 // Flushed to DB in a single batch every 30s instead of one write per student
 const pendingHeartbeats = new Map();
 
-// Track in-progress reveals to prevent race condition double-broadcasts
-const revealInProgress = new Set();
+// revealInProgress is now Redis-backed (SET with NX) — see claimPollReveal() below
+// Kept as in-memory fallback when Redis is unavailable
+const revealInProgressLocal = new Set();
 
 // Track active attendance windows: normalizedSessionId → { windowId, closesAt, markedStudentIds: Set }
 const attendanceWindows = new Map();
@@ -333,11 +335,10 @@ async function handleActivatePoll(data) {
   pool.query('UPDATE polls SET ends_at = $1 WHERE id = $2', [new Date(pollEndTime), poll.id])
     .catch(err => logger.error('Failed to persist poll ends_at', { error: err.message }));
 
-  global.activePollEndTimes.set(normalizedSessionId, {
-    pollId: poll.id,
-    pollEndTime,
-    poll
-  });
+  global.activePollEndTimes.set(normalizedSessionId, { pollId: poll.id, pollEndTime, poll });
+
+  // Cache timer state in Redis so any instance can re-arm on startup
+  await cachePollTimerState(normalizedSessionId, poll.id, pollEndTime, poll);
 
   await broadcastPollToSession(normalizedSessionId, {
     type: 'poll-activated',
@@ -354,6 +355,7 @@ async function handleActivatePoll(data) {
     await triggerAnswerRevealFromTimer(normalizedSessionId, poll.id);
     global.pollTimers.delete(normalizedSessionId);
     global.activePollEndTimes.delete(normalizedSessionId);
+    await clearPollTimerState(normalizedSessionId);
   }, timeLimitMs);
 
   global.pollTimers.set(normalizedSessionId, timer);
@@ -363,6 +365,13 @@ async function handleActivatePoll(data) {
 async function triggerAnswerRevealFromTimer(sessionId, pollId) {
   try {
     const normalizedSessionId = sessionId.toUpperCase();
+
+    // Atomic guard: only one instance should broadcast the reveal
+    const claimed = await claimPollReveal(pollId);
+    if (!claimed) {
+      logger.info('Poll reveal already claimed by another instance, skipping', { pollId });
+      return;
+    }
     const activePollData = global.activePollEndTimes.get(normalizedSessionId);
 
     const revealMessage = {
@@ -449,16 +458,94 @@ setInterval(async () => {
   }
 }, 30000);
 
-function broadcastToSession(sessionId, message) {
-  const connections = sessionConnections.get(sessionId);
-  if (connections && connections.length > 0) {
-    const payload = JSON.stringify(message);
-    connections.forEach(ws => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(payload);
+// ─── Redis pub/sub fan-out setup ─────────────────────────────────────────────
+// Each instance subscribes to session:* channels. When any instance publishes,
+// all instances (including this one) forward the message to their local WS clients.
+if (redisSub) {
+  redisSub.psubscribe('session:*', (err) => {
+    if (err) logger.error('Redis psubscribe error', { error: err.message });
+    else logger.info('Redis pub/sub: subscribed to session:* channels');
+  });
+
+  redisSub.on('pmessage', (pattern, channel, rawPayload) => {
+    const sessionId = channel.replace('session:', '');
+    const connections = sessionConnections.get(sessionId);
+    if (!connections || connections.length === 0) return;
+
+    // Support optional eligibility filter embedded by broadcastPollToSession
+    let parsed;
+    let eligibleIds = null;
+    try {
+      parsed = JSON.parse(rawPayload);
+      if (parsed._eligibleIds) {
+        eligibleIds = new Set(parsed._eligibleIds);
+        // Strip internal field before sending to clients
+        const { _eligibleIds, ...clientMsg } = parsed;
+        rawPayload = JSON.stringify(clientMsg);
       }
+    } catch (_) { /* send as-is */ }
+
+    connections.forEach(ws => {
+      if (ws.readyState !== WebSocket.OPEN) return;
+      if (eligibleIds) {
+        const isTeacher = ws.userRole === 'teacher';
+        const isEligible = eligibleIds.has(String(ws.userId));
+        if (!isTeacher && !isEligible) return;
+      }
+      ws.send(rawPayload);
     });
+  });
+}
+
+// Atomic poll reveal guard — Redis SET NX prevents double-broadcast across instances
+async function claimPollReveal(pollId) {
+  if (redis) {
+    const result = await redis.set(`reveal:${pollId}`, '1', 'EX', 30, 'NX').catch(() => null);
+    return result === 'OK';
   }
+  // Fallback: in-memory Set (single instance only)
+  if (revealInProgressLocal.has(pollId)) return false;
+  revealInProgressLocal.add(pollId);
+  setTimeout(() => revealInProgressLocal.delete(pollId), 30000);
+  return true;
+}
+
+// Store active poll timer state in Redis so any instance can restore it on startup
+async function cachePollTimerState(sessionId, pollId, pollEndTime, poll) {
+  if (!redis) return;
+  await redis.setex(
+    `poll:timer:${sessionId}`,
+    Math.max(10, Math.ceil((pollEndTime - Date.now()) / 1000) + 30),
+    JSON.stringify({ pollId, pollEndTime, poll })
+  ).catch(() => {});
+}
+
+async function clearPollTimerState(sessionId) {
+  if (redis) await redis.del(`poll:timer:${sessionId}`).catch(() => {});
+}
+
+// ─── Broadcast helpers ────────────────────────────────────────────────────────
+
+// Publish to Redis so ALL instances deliver to their local WS clients.
+// Falls back to direct local broadcast when Redis is unavailable.
+async function broadcastToSession(sessionId, message) {
+  const payload = JSON.stringify(message);
+  if (redisPub) {
+    await redisPub.publish(`session:${sessionId}`, payload).catch((err) => {
+      logger.warn('Redis publish failed, falling back to local broadcast', { error: err.message });
+      _localBroadcast(sessionId, payload);
+    });
+  } else {
+    _localBroadcast(sessionId, payload);
+  }
+}
+
+function _localBroadcast(sessionId, payload) {
+  const connections = sessionConnections.get(sessionId);
+  if (!connections || connections.length === 0) return;
+  connections.forEach(ws => {
+    if (ws.readyState === WebSocket.OPEN) ws.send(payload);
+  });
 }
 
 // Push a message to all students enrolled in a session who are on the dashboard page
@@ -502,35 +589,29 @@ global.sessionConnections = sessionConnections;
 
 /**
  * Broadcast poll-related messages only to attendance-eligible students.
- * If attendance was never taken → falls back to broadcastToSession (backward compat).
+ * If attendance was never taken → broadcasts to all (backward compat).
  * If attendance was taken → sends only to 'present' and 'late' students + teachers.
- * On any error → falls back to broadcastToSession (never silently block polls).
+ * Uses Redis pub/sub so all instances filter correctly. Falls back to local broadcast on error.
  */
 async function broadcastPollToSession(sessionId, message) {
-  const connections = sessionConnections.get(sessionId);
-  if (!connections || connections.length === 0) return;
-
   try {
     // Check if attendance was ever taken for this session
     const attendanceCheck = await pool.query(
-      `SELECT COUNT(*) as total,
-              COUNT(*) FILTER (WHERE sp.attendance_status IS NOT NULL) as has_attendance
+      `SELECT COUNT(*) FILTER (WHERE sp.attendance_status IS NOT NULL) as has_attendance
        FROM session_participants sp
        JOIN sessions s ON sp.session_id = s.id
        WHERE s.session_id = $1`,
       [sessionId]
     );
 
-    const stats = attendanceCheck.rows[0];
-    const attendanceTaken = parseInt(stats.has_attendance) > 0;
+    const attendanceTaken = parseInt(attendanceCheck.rows[0]?.has_attendance || 0) > 0;
 
     if (!attendanceTaken) {
-      // Backward compat: attendance never taken → broadcast to all
-      broadcastToSession(sessionId, message);
+      await broadcastToSession(sessionId, message);
       return;
     }
 
-    // Attendance was taken — fetch eligible student IDs
+    // Fetch eligible IDs and embed in payload for cross-instance filtering
     const eligibleResult = await pool.query(
       `SELECT sp.student_id
        FROM session_participants sp
@@ -539,22 +620,35 @@ async function broadcastPollToSession(sessionId, message) {
        AND sp.attendance_status IN ('present', 'late')`,
       [sessionId]
     );
-    const eligibleIds = new Set(eligibleResult.rows.map(r => String(r.student_id)));
+    const eligibleIds = eligibleResult.rows.map(r => String(r.student_id));
 
-    const payload = JSON.stringify(message);
-    connections.forEach(ws => {
-      if (ws.readyState !== WebSocket.OPEN) return;
-      // Teachers always receive poll events for their own dashboard
-      const isTeacher = ws.userRole === 'teacher';
-      const isEligible = eligibleIds.has(String(ws.userId));
-      if (isTeacher || isEligible) {
-        ws.send(payload);
-      }
-    });
+    // _eligibleIds is stripped by the pmessage handler before delivery to clients
+    const payload = JSON.stringify({ ...message, _eligibleIds: eligibleIds });
+
+    if (redisPub) {
+      await redisPub.publish(`session:${sessionId}`, payload).catch((err) => {
+        logger.warn('Redis publish failed in broadcastPollToSession, falling back', { error: err.message });
+        _localFilteredBroadcast(sessionId, message, new Set(eligibleIds));
+      });
+    } else {
+      _localFilteredBroadcast(sessionId, message, new Set(eligibleIds));
+    }
   } catch (error) {
     logger.error('Error in broadcastPollToSession, falling back to full broadcast', { error: error.message });
-    broadcastToSession(sessionId, message);
+    await broadcastToSession(sessionId, message);
   }
+}
+
+function _localFilteredBroadcast(sessionId, message, eligibleIds) {
+  const connections = sessionConnections.get(sessionId);
+  if (!connections || connections.length === 0) return;
+  const payload = JSON.stringify(message);
+  connections.forEach(ws => {
+    if (ws.readyState !== WebSocket.OPEN) return;
+    const isTeacher = ws.userRole === 'teacher';
+    const isEligible = eligibleIds.has(String(ws.userId));
+    if (isTeacher || isEligible) ws.send(payload);
+  });
 }
 
 global.broadcastPollToSession = broadcastPollToSession;

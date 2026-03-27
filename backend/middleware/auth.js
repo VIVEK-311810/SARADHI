@@ -1,10 +1,13 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
 const logger = require('../logger');
+const { redis } = require('../redis');
 
 if (!process.env.JWT_SECRET) {
   throw new Error('FATAL: JWT_SECRET environment variable is not set');
 }
+
+const USER_CACHE_TTL = 300; // 5 minutes
 
 const authenticate = async (req, res, next) => {
   try {
@@ -16,15 +19,44 @@ const authenticate = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
 
-    const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [decoded.userId]);
-
-    if (userResult.rows.length === 0) {
-      return res.status(401).json({ message: 'Invalid token. User not found.' });
+    // Check JWT revocation list (only when Redis is available)
+    if (redis && decoded.jti) {
+      const isRevoked = await redis.sismember('revoked:tokens', decoded.jti).catch(() => 0);
+      if (isRevoked) {
+        return res.status(401).json({ message: 'Token has been revoked.' });
+      }
     }
 
-    const user = userResult.rows[0];
+    // Try Redis cache before hitting DB
+    const cacheKey = `auth:user:${decoded.userId}`;
+    let user = null;
 
-    // Enforce SASTRA domain restrictions (only exact @sastra.edu for teachers)
+    if (redis) {
+      const cached = await redis.get(cacheKey).catch(() => null);
+      if (cached) {
+        user = JSON.parse(cached);
+      }
+    }
+
+    if (!user) {
+      const userResult = await pool.query(
+        'SELECT id, email, role, full_name, created_at FROM users WHERE id = $1',
+        [decoded.userId]
+      );
+
+      if (userResult.rows.length === 0) {
+        return res.status(401).json({ message: 'Invalid token. User not found.' });
+      }
+
+      user = userResult.rows[0];
+
+      // Cache for 5 minutes (non-blocking — don't fail auth if cache write fails)
+      if (redis) {
+        redis.setex(cacheKey, USER_CACHE_TTL, JSON.stringify(user)).catch(() => {});
+      }
+    }
+
+    // Enforce SASTRA domain restrictions
     const isValidTeacher = user.role === 'teacher' && (user.email.endsWith('@sastra.edu') || user.email.endsWith('.sastra.edu'));
     const isValidStudent = user.role === 'student' && /^\d+@sastra\.ac\.in$/.test(user.email);
 

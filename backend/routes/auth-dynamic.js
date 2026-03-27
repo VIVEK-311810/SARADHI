@@ -1,8 +1,10 @@
 const express = require('express');
 const { passport, generateOAuthState, verifyOAuthState } = require('../config/oauth-dynamic');
 const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
 const pool = require('../db');
 const logger = require('../logger');
+const { redis } = require('../redis');
 
 const router = express.Router();
 
@@ -90,7 +92,7 @@ router.get('/google/callback/edu',
           fullName: user.full_name
         },
         process.env.JWT_SECRET,
-        { expiresIn: '24h', algorithm: 'HS256' }
+        { expiresIn: '24h', algorithm: 'HS256', jwtid: uuidv4() }
       );
       
       // Redirect to frontend with token
@@ -141,7 +143,7 @@ router.get('/google/callback/acin',
           fullName: user.full_name
         },
         process.env.JWT_SECRET,
-        { expiresIn: '24h', algorithm: 'HS256' }
+        { expiresIn: '24h', algorithm: 'HS256', jwtid: uuidv4() }
       );
       
       // Redirect to frontend with token
@@ -179,7 +181,7 @@ router.get('/google/callback',
       const token = jwt.sign(
         { userId: user.id, email: user.email, role: user.role, fullName: user.full_name },
         process.env.JWT_SECRET,
-        { expiresIn: '24h', algorithm: 'HS256' }
+        { expiresIn: '24h', algorithm: 'HS256', jwtid: uuidv4() }
       );
       res.redirect(
         `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/callback?token=${token}&user=${encodeURIComponent(JSON.stringify({
@@ -275,15 +277,35 @@ router.get('/me', async (req, res) => {
   }
 });
 
-// Logout
-router.post('/logout', (req, res) => {
-  req.logout((err) => {
-    if (err) {
-      logger.error('Logout error', { error: err.message });
-      return res.status(500).json({ error: 'Logout failed' });
+// Logout — revoke JWT so it can't be reused before expiry
+router.post('/logout', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ') && redis) {
+      const token = authHeader.substring(7);
+      try {
+        const decoded = jwt.decode(token);
+        if (decoded?.jti && decoded?.exp) {
+          const ttl = decoded.exp - Math.floor(Date.now() / 1000);
+          if (ttl > 0) {
+            await redis.sadd('revoked:tokens', decoded.jti);
+            await redis.expire('revoked:tokens', ttl);
+          }
+        }
+      } catch (_) { /* token malformed — nothing to revoke */ }
     }
-    res.json({ message: 'Logged out successfully' });
-  });
+
+    req.logout((err) => {
+      if (err) {
+        logger.error('Logout error', { error: err.message });
+        return res.status(500).json({ error: 'Logout failed' });
+      }
+      res.json({ message: 'Logged out successfully' });
+    });
+  } catch (error) {
+    logger.error('Logout error', { error: error.message });
+    res.status(500).json({ error: 'Logout failed' });
+  }
 });
 
 // Check authentication status

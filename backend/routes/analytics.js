@@ -49,8 +49,8 @@ router.get('/teacher/:teacherId/overview', authenticate, authorize('teacher'), a
   }
 });
 
-// GET /api/analytics/teacher/:teacherId/sessions
-// Returns per-session analytics
+// GET /api/analytics/teacher/:teacherId/sessions?page=1&limit=20
+// Returns per-session analytics, paginated
 router.get('/teacher/:teacherId/sessions', authenticate, authorize('teacher'), async (req, res) => {
   try {
     const { teacherId } = req.params;
@@ -58,26 +58,36 @@ router.get('/teacher/:teacherId/sessions', authenticate, authorize('teacher'), a
       return res.status(403).json({ error: 'Access denied. You can only view your own analytics.' });
     }
 
-    const result = await pool.query(`
-      SELECT
-        s.id,
-        s.session_id,
-        s.title,
-        s.course_name,
-        s.is_active,
-        s.created_at,
-        COUNT(DISTINCT p.id) as poll_count,
-        COUNT(DISTINCT sp.student_id) as participant_count,
-        COALESCE(ROUND(AVG(CASE WHEN pr.is_correct THEN 100 ELSE 0 END), 1), 0) as avg_accuracy,
-        COUNT(pr.id) as total_responses
-      FROM sessions s
-      LEFT JOIN polls p ON s.id = p.session_id
-      LEFT JOIN session_participants sp ON s.id = sp.session_id
-      LEFT JOIN poll_responses pr ON p.id = pr.poll_id
-      WHERE s.teacher_id = $1
-      GROUP BY s.id, s.session_id, s.title, s.course_name, s.is_active, s.created_at
-      ORDER BY s.created_at DESC
-    `, [teacherId]);
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+    const offset = (page - 1) * limit;
+
+    const [result, countResult] = await Promise.all([
+      pool.query(`
+        SELECT
+          s.id,
+          s.session_id,
+          s.title,
+          s.course_name,
+          s.is_active,
+          s.created_at,
+          COUNT(DISTINCT p.id) as poll_count,
+          COUNT(DISTINCT sp.student_id) as participant_count,
+          COALESCE(ROUND(AVG(CASE WHEN pr.is_correct THEN 100 ELSE 0 END), 1), 0) as avg_accuracy,
+          COUNT(pr.id) as total_responses
+        FROM sessions s
+        LEFT JOIN polls p ON s.id = p.session_id
+        LEFT JOIN session_participants sp ON s.id = sp.session_id
+        LEFT JOIN poll_responses pr ON p.id = pr.poll_id
+        WHERE s.teacher_id = $1
+        GROUP BY s.id, s.session_id, s.title, s.course_name, s.is_active, s.created_at
+        ORDER BY s.created_at DESC
+        LIMIT $2 OFFSET $3
+      `, [teacherId, limit, offset]),
+      pool.query('SELECT COUNT(*) as total FROM sessions WHERE teacher_id = $1', [teacherId])
+    ]);
+
+    const total = parseInt(countResult.rows[0].total) || 0;
 
     res.json({
       success: true,
@@ -92,7 +102,14 @@ router.get('/teacher/:teacherId/sessions', authenticate, authorize('teacher'), a
         avgAccuracy: parseFloat(row.avg_accuracy) || 0,
         totalResponses: parseInt(row.total_responses) || 0,
         createdAt: row.created_at
-      }))
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasMore: offset + result.rows.length < total
+      }
     });
   } catch (error) {
     logger.error('Sessions analytics error', { error: error.message });
