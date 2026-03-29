@@ -11,15 +11,25 @@ function createClient(name) {
     maxRetriesPerRequest: 3,
     enableReadyCheck: false,
     lazyConnect: true,
+    // Keep-alive: prevents idle connections from being dropped by Redis Cloud
+    keepAlive: 10000,
+    // Reconnect with capped exponential backoff (max 10s between retries)
+    retryStrategy: (times) => Math.min(times * 500, 10000),
+    // Connection name visible in Redis MONITOR / CLIENT LIST
+    connectionName: `saradhi-${name}`,
   });
 
   client.on('error', (err) => {
-    logger.warn(`Redis ${name} error (non-fatal)`, { error: err.message });
+    // Suppress noisy ETIMEDOUT/ECONNRESET reconnect noise — ioredis retries automatically
+    if (err.code === 'ETIMEDOUT' || err.code === 'ECONNRESET' || err.code === 'ECONNREFUSED') {
+      logger.debug(`Redis ${name} connection error (retrying)`, { code: err.code });
+    } else {
+      logger.warn(`Redis ${name} error (non-fatal)`, { error: err.message });
+    }
   });
 
-  client.on('connect', () => {
-    logger.info(`Redis ${name} connected`);
-  });
+  client.on('connect', () => logger.info(`Redis ${name} connected`));
+  client.on('reconnecting', () => logger.debug(`Redis ${name} reconnecting...`));
 
   return client;
 }

@@ -28,6 +28,15 @@ function startWorkers() {
     return;
   }
 
+  // BullMQ warns about volatile-lru eviction policy — Redis Cloud free tier
+  // uses this by default and it cannot be changed. The warning is cosmetic;
+  // suppress it so it doesn't spam logs on every startup.
+  const _consoleWarn = console.warn.bind(console);
+  console.warn = (...args) => {
+    if (typeof args[0] === 'string' && args[0].includes('Eviction policy')) return;
+    _consoleWarn(...args);
+  };
+
   // ── Vectorization worker ──────────────────────────────────────────────────
   // Concurrency 2: process up to 2 files simultaneously (HuggingFace allows this)
   vectorizeWorker = new Worker('vectorize', async (job) => {

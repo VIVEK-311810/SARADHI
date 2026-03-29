@@ -1281,7 +1281,7 @@ async function autoMigrate() {
   const run = async (sql, label) => {
     try {
       await client.query(sql);
-      logger.info(`Auto-migration OK: ${label}`);
+      logger.debug(`Auto-migration OK: ${label}`);
     } catch (err) {
       logger.error(`Auto-migration FAILED (non-fatal): ${label}`, { error: err.message });
     }
@@ -1532,6 +1532,7 @@ async function autoMigrate() {
   await cacheService.init().catch(err => logger.warn('Cache service init failed (non-fatal)', { error: err.message }));
 
   client.release();
+  logger.info('Auto-migration complete');
 }
 
 // Re-hydrate attendance windows from DB on startup so mark-attendance works after a restart
