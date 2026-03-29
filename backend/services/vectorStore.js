@@ -20,13 +20,14 @@ class VectorStore {
           session_id: sessionId,
           chunk_index: i,
           text: chunk.text.substring(0, 1000), // Pinecone metadata limit
-          token_count: chunk.tokenCount,
-          page_number: chunk.pageNumber || null,
-          section_title: chunk.sectionTitle || null,
+          token_count: chunk.tokenCount || 0,
+          // Pinecone rejects null — use empty string / 0 as sentinels
+          page_number: chunk.pageNumber ?? 0,
+          section_title: chunk.sectionTitle || '',
           // Denormalized fields — eliminates N+1 lookups during search
-          resource_title: resourceMeta.title || null,
-          file_name: resourceMeta.fileName || null,
-          resource_type: resourceMeta.resourceType || null,
+          resource_title: resourceMeta.title || '',
+          file_name: resourceMeta.fileName || '',
+          resource_type: resourceMeta.resourceType || '',
         }
       }));
 
