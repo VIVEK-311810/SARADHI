@@ -111,15 +111,25 @@ router.post('/upload', authenticate, authorize('teacher'), upload.single('file')
       return res.status(500).json({ error: 'Failed to save resource metadata' });
     }
 
-    // Trigger async vectorization (don't wait)
-    vectorizeResource(resourceId, session_id).catch(err => {
-      logger.error('Vectorization error', { error: err.message, resourceId });
-    });
-
-    // Trigger async summarization (don't wait)
-    summarizeResource(resourceId).catch(err => {
-      logger.error('Summarization error', { error: err.message, resourceId });
-    });
+    // Enqueue vectorization + summarization via BullMQ if available,
+    // otherwise fall back to in-process fire-and-forget (local dev without Redis)
+    const { vectorizeQueue } = require('../queues');
+    if (vectorizeQueue) {
+      await vectorizeQueue.add('vectorize', { resourceId, sessionId: session_id, includesSummarize: true }, {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
+      });
+      logger.info('Vectorization job enqueued', { resourceId });
+    } else {
+      vectorizeResource(resourceId, session_id).catch(err => {
+        logger.error('Vectorization error (in-process fallback)', { error: err.message, resourceId });
+      });
+      summarizeResource(resourceId).catch(err => {
+        logger.error('Summarization error (in-process fallback)', { error: err.message, resourceId });
+      });
+    }
 
     res.json({
       success: true,
@@ -609,3 +619,5 @@ async function summarizeResource(resourceId) {
 }
 
 module.exports = router;
+module.exports.vectorizeResource = vectorizeResource;
+module.exports.summarizeResource = summarizeResource;

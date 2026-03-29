@@ -902,6 +902,7 @@ const communityRouter = require('./routes/community');
 const aiAssistantRouter = require('./routes/ai-assistant');
 const knowledgeCardsRouter = require('./routes/knowledge-cards');
 const healthRouter = require('./routes/health');
+const { startWorkers, stopWorkers } = require('./workers/aiWorker');
 
 // Mount routes
 app.use('/auth', authRouter);
@@ -1588,6 +1589,7 @@ server.listen(PORT, async () => {
   await autoMigrate();
   await restoreActivePolls();
   await restoreAttendanceWindows();
+  startWorkers();
 });
 
 // Graceful shutdown — notify WebSocket clients, drain pool
@@ -1603,11 +1605,13 @@ function gracefulShutdown(signal) {
 
   // Give clients 2 seconds to receive the message
   setTimeout(() => {
-    server.close(() => {
-      logger.info('HTTP server closed');
-      pool.end(() => {
-        logger.info('Database pool closed');
-        process.exit(0);
+    stopWorkers().catch(() => {}).finally(() => {
+      server.close(() => {
+        logger.info('HTTP server closed');
+        pool.end(() => {
+          logger.info('Database pool closed');
+          process.exit(0);
+        });
       });
     });
     // Force exit if graceful shutdown takes too long

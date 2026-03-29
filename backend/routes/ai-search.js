@@ -401,4 +401,118 @@ async function handleGeneralQuestion(req, res, sessionId, query, top_k) {
   }
 }
 
+// POST /api/ai-search/session/:sessionId/async
+// Enqueues the search and returns a jobId immediately. Client polls GET /job/:jobId for result.
+router.post('/session/:sessionId/async', authenticate, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { query } = req.body;
+    const top_k = Math.min(parseInt(req.body.top_k) || 5, 20);
+
+    if (!query || query.trim().length === 0) {
+      return res.status(400).json({ error: 'Query is required' });
+    }
+    if (query.length > 500) {
+      return res.status(400).json({ error: 'Query too long (max 500 characters)' });
+    }
+
+    // Verify session membership (same check as sync route)
+    const sessionCheck = await pool.query(
+      `SELECT 1 FROM sessions s
+       WHERE s.session_id = $1
+         AND (s.teacher_id = $2 OR EXISTS (
+           SELECT 1 FROM session_participants sp WHERE sp.session_id = s.id AND sp.student_id = $2
+         ))`,
+      [sessionId.toUpperCase(), req.user.id]
+    );
+    if (sessionCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Access denied: not a participant in this session' });
+    }
+
+    const { aiSearchQueue } = require('../queues');
+
+    // If queue not available (no Redis), fall back to synchronous path
+    if (!aiSearchQueue) {
+      return router.handle(
+        Object.assign(req, { url: `/session/${sessionId}` }),
+        res
+      );
+    }
+
+    const job = await aiSearchQueue.add('search', {
+      sessionId: sessionId.toUpperCase(),
+      query,
+      top_k,
+      userId: req.user.id,
+    });
+
+    res.status(202).json({ jobId: job.id, status: 'queued' });
+  } catch (error) {
+    logger.error('AI search async enqueue error', { error: error.message });
+    res.status(500).json({ error: 'Failed to queue search request' });
+  }
+});
+
+// GET /api/ai-search/job/:jobId
+// Poll for async search result. Returns 202 while pending, 200 with result when done, 500 on failure.
+router.get('/job/:jobId', authenticate, async (req, res) => {
+  try {
+    const { aiSearchQueue } = require('../queues');
+    if (!aiSearchQueue) return res.status(503).json({ error: 'Async search not available' });
+
+    const job = await aiSearchQueue.getJob(req.params.jobId);
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+
+    const state = await job.getState();
+
+    if (state === 'completed') {
+      return res.json({ status: 'completed', result: job.returnvalue });
+    }
+    if (state === 'failed') {
+      return res.status(500).json({ status: 'failed', error: job.failedReason });
+    }
+
+    // active, waiting, delayed
+    res.status(202).json({ status: state });
+  } catch (error) {
+    logger.error('AI search job poll error', { error: error.message });
+    res.status(500).json({ error: 'Failed to check job status' });
+  }
+});
+
+// Exported for the BullMQ worker — runs the actual search logic without an HTTP req/res
+async function handleAiSearchJob({ sessionId, query, top_k, userId }) {
+  const classification = await queryClassifier.getCachedOrClassify(query, sessionId);
+
+  // Build minimal mock req/res so existing handlers can be reused
+  let result;
+  const mockRes = {
+    _data: null,
+    json(data) { this._data = data; return this; },
+    status() { return this; },
+  };
+  const mockReq = { user: { id: userId }, body: { query }, query: {} };
+
+  switch (classification.type) {
+    case 'list_all':
+      await handleListAll(mockReq, mockRes, sessionId);
+      break;
+    case 'filter_by_topic':
+      await handleTopicFilter(mockReq, mockRes, sessionId, classification.topic, top_k);
+      break;
+    case 'summarize_file':
+      await handleSummarize(mockReq, mockRes, sessionId, classification.fileName);
+      break;
+    case 'specific_file_question':
+      await handleFileSpecificQuestion(mockReq, mockRes, sessionId, classification.fileName, query, top_k);
+      break;
+    case 'general_question':
+    default:
+      await handleGeneralQuestion(mockReq, mockRes, sessionId, query, top_k);
+  }
+
+  return mockRes._data;
+}
+
 module.exports = router;
+module.exports.handleAiSearchJob = handleAiSearchJob;
