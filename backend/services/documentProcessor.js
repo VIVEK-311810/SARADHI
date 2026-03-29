@@ -41,7 +41,9 @@ class DocumentProcessor {
 
   async extractFromPDF(buffer) {
     try {
-      const pdfData = await pdfParse(buffer);
+      // verbosity: 0 silences pdfjs-dist TrueType font noise ("TT: CALL empty stack")
+      // that would otherwise spam stdout on every PDF with non-standard fonts
+      const pdfData = await pdfParse(buffer, { verbosity: 0 });
 
       logger.info('PDF parsed successfully', { pages: pdfData.numpages, textLength: pdfData.text?.length });
 
