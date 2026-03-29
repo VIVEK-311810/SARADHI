@@ -537,7 +537,7 @@ async function vectorizeResource(resourceId, sessionId) {
     logger.info('Successfully vectorized resource', { resourceId, chunkCount: chunks.length });
 
   } catch (error) {
-    logger.error('Vectorization failed', { resourceId, error: error.message });
+    logger.error('Vectorization failed', { resourceId, error: error.message, stack: error.stack });
 
     await supabase
       .from('resources')
@@ -546,6 +546,9 @@ async function vectorizeResource(resourceId, sessionId) {
         last_vectorized_at: new Date().toISOString()
       })
       .eq('id', resourceId);
+
+    // Re-throw so BullMQ marks the job as failed and triggers retries
+    throw error;
   }
 }
 
