@@ -27,10 +27,22 @@ const AIResourceSearch = () => {
     setHasSearched(true);
 
     try {
-      const data = await apiRequest(`/ai-search/session/${sessionId}`, {
+      // Enqueue job — returns immediately with jobId
+      const { jobId } = await apiRequest(`/ai-search/session/${sessionId}/async`, {
         method: 'POST',
         body: JSON.stringify({ query, top_k: 5 }),
       });
+
+      // Poll until complete (max 60s)
+      const deadline = Date.now() + 60000;
+      let data = null;
+      while (Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 2000));
+        const poll = await apiRequest(`/ai-search/job/${jobId}`);
+        if (poll.status === 'completed') { data = poll.result; break; }
+        if (poll.status === 'failed') throw new Error(poll.error || 'Search failed');
+      }
+      if (!data) throw new Error('Search timed out. Please try again.');
 
       setResponseType(data.type || null);
       setResponseData(data);
