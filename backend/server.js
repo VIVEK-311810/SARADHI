@@ -845,8 +845,21 @@ async function getAttendanceCounts(numericSessionId) {
 // Trust Render's reverse proxy so express-rate-limit reads the real client IP
 app.set('trust proxy', 1);
 
-// Security middleware
-app.use(helmet());
+// Security middleware — explicit CSP prevents inline script execution even if XSS payload reaches the browser
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],   // Tailwind utility classes require inline styles
+      imgSrc: ["'self'", "data:", "blob:", "*.supabase.co"],
+      connectSrc: ["'self'", "*.supabase.co", "*.pinecone.io", "router.huggingface.co", "api.mistral.ai", "wss:"],
+      fontSrc: ["'self'", "data:"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+    }
+  }
+}));
 
 // CORS — always restrict to an explicit allowlist; never use wildcard
 const allowedOrigins = [

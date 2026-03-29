@@ -9,12 +9,14 @@ const apiLimiter = rateLimit({
   message: { error: 'Too many requests, please try again later.' }
 });
 
-// Strict limiter for AI endpoints — HuggingFace calls are expensive
+// Strict limiter for AI endpoints — keyed by user ID to handle university NAT
+// (IP-based keying would share 10 req/min across the entire class on a shared LAN)
 const aiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id || ipKeyGenerator(req),
   message: { error: 'AI query limit reached. Please wait a minute before sending another query.' }
 });
 

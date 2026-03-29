@@ -13,6 +13,8 @@ import {
   AlertDialogHeader, AlertDialogTitle,
 } from '../ui/alert-dialog';
 
+const SESSIONS_PER_PAGE = 20;
+
 const EnhancedTeacherDashboard = () => {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState([]);
@@ -20,6 +22,9 @@ const EnhancedTeacherDashboard = () => {
   const [fetchError, setFetchError] = useState(null);
   const [stats, setStats] = useState({ totalSessions: 0, totalStudents: 0, totalPolls: 0 });
   const [confirmEnd, setConfirmEnd] = useState(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
 
   const currentUser = safeParseUser();
 
@@ -28,18 +33,24 @@ const EnhancedTeacherDashboard = () => {
       navigate('/auth');
       return;
     }
-    fetchSessions();
-  }, [navigate]);
+    fetchSessions(page);
+  }, [navigate, page]);
 
-  const fetchSessions = async () => {
+  const fetchSessions = async (pageNum = 1) => {
     try {
       if (!currentUser || !currentUser.id) { setLoading(false); return; }
-      const data = await sessionAPI.getTeacherSessions(currentUser.id);
-      setSessions(data);
+      const data = await sessionAPI.getTeacherSessions(currentUser.id, pageNum, SESSIONS_PER_PAGE);
+      // Handle both old (array) and new (paginated object) response shapes
+      const rows = Array.isArray(data) ? data : (data.sessions || []);
+      const totalCount = Array.isArray(data) ? rows.length : (data.total || rows.length);
+      const pages = Array.isArray(data) ? 1 : (data.totalPages || 1);
+      setSessions(rows);
+      setTotal(totalCount);
+      setTotalPages(pages);
       setStats({
-        totalSessions: data.length,
-        totalStudents: data.reduce((acc, s) => acc + parseInt(s.participant_count || 0, 10), 0),
-        totalPolls: data.reduce((acc, s) => acc + parseInt(s.poll_count || 0, 10), 0),
+        totalSessions: totalCount,
+        totalStudents: rows.reduce((acc, s) => acc + parseInt(s.participant_count || 0, 10), 0),
+        totalPolls: rows.reduce((acc, s) => acc + parseInt(s.poll_count || 0, 10), 0),
       });
     } catch (error) {
       console.error('Error fetching sessions:', error);
@@ -210,7 +221,7 @@ const EnhancedTeacherDashboard = () => {
               <CardDescription className="mt-1">Manage and revisit your class sessions</CardDescription>
             </div>
             <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-full">
-              {sessions.length} sessions
+              {total} sessions
             </span>
           </div>
         </CardHeader>
@@ -281,6 +292,36 @@ const EnhancedTeacherDashboard = () => {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Pagination controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-t border-slate-200/60 dark:border-slate-700/60">
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Showing {(page - 1) * SESSIONS_PER_PAGE + 1}–{Math.min(page * SESSIONS_PER_PAGE, total)} of {total}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={page <= 1}
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+              >
+                Previous
+              </Button>
+              <span className="text-xs text-slate-500 dark:text-slate-400 px-1">
+                {page} / {totalPages}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={page >= totalPages}
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              >
+                Next
+              </Button>
+            </div>
           </div>
         )}
       </Card>

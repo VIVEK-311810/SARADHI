@@ -206,9 +206,9 @@ export const sessionAPI = {
       body: JSON.stringify(sessionData),
     }),
 
-  // Get teacher sessions
-  getTeacherSessions: (teacherId) =>
-    apiRequest(`/sessions/teacher/${teacherId}`),
+  // Get teacher sessions (paginated)
+  getTeacherSessions: (teacherId, page = 1, limit = 20) =>
+    apiRequest(`/sessions/teacher/${teacherId}?page=${page}&limit=${limit}`),
 
   // 🔴 Delete a session (teacher only)
   endSession: (sessionId,teacherId) =>

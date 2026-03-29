@@ -4,6 +4,7 @@ import { utils, apiRequest } from '../../utils/api';
 import { useAIChat } from '../../hooks/useAIChat';
 import SourceCard from './SourceCard';
 import QuizCard from './QuizCard';
+import DOMPurify from 'dompurify';
 
 const AIAssistant = () => {
   const navigate = useNavigate();
@@ -381,7 +382,7 @@ function MessageBubble({ msg, currentStatus, statusMessages, confidenceColors, d
         {msg.content && (
           <div
             className="whitespace-pre-wrap break-words"
-            dangerouslySetInnerHTML={{ __html: formatContent(msg.content) }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formatContent(msg.content)) }}
           />
         )}
 

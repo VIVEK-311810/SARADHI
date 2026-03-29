@@ -35,31 +35,48 @@ router.post('/', authenticate, authorize('teacher'), async (req, res) => {
   }
 });
 
-// GET /teacher/:teacherId — Get all sessions for a teacher
+// GET /teacher/:teacherId — Get paginated sessions for a teacher
+// Query params: ?page=1&limit=20 (default page=1, limit=20, max limit=100)
 router.get('/teacher/:teacherId', authenticate, authorize('teacher'), async (req, res) => {
   try {
     const { teacherId } = req.params;
     if (teacherId !== req.user.id) {
       return res.status(403).json({ error: 'Access denied. You can only view your own sessions.' });
     }
-    const result = await pool.query(`
-      SELECT
-        s.*,
-        COALESCE(participant_counts.participant_count, 0) as participant_count,
-        COALESCE(poll_counts.poll_count, 0) as poll_count
-      FROM sessions s
-      LEFT JOIN (
-        SELECT session_id, COUNT(*) as participant_count
-        FROM session_participants GROUP BY session_id
-      ) participant_counts ON s.id = participant_counts.session_id
-      LEFT JOIN (
-        SELECT session_id, COUNT(*) as poll_count FROM polls GROUP BY session_id
-      ) poll_counts ON s.id = poll_counts.session_id
-      WHERE s.teacher_id = $1
-      ORDER BY s.created_at DESC
-    `, [teacherId]);
 
-    res.json(result.rows);
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const offset = (page - 1) * limit;
+
+    const [result, countResult] = await Promise.all([
+      pool.query(`
+        SELECT
+          s.*,
+          COALESCE(participant_counts.participant_count, 0) as participant_count,
+          COALESCE(poll_counts.poll_count, 0) as poll_count
+        FROM sessions s
+        LEFT JOIN (
+          SELECT session_id, COUNT(*) as participant_count
+          FROM session_participants GROUP BY session_id
+        ) participant_counts ON s.id = participant_counts.session_id
+        LEFT JOIN (
+          SELECT session_id, COUNT(*) as poll_count FROM polls GROUP BY session_id
+        ) poll_counts ON s.id = poll_counts.session_id
+        WHERE s.teacher_id = $1
+        ORDER BY s.created_at DESC
+        LIMIT $2 OFFSET $3
+      `, [teacherId, limit, offset]),
+      pool.query('SELECT COUNT(*) as total FROM sessions WHERE teacher_id = $1', [teacherId])
+    ]);
+
+    const total = parseInt(countResult.rows[0].total);
+    res.json({
+      sessions: result.rows,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    });
   } catch (error) {
     logger.error('Error fetching teacher sessions', { error: error.message });
     res.status(500).json({ error: 'Internal server error' });
