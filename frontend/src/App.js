@@ -39,7 +39,6 @@ const TeacherAnalytics          = lazy(() => import('./components/teacher/Teache
 const EnhancedStudentDashboard = lazy(() => import('./components/student/EnhancedStudentDashboard'));
 const EnhancedStudentSession   = lazy(() => import('./components/student/EnhancedStudentSession'));
 const JoinSession              = lazy(() => import('./components/student/JoinSession'));
-const SessionResources         = lazy(() => import('./components/student/SessionResources'));
 const AIAssistant              = lazy(() => import('./components/student/AIAssistant'));
 const VisitSession             = lazy(() => import('./components/student/VisitSession'));
 const AIResourceSearch         = lazy(() => import('./components/student/AIResourceSearch'));
@@ -113,7 +112,7 @@ function StudentRoutes() {
           <Route path="/student/dashboard"                     element={<EnhancedStudentDashboard />} />
           <Route path="/student/join"                          element={<JoinSession />} />
           <Route path="/student/session/:sessionId"            element={<EnhancedStudentSession />} />
-          <Route path="/student/session/:sessionId/resources"  element={<SessionResources />} />
+          <Route path="/student/session/:sessionId/resources"  element={<SessionResourcesShared />} />
           <Route path="/student/session/:sessionId/search"     element={<AIResourceSearch />} />
           <Route path="/student/ai-assistant/:sessionId"       element={<AIAssistant />} />
           <Route path="/student/ai-assistant"                  element={<Navigate to="/student/dashboard" replace />} />

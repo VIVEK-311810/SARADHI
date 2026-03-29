@@ -1,6 +1,6 @@
 import React from 'react';
 import { utils } from '../../utils/api';
-import ResourceUploadManager from '../teacher/ResourceUploadManager';
+import ResourceUpload from '../teacher/ResourceUpload';
 import ResourceViewer from '../student/ResourceViewer';
 
 const SessionResources = () => {
@@ -8,7 +8,7 @@ const SessionResources = () => {
 
   // Route to appropriate component based on user role
   if (currentUser?.role === 'teacher') {
-    return <ResourceUploadManager />;
+    return <ResourceUpload />;
   } else if (currentUser?.role === 'student') {
     return <ResourceViewer />;
   }
