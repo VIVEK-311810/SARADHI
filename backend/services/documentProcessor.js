@@ -1,4 +1,16 @@
 const pdfParse = require('pdf-parse-new');
+
+// pdf-parse-new uses pdfjs-dist internally which prints TrueType font warnings
+// and per-page timing directly to stdout via console.log — bypassing our logger.
+// The verbosity option is not forwarded by pdf-parse-new, so we filter here.
+const _consoleLog = console.log.bind(console);
+console.log = (...args) => {
+  if (typeof args[0] === 'string' && (
+    args[0].includes('TT: CALL') ||
+    args[0].includes('getTextContent')
+  )) return;
+  _consoleLog(...args);
+};
 const mammoth = require('mammoth');
 const officeParser = require('officeparser');
 const { supabase } = require('../config/supabase');
