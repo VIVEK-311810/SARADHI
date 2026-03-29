@@ -432,6 +432,49 @@ router.get('/:resourceId/vectorization-status', authenticate, async (req, res) =
   }
 });
 
+// POST /api/resources/:resourceId/retry-vectorize — re-queue a failed/pending resource
+router.post('/:resourceId/retry-vectorize', authenticate, authorize('teacher'), async (req, res) => {
+  try {
+    const { resourceId } = req.params;
+
+    const { data: resource, error } = await supabase
+      .from('resources')
+      .select('id, session_id, title, vectorization_status, resource_type')
+      .eq('id', resourceId)
+      .single();
+
+    if (error || !resource) return res.status(404).json({ error: 'Resource not found' });
+    if (resource.vectorization_status === 'completed') {
+      return res.status(400).json({ error: 'Resource is already vectorized' });
+    }
+
+    // Reset status so the UI shows processing
+    await supabase.from('resources')
+      .update({ vectorization_status: 'processing', is_vectorized: false })
+      .eq('id', resourceId);
+
+    const { vectorizeQueue } = require('../queues');
+    if (vectorizeQueue) {
+      await vectorizeQueue.add('vectorize', { resourceId, sessionId: resource.session_id, includesSummarize: true }, {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
+      });
+    } else {
+      vectorizeResource(resourceId, resource.session_id).catch(err =>
+        logger.error('Retry vectorization error (in-process)', { error: err.message, resourceId })
+      );
+    }
+
+    logger.info('Vectorization retry queued', { resourceId, title: resource.title });
+    res.json({ success: true, message: 'Vectorization retry started' });
+  } catch (error) {
+    logger.error('Retry vectorize error', { error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Helper functions
 function getResourceType(fileExtension) {
   const typeMap = {

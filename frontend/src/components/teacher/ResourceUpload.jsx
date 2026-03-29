@@ -26,6 +26,16 @@ const ResourceUpload = () => {
     fetchResources();
   }, [sessionId]);
 
+  // Auto-poll every 5s while any resource is pending/processing
+  useEffect(() => {
+    const hasInProgress = resources.some(
+      (r) => r.vectorization_status === 'processing' || r.vectorization_status === 'pending'
+    );
+    if (!hasInProgress) return;
+    const interval = setInterval(fetchResources, 5000);
+    return () => clearInterval(interval);
+  }, [resources]);
+
   const fetchResources = async () => {
     try {
       const data = await apiRequest(`/resources/session/${sessionId}`);
@@ -132,6 +142,16 @@ const ResourceUpload = () => {
     } catch (_) {
       toast.error('Upload failed');
       setIsUploading(false);
+    }
+  };
+
+  const handleRetryVectorize = async (resourceId) => {
+    try {
+      await apiRequest(`/resources/${resourceId}/retry-vectorize`, { method: 'POST' });
+      toast.success('Vectorization restarted');
+      fetchResources();
+    } catch (error) {
+      toast.error('Retry failed: ' + error.message);
     }
   };
 
@@ -335,7 +355,7 @@ const ResourceUpload = () => {
                           <span>Views: {resource.view_count}</span>
                           <span>Downloads: {resource.download_count}</span>
                         </div>
-                        <div className="mt-2">
+                        <div className="mt-2 flex items-center gap-2">
                           <span className={`text-xs px-2 py-1 rounded ${
                             resource.vectorization_status === 'completed' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' :
                             resource.vectorization_status === 'processing' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' :
@@ -347,6 +367,15 @@ const ResourceUpload = () => {
                              resource.vectorization_status === 'failed' ? '✗ Failed' :
                              'Pending'}
                           </span>
+                          {resource.vectorization_status === 'failed' && (
+                            <button
+                              onClick={() => handleRetryVectorize(resource.id)}
+                              className="text-xs px-2 py-1 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors"
+                              title="Retry AI processing"
+                            >
+                              ↺ Retry
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
