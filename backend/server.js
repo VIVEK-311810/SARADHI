@@ -120,15 +120,24 @@ wss.on('connection', (ws, req) => {
           handleCloseAttendance(ws, data);
           break;
         case 'student-stuck': {
-          // Student signals they're confused — track count per session, notify teacher
+          // Student signals they're confused — track unique students per session, notify teacher
           if (ws.sessionId && ws.studentId) {
             const sid = String(ws.sessionId).toUpperCase();
-            if (!global.stuckCounts) global.stuckCounts = new Map();
-            if (!global.stuckCounts.has(sid)) global.stuckCounts.set(sid, new Set());
-            global.stuckCounts.get(sid).add(ws.studentId);
-            const count = global.stuckCounts.get(sid).size;
+            const redisKey = `stuck:${sid}`;
+            let count;
+            if (redis) {
+              await redis.sadd(redisKey, String(ws.studentId)).catch(() => {});
+              await redis.expire(redisKey, 86400).catch(() => {}); // 24h TTL
+              count = await redis.scard(redisKey).catch(() => null);
+            }
+            if (count == null) {
+              // Redis unavailable — fall back to in-memory
+              if (!global.stuckCounts) global.stuckCounts = new Map();
+              if (!global.stuckCounts.has(sid)) global.stuckCounts.set(sid, new Set());
+              global.stuckCounts.get(sid).add(ws.studentId);
+              count = global.stuckCounts.get(sid).size;
+            }
             broadcastToSession(sid, { type: 'stuck-update', count });
-            // Acknowledge back to the student
             ws.send(JSON.stringify({ type: 'stuck-ack' }));
           }
           break;
@@ -137,6 +146,9 @@ wss.on('connection', (ws, req) => {
           // Teacher resets stuck count (e.g. after addressing)
           if (ws.userRole === 'teacher' && ws.sessionId) {
             const sid = String(ws.sessionId).toUpperCase();
+            if (redis) {
+              await redis.del(`stuck:${sid}`).catch(() => {});
+            }
             if (global.stuckCounts) global.stuckCounts.delete(sid);
             broadcastToSession(sid, { type: 'stuck-update', count: 0 });
           }
@@ -1596,6 +1608,9 @@ async function autoMigrate() {
     )
   `, 'knowledge_card_votes');
   await run(`CREATE INDEX IF NOT EXISTS idx_kc_votes_pair ON knowledge_card_votes(pair_id)`, 'idx_kc_votes_pair');
+
+  // Migration: add difficulty column to generated_mcqs (1=easy, 2=medium, 3=hard)
+  await run(`ALTER TABLE generated_mcqs ADD COLUMN IF NOT EXISTS difficulty SMALLINT DEFAULT 1`, 'generated_mcqs.difficulty');
 
   // Initialize cache service
   const cacheService = require('./services/cacheService');

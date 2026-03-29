@@ -410,6 +410,15 @@ const GeneratedMCQs = ({ sessionId, generatedMCQs, onMCQsSent }) => {
                 )}
                 <div className="flex items-center space-x-2">
                   <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">MCQ {index + 1}</span>
+                  {mcq.difficulty && (
+                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                      mcq.difficulty === 1 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
+                      mcq.difficulty === 2 ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' :
+                                             'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                    }`}>
+                      {mcq.difficulty === 1 ? 'Easy' : mcq.difficulty === 2 ? 'Medium' : 'Hard'}
+                    </span>
+                  )}
                   {mcq.isEdited && (
                     <span className="text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded">Edited</span>
                   )}

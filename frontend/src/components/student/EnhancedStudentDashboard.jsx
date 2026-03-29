@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { StatCardsSkeleton, SessionListSkeleton } from '../shared/SkeletonLoader';
 import ErrorScreen from '../shared/ErrorScreen';
+import ErrorCard from '../shared/ErrorCard';
 import { studentAPI, apiRequest, safeParseUser } from '../../utils/api';
 import { isDemoMode, DEMO_GAMIFICATION } from '../../utils/demoData';
 import { Button } from '../ui/button';
@@ -163,6 +164,14 @@ const EnhancedStudentDashboard = () => {
 
   return (
     <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6 pb-8">
+
+      {/* Refresh error banner — shown when a background refresh fails but stale data is still visible */}
+      {fetchError && joinedSessions.length > 0 && (
+        <ErrorCard
+          message={fetchError}
+          onRetry={() => { setFetchError(null); fetchStudentData(); }}
+        />
+      )}
 
       {/* Welcome Header */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-accent-500 to-primary-700 dark:from-accent-600 dark:to-primary-900 p-5 sm:p-7 text-white shadow-glow-accent">

@@ -66,7 +66,7 @@ router.post("/generated-mcqs", validateWebhookSecret, async (req, res) => {
     // Store MCQs in a temporary table for teacher review
     const insertedMCQs = [];
     for (const mcq of mcqs) {
-      const { question, option_a, option_b, option_c, option_d, correct_answer, justification } = mcq;
+      const { question, option_a, option_b, option_c, option_d, correct_answer, justification, difficulty } = mcq;
 
       if (!question || !option_a || !option_b || !option_c || !option_d) {
         logger.warn('Skipping invalid MCQ', { mcqId: mcq.id });
@@ -82,9 +82,10 @@ router.post("/generated-mcqs", validateWebhookSecret, async (req, res) => {
       else if (correct_answer === 'C') correctIndex = 2;
       else if (correct_answer === 'D') correctIndex = 3;
 
+      const diffNum = parseInt(difficulty);
       const result = await pool.query(
-        "INSERT INTO generated_mcqs (session_id, question, options, correct_answer, justification, created_at) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP) RETURNING *",
-        [numericSessionId, question, JSON.stringify(options), correctIndex, justification]
+        "INSERT INTO generated_mcqs (session_id, question, options, correct_answer, justification, difficulty, created_at) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP) RETURNING *",
+        [numericSessionId, question, JSON.stringify(options), correctIndex, justification, [1, 2, 3].includes(diffNum) ? diffNum : 1]
       );
       insertedMCQs.push(result.rows[0]);
     }

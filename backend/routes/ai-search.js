@@ -12,6 +12,33 @@ const logger = require('../logger');
 
 const router = express.Router();
 
+/**
+ * Fetch the last N Q&A pairs from the student's most recent active AI conversation
+ * in this session. Returns [{role,content},...] ready to pass as conversationHistory.
+ * Returns [] if no history exists (first query, no Redis required).
+ */
+async function getRecentConversationHistory(studentId, sessionId, pairLimit = 3) {
+  try {
+    const result = await pool.query(
+      `SELECT m.role, m.content
+       FROM ai_messages m
+       JOIN ai_conversations c ON c.id = m.conversation_id
+       WHERE c.student_id = $1
+         AND c.session_id = $2
+         AND c.is_active = TRUE
+         AND m.message_type IN ('text', 'answer')
+       ORDER BY c.updated_at DESC, m.created_at DESC
+       LIMIT $3`,
+      [studentId, sessionId.toUpperCase(), pairLimit * 2]  // pairs × 2 roles
+    );
+    // Reverse so oldest messages come first (chronological order for prompt)
+    return result.rows.reverse();
+  } catch {
+    // Non-critical — search still works without history
+    return [];
+  }
+}
+
 // POST /api/ai-search/session/:sessionId - Enhanced search with query classification
 router.post('/session/:sessionId', authenticate, async (req, res) => {
   try {
@@ -306,8 +333,11 @@ async function handleFileSpecificQuestion(req, res, sessionId, fileName, query, 
       file_name: resource.file_name
     }));
 
+    // Fetch recent conversation history to support follow-up questions
+    const conversationHistory = await getRecentConversationHistory(req.user.id, sessionId);
+
     // Generate RAG answer
-    const result = await ragService.generateAnswer(query, enrichedChunks, 'specific_file');
+    const result = await ragService.generateAnswer(query, enrichedChunks, { queryType: 'specific_file', conversationHistory });
 
     // Log search
     await supabase
@@ -373,8 +403,11 @@ async function handleGeneralQuestion(req, res, sessionId, query, top_k) {
       };
     });
 
+    // Fetch recent conversation history to support follow-up questions
+    const conversationHistory = await getRecentConversationHistory(req.user.id, sessionId);
+
     // Generate RAG answer
-    const result = await ragService.generateAnswer(query, enrichedChunks, 'general');
+    const result = await ragService.generateAnswer(query, enrichedChunks, { queryType: 'general', conversationHistory });
 
     // Log search — single batch insert, non-blocking
     if (enrichedChunks.length > 0) {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { apiRequest } from '../../utils/api';
+import ErrorCard from '../shared/ErrorCard';
 
 const AIResourceSearch = () => {
   const { sessionId } = useParams();
@@ -300,17 +301,10 @@ const AIResourceSearch = () => {
 
       case 'error': {
         return (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 sm:p-6">
-            <div className="flex items-start gap-3">
-              <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-              <div>
-                <h3 className="text-sm sm:text-base font-semibold text-red-900 dark:text-red-300">Search Error</h3>
-                <p className="text-xs sm:text-sm text-red-700 dark:text-red-400 mt-1">{responseData?.error || 'Something went wrong. Please try again.'}</p>
-              </div>
-            </div>
-          </div>
+          <ErrorCard
+            message={responseData?.error || 'Something went wrong. Please try again.'}
+            onRetry={() => { setResponseType(null); setResponseData(null); setHasSearched(false); }}
+          />
         );
       }
 

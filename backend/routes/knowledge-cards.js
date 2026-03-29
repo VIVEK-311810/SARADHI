@@ -154,6 +154,31 @@ async function getPairVotes(pairId) {
   };
 }
 
+// ─── Helper: Get vote counts for multiple pairs in one query ─────────────────
+// Returns Map<pairId, { thumbsUp, thumbsDown }> for O(1) lookup
+
+async function getBatchPairVotes(pairIds) {
+  const voteMap = new Map();
+  if (!pairIds || pairIds.length === 0) return voteMap;
+
+  const result = await pool.query(`
+    SELECT pair_id,
+      SUM(CASE WHEN vote = 'up' THEN 1 ELSE 0 END) as thumbs_up,
+      SUM(CASE WHEN vote = 'down' THEN 1 ELSE 0 END) as thumbs_down
+    FROM knowledge_card_votes
+    WHERE pair_id = ANY($1)
+    GROUP BY pair_id
+  `, [pairIds]);
+
+  for (const row of result.rows) {
+    voteMap.set(row.pair_id, {
+      thumbsUp: parseInt(row.thumbs_up) || 0,
+      thumbsDown: parseInt(row.thumbs_down) || 0
+    });
+  }
+  return voteMap;
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // ROUTES
 // ════════════════════════════════════════════════════════════════════════════
@@ -229,7 +254,25 @@ router.get('/session/:sessionId', authenticate, authorize('teacher'), async (req
       ORDER BY r.created_at DESC
     `, [sessionMeta.id]);
 
-    const rounds = result.rows.map(row => ({ ...row, pairs: row.pairs || [] }));
+    // Collect pair IDs from revealed/completed pairs for batch vote fetch
+    const revealedPairIds = [];
+    for (const row of result.rows) {
+      for (const pair of (row.pairs || [])) {
+        if (pair.status === 'revealed' || pair.status === 'completed') {
+          revealedPairIds.push(pair.id);
+        }
+      }
+    }
+
+    const voteMap = await getBatchPairVotes(revealedPairIds);
+
+    const rounds = result.rows.map(row => ({
+      ...row,
+      pairs: (row.pairs || []).map(pair => ({
+        ...pair,
+        votes: voteMap.get(pair.id) || { thumbsUp: 0, thumbsDown: 0 }
+      }))
+    }));
     res.json({ success: true, data: rounds });
   } catch (error) {
     logger.error('Get knowledge cards error', { error: error.message });

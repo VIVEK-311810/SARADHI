@@ -56,7 +56,7 @@ async function retrieveContext(state) {
 // ── Node 2: Generate MCQs via Mistral ─────────────────────────────────────────
 const MCQ_SYSTEM = `You are an expert MCQ generator for educational content.
 
-Based on the transcript and course materials provided, generate 3-4 high-quality multiple-choice questions with 4 options (A, B, C, D), the correct answer, and a concise justification.
+Based on the transcript and course materials provided, generate 3-4 high-quality multiple-choice questions with 4 options (A, B, C, D), the correct answer, a concise justification, and a difficulty level based on Bloom's Taxonomy (1=Remember, 2=Understand/Apply, 3=Analyze/Evaluate).
 
 Format your output STRICTLY as:
 
@@ -68,6 +68,7 @@ C. [Option C]
 D. [Option D]
 Correct Answer: [A/B/C/D]
 Justification: [Concise justification here]
+Difficulty: [1/2/3]
 Source: [Transcript/Additional Resource]
 
 (Continue with ---MCQ2---, ---MCQ3---, ---MCQ4--- as needed)`;
@@ -101,7 +102,7 @@ function parseMCQOutput(text) {
 
   for (const block of blocks) {
     let question = '', optionA = '', optionB = '', optionC = '', optionD = '';
-    let correctAnswer = '', justification = '';
+    let correctAnswer = '', justification = '', difficulty = '1';
     let currentSection = '';
 
     for (const rawLine of block.split('\n')) {
@@ -115,12 +116,14 @@ function parseMCQOutput(text) {
       else if (line.startsWith('D.'))              { optionD = line.slice(2).trim();                         currentSection = ''; }
       else if (line.startsWith('Correct Answer:')) { correctAnswer = line.slice('Correct Answer:'.length).trim(); currentSection = ''; }
       else if (line.startsWith('Justification:'))  { justification = line.slice('Justification:'.length).trim(); currentSection = 'justification'; }
+      else if (line.startsWith('Difficulty:'))     { difficulty = line.slice('Difficulty:'.length).trim();   currentSection = ''; }
       else if (line.startsWith('Source:'))         { currentSection = ''; }
       else if (currentSection === 'question')      { question += ' ' + line; }
       else if (currentSection === 'justification') { justification += ' ' + line; }
     }
 
     if (question && optionA && optionB && optionC && optionD && correctAnswer) {
+      const diffNum = parseInt(difficulty);
       mcqs.push({
         question:       question.trim(),
         option_a:       optionA,
@@ -129,6 +132,7 @@ function parseMCQOutput(text) {
         option_d:       optionD,
         correct_answer: correctAnswer.toUpperCase().charAt(0),
         justification:  justification.trim(),
+        difficulty:     [1, 2, 3].includes(diffNum) ? diffNum : 1,
       });
     }
   }
@@ -159,14 +163,15 @@ async function parseAndStore(state) {
   for (const mcq of mcqs) {
     const correctIdx = ANSWER_INDEX[mcq.correct_answer] ?? 0;
     const res = await pool.query(
-      `INSERT INTO generated_mcqs (session_id, question, options, correct_answer, justification)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      `INSERT INTO generated_mcqs (session_id, question, options, correct_answer, justification, difficulty)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
       [
         numericSessionId,
         mcq.question,
         JSON.stringify([mcq.option_a, mcq.option_b, mcq.option_c, mcq.option_d]),
         correctIdx,
         mcq.justification,
+        mcq.difficulty || 1,
       ]
     );
     insertedMCQs.push(res.rows[0]);
