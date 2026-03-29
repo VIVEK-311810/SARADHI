@@ -11,6 +11,7 @@ const cacheService = require('../services/cacheService');
 const { authenticate, authorize } = require('../middleware/auth');
 const logger = require('../logger');
 
+const pool = require('../db');
 const router = express.Router();
 
 // ─── SSE Chat Endpoint ──────────────────────────────────────────────────────
@@ -28,28 +29,25 @@ router.post('/session/:sessionId/chat', authenticate, async (req, res) => {
   }
 
   // Verify user belongs to this session (student must be enrolled; teacher must own it)
+  // Uses pool.query with JOIN because session_participants.session_id is the integer FK
+  // (sessions.id), not the string session code — Supabase .eq() on the string code won't match
   try {
     const normalizedSessionId = sessionId.toUpperCase();
-    if (req.user.role === 'student') {
-      const { data: participant } = await supabase
-        .from('session_participants')
-        .select('id')
-        .eq('session_id', normalizedSessionId)
-        .eq('student_id', studentId)
-        .single();
-      if (!participant) {
-        return res.status(403).json({ error: 'You are not a participant in this session' });
-      }
-    } else if (req.user.role === 'teacher') {
-      const { data: session } = await supabase
-        .from('sessions')
-        .select('id')
-        .eq('session_id', normalizedSessionId)
-        .eq('teacher_id', studentId)
-        .single();
-      if (!session) {
-        return res.status(403).json({ error: 'You do not own this session' });
-      }
+    const check = await pool.query(
+      `SELECT 1 FROM sessions s
+       WHERE s.session_id = $1
+         AND (
+           ($2 = 'teacher' AND s.teacher_id = $3)
+           OR
+           ($2 = 'student' AND EXISTS (
+             SELECT 1 FROM session_participants sp
+             WHERE sp.session_id = s.id AND sp.student_id = $3
+           ))
+         )`,
+      [normalizedSessionId, req.user.role, studentId]
+    );
+    if (check.rows.length === 0) {
+      return res.status(403).json({ error: 'Access denied: not a participant in this session' });
     }
   } catch {
     return res.status(403).json({ error: 'Session access denied' });
