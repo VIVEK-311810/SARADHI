@@ -868,6 +868,17 @@ app.use(compression());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ limit: '20mb', extended: true }));
 
+// Cache-Control helper — use on read-heavy endpoints that change infrequently.
+// `private` = browser cache only (not shared CDN cache — data is user-specific).
+// `stale-while-revalidate` = serve stale copy instantly while fetching fresh in background.
+function cachePrivate(maxAgeSeconds, swrSeconds = maxAgeSeconds * 2) {
+  return (_req, res, next) => {
+    res.set('Cache-Control', `private, max-age=${maxAgeSeconds}, stale-while-revalidate=${swrSeconds}`);
+    next();
+  };
+}
+app.set('etag', 'strong'); // Express generates ETags by default; ensure strong ETags for If-None-Match 304s
+
 // Session middleware for OAuth2
 app.use(session({
   secret: process.env.SESSION_SECRET,
@@ -907,22 +918,65 @@ const knowledgeCardsRouter = require('./routes/knowledge-cards');
 const healthRouter = require('./routes/health');
 const { startWorkers, stopWorkers } = require('./workers/aiWorker');
 
+// ── Bull Board — job queue dashboard at /admin/queues ─────────────────────────
+// Protected by BULL_BOARD_PASSWORD env var (basic auth). Skip if Redis unavailable.
+function setupBullBoard() {
+  const { vectorizeQueue, aiSearchQueue } = require('./queues');
+  if (!vectorizeQueue) return; // Redis not configured — skip
+
+  const { createBullBoard } = require('@bull-board/api');
+  const { BullMQAdapter } = require('@bull-board/api/bullMQAdapter');
+  const { ExpressAdapter } = require('@bull-board/express');
+
+  const serverAdapter = new ExpressAdapter();
+  serverAdapter.setBasePath('/admin/queues');
+
+  createBullBoard({
+    queues: [
+      new BullMQAdapter(vectorizeQueue),
+      new BullMQAdapter(aiSearchQueue),
+    ],
+    serverAdapter,
+  });
+
+  // Basic-auth guard — require BULL_BOARD_PASSWORD env var
+  const BOARD_PASSWORD = process.env.BULL_BOARD_PASSWORD;
+  app.use('/admin/queues', (req, res, next) => {
+    if (!BOARD_PASSWORD) return next(); // no password set → open (dev only)
+    const auth = req.headers.authorization;
+    if (auth) {
+      const [, encoded] = auth.split(' ');
+      const [, pwd] = Buffer.from(encoded, 'base64').toString().split(':');
+      if (pwd === BOARD_PASSWORD) return next();
+    }
+    res.set('WWW-Authenticate', 'Basic realm="Bull Board"');
+    res.status(401).send('Unauthorized');
+  }, serverAdapter.getRouter());
+
+  logger.info('Bull Board mounted at /admin/queues');
+}
+
 // Mount routes
 app.use('/auth', authRouter);
 app.use('/api/sessions', sessionsRouter);
 app.use('/api/polls', pollsRouter);
-app.use('/api/resources', newResourcesRouter);
+// Resources list changes on upload/delete — 15s cache covers rapid re-fetches
+app.use('/api/resources', cachePrivate(15), newResourcesRouter);
 app.use('/api/ai-search', aiSearchRouter);
-app.use('/api/students', studentsRouter);
+// Student dashboard summary — changes after polls close; 30s cache
+app.use('/api/students', cachePrivate(30), studentsRouter);
 app.use('/api', generatedMCQsRoutes);
 app.use('/api/transcription', transcriptionRouter);
-app.use('/api/analytics', analyticsRouter);
+// Analytics rarely change mid-session; 60s cache
+app.use('/api/analytics', cachePrivate(60), analyticsRouter);
 app.use('/api/export', exportRouter);
-app.use('/api/gamification', gamificationRouter);
+// Gamification stats change after polls — 30s cache
+app.use('/api/gamification', cachePrivate(30), gamificationRouter);
 app.use('/api/community', communityRouter);
 app.use('/api/ai-assistant', aiAssistantRouter);
 app.use('/api/knowledge-cards', knowledgeCardsRouter);
 app.use('/health', healthRouter);
+setupBullBoard();
 
 // Attendance REST endpoint — get attendance list and counts for a session
 app.get('/api/sessions/:sessionId/attendance', authenticate, async (req, res) => {

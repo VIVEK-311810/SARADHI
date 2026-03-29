@@ -242,6 +242,10 @@ const EnhancedSessionManagement = () => {
               toast.success('Class notes are ready for students!');
             }
             break;
+          case 'server-restarting':
+            wsReconnectAttemptsRef.current = 0;
+            setWsConnected(false);
+            break;
           default:
             break;
         }

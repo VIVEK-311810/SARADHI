@@ -483,6 +483,13 @@ const EnhancedStudentSession = () => {
           setLeaderboardVisible(!!data.visible);
           break;
 
+        case 'server-restarting':
+          // Server is doing a graceful deploy — reconnect logic in onclose will handle it
+          // Reset reconnect counter so we get fresh exponential backoff
+          reconnectAttemptsRef.current = 0;
+          setConnectionStatus('reconnecting');
+          break;
+
         default:
           break;
       }
