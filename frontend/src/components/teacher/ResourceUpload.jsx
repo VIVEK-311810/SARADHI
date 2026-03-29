@@ -95,52 +95,52 @@ const ResourceUpload = () => {
     setIsUploading(true);
     setUploadProgress(0);
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('session_id', sessionId);
-    formData.append('title', title);
-    formData.append('description', description);
-    formData.append('is_downloadable', isDownloadable);
-
     try {
-      const xhr = new XMLHttpRequest();
-
-      xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-          const progress = Math.round((e.loaded / e.total) * 100);
-          setUploadProgress(progress);
-        }
+      // Step 1 — get a signed URL from our backend (no file bytes go through Node)
+      const { signedUrl, resourceId, filePath } = await apiRequest('/resources/upload-url', {
+        method: 'POST',
+        body: JSON.stringify({
+          session_id: sessionId,
+          title,
+          description,
+          is_downloadable: isDownloadable,
+          filename: file.name,
+          mime_type: file.type,
+        }),
       });
 
-      xhr.addEventListener('load', () => {
-        if (xhr.status === 200) {
-          toast.success('File uploaded! Vectorization in progress.');
-          setFile(null);
-          setTitle('');
-          setDescription('');
-          setUploadProgress(0);
-          fetchResources();
-        } else {
-          let errorMsg = xhr.statusText;
-          try { errorMsg = JSON.parse(xhr.responseText).error || errorMsg; } catch (_) {}
-          toast.error('Upload failed: ' + errorMsg);
-        }
-        setIsUploading(false);
+      // Step 2 — upload directly to Supabase Storage with progress tracking
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 100));
+        });
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else reject(new Error(`Storage upload failed: ${xhr.status}`));
+        });
+        xhr.addEventListener('error', () => reject(new Error('Network error during upload')));
+        xhr.open('PUT', signedUrl);
+        xhr.setRequestHeader('Content-Type', file.type);
+        xhr.send(file);
       });
 
-      xhr.addEventListener('error', () => {
-        toast.error('Upload failed. Please check your connection.');
-        setIsUploading(false);
+      // Step 3 — notify backend to set public URL + enqueue vectorization
+      await apiRequest('/resources/upload-complete', {
+        method: 'POST',
+        body: JSON.stringify({ resourceId, filePath }),
       });
 
-      const apiUrl = process.env.REACT_APP_API_URL || 'https://vk-edu-b2.onrender.com/api';
-      const token = localStorage.getItem('authToken');
-      xhr.open('POST', `${apiUrl}/resources/upload`);
-      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-      xhr.send(formData);
+      toast.success('File uploaded! Vectorization in progress.');
+      setFile(null);
+      setTitle('');
+      setDescription('');
+      setUploadProgress(0);
+      fetchResources();
 
-    } catch (_) {
-      toast.error('Upload failed');
+    } catch (err) {
+      toast.error('Upload failed: ' + err.message);
+    } finally {
       setIsUploading(false);
     }
   };

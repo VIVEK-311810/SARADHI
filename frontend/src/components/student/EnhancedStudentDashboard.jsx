@@ -47,6 +47,9 @@ const EnhancedStudentDashboard = () => {
             setJoinedSessions(prev => prev.map(s => s.session_id === data.sessionId ? { ...s, is_live: true } : s));
           } else if (data.type === 'class-ended' && data.sessionId) {
             setJoinedSessions(prev => prev.map(s => s.session_id === data.sessionId ? { ...s, is_live: false } : s));
+          } else if (data.type === 'stats-updated') {
+            // Poll just closed — refresh gamification stats without waiting for the interval
+            fetchStudentData();
           }
         } catch (_) {}
       };
@@ -54,7 +57,8 @@ const EnhancedStudentDashboard = () => {
       ws.onclose = () => {};
     }
 
-    const refreshInterval = setInterval(() => { fetchStudentData(); }, 30000);
+    // 5-minute fallback poll (primary updates come via stats-updated WS event)
+    const refreshInterval = setInterval(() => { fetchStudentData(); }, 300000);
     return () => {
       clearInterval(refreshInterval);
       if (dashboardWsRef.current) { dashboardWsRef.current.close(); dashboardWsRef.current = null; }

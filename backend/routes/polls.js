@@ -330,6 +330,11 @@ async function triggerAnswerReveal(sessionId, pollId) {
 
       if (global.clearPollTimer) global.clearPollTimer(sessionIdString);
       logger.info('Answer reveal broadcast (all responded)', { pollId, sessionId: sessionIdString });
+
+      // Push stats-updated to students on the dashboard page
+      if (global.broadcastToDashboardsForSession) {
+        global.broadcastToDashboardsForSession(normalizedSessionId, { type: 'stats-updated' }).catch(() => {});
+      }
     }
 
     // Deactivate poll in DB so late-joiners don't see a finished poll as active

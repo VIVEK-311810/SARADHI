@@ -406,6 +406,9 @@ async function triggerAnswerRevealFromTimer(sessionId, pollId) {
           type: 'leaderboard-update',
           leaderboard
         });
+        // Push stats-updated to students on the dashboard page so they
+        // refresh gamification data without waiting for the 30s poll interval
+        broadcastToDashboardsForSession(normalizedSessionId, { type: 'stats-updated' }).catch(() => {});
       }
     } catch (lbErr) {
       logger.warn('Failed to broadcast leaderboard update', { error: lbErr.message });

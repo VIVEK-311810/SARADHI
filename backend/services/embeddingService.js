@@ -1,32 +1,26 @@
 const axios = require('axios');
+const logger = require('../logger');
+
+// Batch size: HuggingFace inference accepts arrays; 32 texts per call keeps
+// payload size reasonable and avoids 413s on longer chunks.
+const BATCH_SIZE = 32;
+const BATCH_DELAY_MS = 500; // delay between batches, not between individual chunks
 
 class EmbeddingService {
   constructor() {
     this.apiUrl = 'https://router.huggingface.co/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction';
     this.apiKey = process.env.HUGGINGFACE_API_KEY;
-    this.maxTokens = 512; // Model limit
-    this.retryAttempts = 5; // Increased from 3 to 5
-    this.lastRequestTime = 0; // Track last request time for rate limiting
-    this.minRequestInterval = 1000; // Minimum 1 second between requests
+    this.maxTokens = 512;
+    this.retryAttempts = 5;
   }
 
+  // Single-text embedding — used for query embedding during search
   async generateEmbedding(text, retryCount = 0) {
     if (!text || text.trim().length === 0) {
       throw new Error('Empty text provided for embedding generation');
     }
 
-    // Enforce minimum interval between requests to avoid rate limiting
-    const now = Date.now();
-    const timeSinceLastRequest = now - this.lastRequestTime;
-    if (timeSinceLastRequest < this.minRequestInterval) {
-      const waitTime = this.minRequestInterval - timeSinceLastRequest;
-      console.log(`Rate limiting: waiting ${waitTime}ms before next request`);
-      await this.sleep(waitTime);
-    }
-
     try {
-      this.lastRequestTime = Date.now();
-
       const response = await axios.post(
         this.apiUrl,
         { inputs: text },
@@ -35,57 +29,82 @@ class EmbeddingService {
             'Authorization': `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json'
           },
-          timeout: 30000 // 30s timeout (account for cold start)
+          timeout: 30000
         }
       );
-
-      return response.data; // 384-dimensional vector
+      return response.data;
     } catch (error) {
-      // Handle model loading (503 error)
       if (error.response?.status === 503 && retryCount < this.retryAttempts) {
-        const waitTime = 5000 + (retryCount * 2000); // Exponential backoff
-        console.log(`Model is loading, waiting ${waitTime/1000} seconds... (attempt ${retryCount + 1}/${this.retryAttempts})`);
+        const waitTime = 5000 + (retryCount * 2000);
+        logger.debug(`HuggingFace model loading, retrying in ${waitTime}ms`, { attempt: retryCount + 1 });
         await this.sleep(waitTime);
         return this.generateEmbedding(text, retryCount + 1);
       }
-
-      // Handle rate limiting (429 error)
       if (error.response?.status === 429 && retryCount < this.retryAttempts) {
-        const waitTime = 10000 + (retryCount * 5000); // Exponential backoff
-        console.log(`Rate limited, waiting ${waitTime/1000} seconds... (attempt ${retryCount + 1}/${this.retryAttempts})`);
+        const waitTime = 10000 + (retryCount * 5000);
+        logger.debug(`HuggingFace rate limited, retrying in ${waitTime}ms`, { attempt: retryCount + 1 });
         await this.sleep(waitTime);
         return this.generateEmbedding(text, retryCount + 1);
       }
-
-      console.error('Embedding generation error:', error.response?.data || error.message);
       throw new Error(`Failed to generate embedding: ${error.response?.data?.error || error.message}`);
     }
   }
 
+  // Batch embedding — sends BATCH_SIZE texts per API call instead of one-by-one.
+  // 55 chunks → 2 API calls instead of 55. Reduces vectorization from ~110s to ~3s.
   async generateBatchEmbeddings(texts) {
     const embeddings = [];
 
-    for (let i = 0; i < texts.length; i++) {
-      const text = texts[i];
+    for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+      const batch = texts.slice(i, i + BATCH_SIZE);
+      const batchEmbeddings = await this._embedBatch(batch);
+      embeddings.push(...batchEmbeddings);
 
-      try {
-        const embedding = await this.generateEmbedding(text);
-        embeddings.push(embedding);
+      logger.info(`Generated embeddings: ${Math.min(i + BATCH_SIZE, texts.length)}/${texts.length}`);
 
-        // Progress logging
-        if ((i + 1) % 10 === 0 || i === texts.length - 1) {
-          console.log(`Generated embeddings: ${i + 1}/${texts.length}`);
-        }
-
-        // Rate limiting: wait 100ms between requests
-        await this.sleep(100);
-      } catch (error) {
-        console.error(`Error generating embedding for chunk ${i}:`, error.message);
-        throw error;
+      // Polite delay between batches only (not between individual texts)
+      if (i + BATCH_SIZE < texts.length) {
+        await this.sleep(BATCH_DELAY_MS);
       }
     }
 
     return embeddings;
+  }
+
+  async _embedBatch(texts, retryCount = 0) {
+    try {
+      const response = await axios.post(
+        this.apiUrl,
+        { inputs: texts, options: { wait_for_model: true } },
+        {
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 60000 // longer timeout for batch
+        }
+      );
+
+      const result = response.data;
+      if (!Array.isArray(result)) {
+        throw new Error(`Unexpected HuggingFace response: ${JSON.stringify(result)}`);
+      }
+      return result;
+    } catch (error) {
+      if (error.response?.status === 503 && retryCount < this.retryAttempts) {
+        const waitTime = 5000 + (retryCount * 2000);
+        logger.debug(`HuggingFace model loading (batch), retrying in ${waitTime}ms`, { attempt: retryCount + 1 });
+        await this.sleep(waitTime);
+        return this._embedBatch(texts, retryCount + 1);
+      }
+      if (error.response?.status === 429 && retryCount < this.retryAttempts) {
+        const waitTime = 10000 + (retryCount * 5000);
+        logger.debug(`HuggingFace rate limited (batch), retrying in ${waitTime}ms`, { attempt: retryCount + 1 });
+        await this.sleep(waitTime);
+        return this._embedBatch(texts, retryCount + 1);
+      }
+      throw new Error(`Batch embed failed: ${error.response?.data?.error || error.message}`);
+    }
   }
 
   chunkText(text, maxTokens = 512, overlap = 50) {

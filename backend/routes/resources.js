@@ -143,6 +143,120 @@ router.post('/upload', authenticate, authorize('teacher'), upload.single('file')
   }
 });
 
+// POST /api/resources/upload-url — Step 1 of direct-to-Supabase upload flow.
+// Returns a signed upload URL valid for 5 minutes. The browser uploads directly
+// to Supabase Storage (bypassing Node RAM), then calls /upload-complete.
+router.post('/upload-url', authenticate, authorize('teacher'), async (req, res) => {
+  try {
+    const { session_id, title, description, is_downloadable, filename, mime_type } = req.body;
+
+    if (!session_id || !title || !filename || !mime_type) {
+      return res.status(400).json({ error: 'session_id, title, filename and mime_type are required' });
+    }
+
+    const allowedExtensions = MIME_TO_EXTENSIONS[mime_type];
+    if (!allowedExtensions) {
+      return res.status(400).json({ error: 'Invalid file type. Only PDF, Word, and PowerPoint files are allowed.' });
+    }
+    const ext = filename.split('.').pop().toLowerCase();
+    if (!allowedExtensions.includes(ext)) {
+      return res.status(400).json({ error: `File extension '.${ext}' does not match the declared content type.` });
+    }
+
+    const resourceId = uuidv4();
+    const resourceType = getResourceType(ext);
+    const filePath = `${session_id}/${resourceType}s/${resourceId}.${ext}`;
+
+    // Pre-register resource in DB with 'pending' status so the teacher sees it immediately
+    const { error: dbError } = await supabase.from('resources').insert({
+      id: resourceId,
+      session_id,
+      teacher_id: req.user.id,
+      title,
+      description: description || null,
+      resource_type: resourceType,
+      file_path: filePath,
+      file_url: '',
+      file_name: filename,
+      file_size: 0,
+      mime_type,
+      is_downloadable: is_downloadable === 'true' || is_downloadable === true,
+      vectorization_status: 'pending',
+    });
+
+    if (dbError) {
+      logger.error('DB error pre-registering resource', { error: dbError.message });
+      return res.status(500).json({ error: 'Failed to register resource' });
+    }
+
+    // Create signed upload URL (5-minute TTL)
+    const { data, error: signedError } = await supabase.storage
+      .from('session-resources')
+      .createSignedUploadUrl(filePath);
+
+    if (signedError) {
+      await supabase.from('resources').delete().eq('id', resourceId);
+      logger.error('Failed to create signed upload URL', { error: signedError.message });
+      return res.status(500).json({ error: 'Failed to create upload URL' });
+    }
+
+    logger.info('Signed upload URL created', { resourceId, filePath });
+    res.json({ signedUrl: data.signedUrl, token: data.token, resourceId, filePath });
+
+  } catch (error) {
+    logger.error('upload-url error', { error: error.message });
+    res.status(500).json({ error: 'Failed to create upload URL' });
+  }
+});
+
+// POST /api/resources/upload-complete — Step 2 of direct-to-Supabase upload flow.
+// Browser calls this after the direct upload succeeds. Updates file_url and enqueues vectorization.
+router.post('/upload-complete', authenticate, authorize('teacher'), async (req, res) => {
+  try {
+    const { resourceId, filePath } = req.body;
+
+    if (!resourceId || !filePath) {
+      return res.status(400).json({ error: 'resourceId and filePath are required' });
+    }
+
+    // Verify ownership
+    const { data: resource, error: fetchError } = await supabase
+      .from('resources').select('id, session_id, teacher_id').eq('id', resourceId).single();
+
+    if (fetchError || !resource) return res.status(404).json({ error: 'Resource not found' });
+    if (resource.teacher_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+
+    // Get public URL now that the file is actually in storage
+    const { data: urlData } = supabase.storage.from('session-resources').getPublicUrl(filePath);
+
+    await supabase.from('resources').update({
+      file_url: urlData.publicUrl,
+      vectorization_status: 'processing',
+    }).eq('id', resourceId);
+
+    // Enqueue vectorization
+    const { vectorizeQueue } = require('../queues');
+    if (vectorizeQueue) {
+      await vectorizeQueue.add('vectorize', { resourceId, sessionId: resource.session_id, includesSummarize: true }, {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
+      });
+      logger.info('Vectorization job enqueued (direct upload)', { resourceId });
+    } else {
+      vectorizeResource(resourceId, resource.session_id).catch(err =>
+        logger.error('Vectorization error (fallback)', { error: err.message, resourceId }));
+    }
+
+    res.json({ success: true, message: 'Upload complete. Vectorization in progress.' });
+
+  } catch (error) {
+    logger.error('upload-complete error', { error: error.message });
+    res.status(500).json({ error: 'Failed to complete upload' });
+  }
+});
+
 // POST /api/resources/add-url - Add URL resource (no vectorization)
 router.post('/add-url', authenticate, authorize('teacher'), async (req, res) => {
   try {
