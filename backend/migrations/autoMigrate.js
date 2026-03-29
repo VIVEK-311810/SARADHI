@@ -1,0 +1,278 @@
+const pool = require('../db');
+const logger = require('../logger');
+
+/**
+ * Apply any missing schema changes on startup so deploys don't need manual SQL runs.
+ * Each statement runs independently — one failure never blocks the rest.
+ * Uses a single DB connection for all DDL to avoid hammering the pool.
+ */
+async function runAutoMigrations() {
+  let client;
+  try {
+    client = await pool.connect();
+  } catch (err) {
+    logger.warn('autoMigrate: DB not reachable on startup, skipping schema sync', { error: err.message });
+    return;
+  }
+
+  const run = async (sql, label) => {
+    try {
+      await client.query(sql);
+      logger.debug(`Auto-migration OK: ${label}`);
+    } catch (err) {
+      logger.error(`Auto-migration FAILED (non-fatal): ${label}`, { error: err.message });
+    }
+  };
+
+  // Migration 007 – live class control, attendance, community
+  await run(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS is_live BOOLEAN NOT NULL DEFAULT FALSE`, 'sessions.is_live');
+  await run(`ALTER TABLE session_participants ADD COLUMN IF NOT EXISTS attendance_status VARCHAR(20)`, 'sp.attendance_status');
+  await run(`ALTER TABLE session_participants ADD COLUMN IF NOT EXISTS attendance_marked_at TIMESTAMP`, 'sp.attendance_marked_at');
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS session_attendance_windows (
+      id SERIAL PRIMARY KEY,
+      session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+      duration_seconds INTEGER NOT NULL DEFAULT 60,
+      opened_by VARCHAR NOT NULL REFERENCES users(id),
+      opened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      closed_at TIMESTAMP,
+      is_active BOOLEAN NOT NULL DEFAULT TRUE
+    )
+  `, 'session_attendance_windows');
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS community_tickets (
+      id SERIAL PRIMARY KEY,
+      session_id INTEGER REFERENCES sessions(id) ON DELETE CASCADE,
+      subject VARCHAR(100),
+      author_id VARCHAR NOT NULL REFERENCES users(id),
+      title VARCHAR(255) NOT NULL,
+      content TEXT NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'open' CHECK (status IN ('open','resolved')),
+      upvote_count INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `, 'community_tickets');
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS community_replies (
+      id SERIAL PRIMARY KEY,
+      ticket_id INTEGER NOT NULL REFERENCES community_tickets(id) ON DELETE CASCADE,
+      author_id VARCHAR NOT NULL REFERENCES users(id),
+      content TEXT NOT NULL,
+      is_solution BOOLEAN NOT NULL DEFAULT FALSE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `, 'community_replies');
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS community_upvotes (
+      id SERIAL PRIMARY KEY,
+      ticket_id INTEGER NOT NULL REFERENCES community_tickets(id) ON DELETE CASCADE,
+      user_id VARCHAR NOT NULL REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(ticket_id, user_id)
+    )
+  `, 'community_upvotes');
+
+  // Migration 008 – AI Study Assistant
+  await run(`
+    CREATE TABLE IF NOT EXISTS ai_conversations (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      session_id VARCHAR(10) NOT NULL,
+      student_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      is_active BOOLEAN DEFAULT TRUE
+    )
+  `, 'ai_conversations');
+
+  await run(`CREATE INDEX IF NOT EXISTS idx_ai_conversations_student_session ON ai_conversations(student_id, session_id)`, 'idx_ai_conversations_student_session');
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS ai_messages (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      conversation_id UUID NOT NULL REFERENCES ai_conversations(id) ON DELETE CASCADE,
+      role VARCHAR(10) NOT NULL CHECK (role IN ('user', 'assistant')),
+      content TEXT NOT NULL,
+      message_type VARCHAR(30) DEFAULT 'text',
+      metadata JSONB,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `, 'ai_messages');
+
+  await run(`CREATE INDEX IF NOT EXISTS idx_ai_messages_conversation ON ai_messages(conversation_id, created_at)`, 'idx_ai_messages_conversation');
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS ai_doubts (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      message_id UUID NOT NULL REFERENCES ai_messages(id) ON DELETE CASCADE,
+      session_id VARCHAR(10) NOT NULL,
+      student_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      doubt_text TEXT NOT NULL,
+      status VARCHAR(20) DEFAULT 'unresolved' CHECK (status IN ('unresolved', 'resolved')),
+      resolved_by VARCHAR REFERENCES users(id),
+      resolved_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `, 'ai_doubts');
+
+  await run(`CREATE INDEX IF NOT EXISTS idx_ai_doubts_session_status ON ai_doubts(session_id, status)`, 'idx_ai_doubts_session_status');
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS ai_study_analytics (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      student_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      session_id VARCHAR(10) NOT NULL,
+      total_queries INTEGER DEFAULT 0,
+      topics_explored TEXT[],
+      resources_referenced UUID[],
+      last_query_at TIMESTAMP,
+      study_duration_minutes INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(student_id, session_id)
+    )
+  `, 'ai_study_analytics');
+
+  await run(`ALTER TABLE resource_chunks ADD COLUMN IF NOT EXISTS section_title VARCHAR(255)`, 'resource_chunks.section_title');
+
+  // Migration 009 – Auto Notes Generation: session live timing + notes lifecycle
+  await run(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS live_started_at TIMESTAMP`, 'sessions.live_started_at');
+  await run(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS live_ended_at TIMESTAMP`, 'sessions.live_ended_at');
+  await run(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS notes_status VARCHAR(20) DEFAULT 'none'`, 'sessions.notes_status');
+  await run(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS notes_url TEXT`, 'sessions.notes_url');
+  await run(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS notes_generated_at TIMESTAMP`, 'sessions.notes_generated_at');
+  await run(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS notes_error TEXT`, 'sessions.notes_error');
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS session_notes (
+      id                      SERIAL PRIMARY KEY,
+      session_id              INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+      status                  VARCHAR(20) NOT NULL DEFAULT 'generating',
+      notes_url               TEXT,
+      storage_path            TEXT,
+      transcript_length       INTEGER,
+      resource_count          INTEGER,
+      generation_started_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      generation_completed_at TIMESTAMP,
+      error_message           TEXT
+    )
+  `, 'session_notes');
+  await run(`CREATE INDEX IF NOT EXISTS idx_session_notes_session_id ON session_notes(session_id)`, 'idx_session_notes_session_id');
+
+  // Migration 009b – Gamification Revamp: XP, session-scoped streaks, summaries
+  await run(`
+    CREATE TABLE IF NOT EXISTS student_xp (
+      id SERIAL PRIMARY KEY,
+      student_id VARCHAR(50) NOT NULL,
+      xp_amount INTEGER NOT NULL,
+      xp_type VARCHAR(50) NOT NULL,
+      session_id INTEGER REFERENCES sessions(id) ON DELETE SET NULL,
+      earned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT unique_session_xp UNIQUE (student_id, session_id, xp_type)
+    )
+  `, 'student_xp');
+  await run(`CREATE INDEX IF NOT EXISTS idx_student_xp_student ON student_xp(student_id)`, 'idx_student_xp_student');
+  await run(`CREATE INDEX IF NOT EXISTS idx_student_xp_session ON student_xp(session_id)`, 'idx_student_xp_session');
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS session_streaks (
+      id SERIAL PRIMARY KEY,
+      student_id VARCHAR(50) NOT NULL,
+      session_id INTEGER REFERENCES sessions(id) ON DELETE CASCADE,
+      current_streak INTEGER DEFAULT 0,
+      max_streak INTEGER DEFAULT 0,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT unique_session_streak UNIQUE (student_id, session_id)
+    )
+  `, 'session_streaks');
+  await run(`CREATE INDEX IF NOT EXISTS idx_session_streaks_student_session ON session_streaks(student_id, session_id)`, 'idx_session_streaks_student_session');
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS session_summaries (
+      id SERIAL PRIMARY KEY,
+      student_id VARCHAR(50) NOT NULL,
+      session_id INTEGER REFERENCES sessions(id) ON DELETE CASCADE,
+      rank INTEGER,
+      total_participants INTEGER,
+      accuracy DECIMAL(5,2),
+      points_earned INTEGER DEFAULT 0,
+      xp_gained INTEGER DEFAULT 0,
+      badges_earned TEXT[] DEFAULT '{}',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT unique_session_summary UNIQUE (student_id, session_id)
+    )
+  `, 'session_summaries');
+  await run(`CREATE INDEX IF NOT EXISTS idx_session_summaries_student ON session_summaries(student_id)`, 'idx_session_summaries_student');
+  await run(`CREATE INDEX IF NOT EXISTS idx_session_summaries_session ON session_summaries(session_id)`, 'idx_session_summaries_session');
+
+  await run(`ALTER TABLE polls ADD COLUMN IF NOT EXISTS difficulty INTEGER DEFAULT 1`, 'polls.difficulty');
+  await run(`ALTER TABLE student_badges ADD COLUMN IF NOT EXISTS badge_tier VARCHAR(10) DEFAULT 'bronze'`, 'student_badges.badge_tier');
+  await run(`ALTER TABLE student_badges ADD COLUMN IF NOT EXISTS badge_category VARCHAR(50)`, 'student_badges.badge_category');
+  await run(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS leaderboard_visible BOOLEAN DEFAULT false`, 'sessions.leaderboard_visible');
+  await run(`
+    CREATE UNIQUE INDEX IF NOT EXISTS unique_session_level_points
+      ON student_points(student_id, session_id, point_type) WHERE poll_id IS NULL
+  `, 'unique_session_level_points');
+
+  // Migration 010 – Knowledge Cards: interactive Q&A card activity
+  await run(`
+    CREATE TABLE IF NOT EXISTS knowledge_card_rounds (
+      id SERIAL PRIMARY KEY,
+      session_id INTEGER REFERENCES sessions(id) ON DELETE CASCADE,
+      teacher_id VARCHAR(50) NOT NULL,
+      status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'distributed', 'active', 'completed')),
+      total_pairs INTEGER DEFAULT 0,
+      topic VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `, 'knowledge_card_rounds');
+  await run(`CREATE INDEX IF NOT EXISTS idx_kc_rounds_session ON knowledge_card_rounds(session_id)`, 'idx_kc_rounds_session');
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS knowledge_card_pairs (
+      id SERIAL PRIMARY KEY,
+      round_id INTEGER REFERENCES knowledge_card_rounds(id) ON DELETE CASCADE,
+      question_text TEXT NOT NULL,
+      answer_text TEXT NOT NULL,
+      difficulty INTEGER DEFAULT 1 CHECK (difficulty BETWEEN 1 AND 3),
+      status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'revealed', 'completed', 'skipped')),
+      question_holder_id VARCHAR(50),
+      answer_holder_id VARCHAR(50),
+      order_index INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `, 'knowledge_card_pairs');
+  await run(`CREATE INDEX IF NOT EXISTS idx_kc_pairs_round ON knowledge_card_pairs(round_id)`, 'idx_kc_pairs_round');
+  await run(`CREATE INDEX IF NOT EXISTS idx_kc_pairs_question_holder ON knowledge_card_pairs(question_holder_id)`, 'idx_kc_pairs_question_holder');
+  await run(`CREATE INDEX IF NOT EXISTS idx_kc_pairs_answer_holder ON knowledge_card_pairs(answer_holder_id)`, 'idx_kc_pairs_answer_holder');
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS knowledge_card_votes (
+      id SERIAL PRIMARY KEY,
+      pair_id INTEGER REFERENCES knowledge_card_pairs(id) ON DELETE CASCADE,
+      student_id VARCHAR(50) NOT NULL,
+      vote VARCHAR(10) NOT NULL CHECK (vote IN ('up', 'down')),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT unique_kc_vote UNIQUE (pair_id, student_id)
+    )
+  `, 'knowledge_card_votes');
+  await run(`CREATE INDEX IF NOT EXISTS idx_kc_votes_pair ON knowledge_card_votes(pair_id)`, 'idx_kc_votes_pair');
+
+  // Migration: add difficulty column to generated_mcqs (1=easy, 2=medium, 3=hard)
+  await run(`ALTER TABLE generated_mcqs ADD COLUMN IF NOT EXISTS difficulty SMALLINT DEFAULT 1`, 'generated_mcqs.difficulty');
+
+  // Initialize cache service
+  const cacheService = require('../services/cacheService');
+  await cacheService.init().catch(err => logger.warn('Cache service init failed (non-fatal)', { error: err.message }));
+
+  client.release();
+  logger.info('Auto-migration complete');
+}
+
+module.exports = { runAutoMigrations };
