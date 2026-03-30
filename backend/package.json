@@ -26,7 +26,6 @@
     "@pinecone-database/pinecone": "^5.1.2",
     "@supabase/supabase-js": "^2.93.3",
     "axios": "^1.13.4",
-    "bcryptjs": "^3.0.2",
     "bullmq": "^5.71.1",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
