@@ -31,3 +31,5 @@ Thumbs.db
 
 # Misc
 .cache/
+.vercel
+.env*.local
