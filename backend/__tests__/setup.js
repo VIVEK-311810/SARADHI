@@ -5,6 +5,14 @@
  * at the module level so all route files get the mocked version.
  */
 
+// Mock Redis so tests never attempt a real connection
+jest.mock('../redis', () => ({
+  redis: null,
+  redisPub: null,
+  redisSub: null,
+  isRedisAvailable: () => false,
+}));
+
 // Mock pg module before anything imports it
 const mockQuery = jest.fn();
 const mockConnect = jest.fn();
@@ -21,6 +29,7 @@ const mockPool = {
   query: mockQuery,
   connect: mockConnect,
   end: jest.fn(),
+  on: jest.fn(),
 };
 
 jest.mock('pg', () => ({
@@ -93,22 +102,6 @@ jest.mock('../services/vectorStore', () => ({
   upsertVectors: jest.fn().mockResolvedValue(1),
   searchSimilar: jest.fn().mockResolvedValue([]),
   deleteResource: jest.fn().mockResolvedValue(),
-}));
-
-// Mock Cloudinary
-jest.mock('cloudinary', () => ({
-  v2: {
-    config: jest.fn(),
-    uploader: {
-      upload: jest.fn().mockResolvedValue({ secure_url: 'http://test.com/file' }),
-      destroy: jest.fn().mockResolvedValue({ result: 'ok' }),
-    },
-  },
-}));
-
-// Mock multer-storage-cloudinary
-jest.mock('multer-storage-cloudinary', () => ({
-  CloudinaryStorage: jest.fn().mockImplementation(() => ({})),
 }));
 
 // Set environment variables for testing

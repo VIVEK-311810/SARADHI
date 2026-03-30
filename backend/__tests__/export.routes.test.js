@@ -147,6 +147,7 @@ describe('Export Routes - /api/export', () => {
         .mockResolvedValueOnce({ rows: [teacher] })
         .mockResolvedValueOnce({ rows: [session] })
         .mockResolvedValueOnce({ rows: [{ full_name: 'Student A', email: 'a@sastra.ac.in', joined_at: new Date() }] })
+        .mockResolvedValueOnce({ rows: [] })  // gamification leaderboard query
         .mockResolvedValueOnce({ rows: [{ question: 'Q1?', options: ['A', 'B'], correct_answer: 0, response_count: '10', correct_count: '8' }] });
 
       const res = await request(app)

@@ -89,8 +89,9 @@ describe('Analytics Routes - /api/analytics', () => {
       ];
 
       mockQuery
-        .mockResolvedValueOnce({ rows: [teacher] })
-        .mockResolvedValueOnce({ rows: sessionsData });
+        .mockResolvedValueOnce({ rows: [teacher] })             // authenticate
+        .mockResolvedValueOnce({ rows: sessionsData })           // main sessions query (Promise.all[0])
+        .mockResolvedValueOnce({ rows: [{ total: '1' }] });     // count query (Promise.all[1])
 
       const res = await request(app)
         .get(`/api/analytics/teacher/${teacher.id}/sessions`)

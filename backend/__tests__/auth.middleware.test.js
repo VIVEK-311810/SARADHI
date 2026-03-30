@@ -120,7 +120,7 @@ describe('Auth Middleware', () => {
       await authenticate(req, res, next);
 
       expect(mockQuery).toHaveBeenCalledWith(
-        'SELECT * FROM users WHERE id = $1',
+        'SELECT id, email, role, full_name, created_at FROM users WHERE id = $1',
         [teacher.id]
       );
     });
