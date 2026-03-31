@@ -2,6 +2,12 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ExportButtons from '../components/teacher/ExportButtons';
 
+jest.mock('sonner', () => ({
+  toast: { error: jest.fn(), success: jest.fn() },
+}));
+
+import { toast } from 'sonner';
+
 // Mock URL.createObjectURL and revokeObjectURL
 global.URL.createObjectURL = jest.fn(() => 'blob:http://localhost/mock-blob');
 global.URL.revokeObjectURL = jest.fn();
@@ -45,7 +51,7 @@ describe('ExportButtons', () => {
       fireEvent.click(screen.getByText('CSV'));
 
       await waitFor(() => {
-        expect(window.alert).toHaveBeenCalledWith('Failed to export. Please try again.');
+        expect(toast.error).toHaveBeenCalledWith('Failed to export. Please try again.');
       });
     });
   });
@@ -53,9 +59,9 @@ describe('ExportButtons', () => {
   describe('type="session"', () => {
     it('should render CSV and PDF buttons', () => {
       render(<ExportButtons type="session" sessionId="ABC123" />);
-      // The buttons contain "CSV" and "PDF" text
-      expect(screen.getByText(/CSV/)).toBeInTheDocument();
-      expect(screen.getByText(/PDF/)).toBeInTheDocument();
+      // Multiple CSV buttons and one PDF button exist
+      expect(screen.getAllByText(/CSV/).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/PDF/).length).toBeGreaterThan(0);
     });
 
     it('should call session CSV export', async () => {
@@ -65,7 +71,7 @@ describe('ExportButtons', () => {
       });
 
       render(<ExportButtons type="session" sessionId="ABC123" />);
-      const csvButton = screen.getByTitle('Export all responses to CSV');
+      const csvButton = screen.getByTitle('Export all poll responses to CSV');
       fireEvent.click(csvButton);
 
       await waitFor(() => {
@@ -83,7 +89,7 @@ describe('ExportButtons', () => {
       });
 
       render(<ExportButtons type="session" sessionId="ABC123" />);
-      const pdfButton = screen.getByTitle('Export session report as PDF');
+      const pdfButton = screen.getByTitle('Export session report as PDF (includes gamification leaderboard)');
       fireEvent.click(pdfButton);
 
       await waitFor(() => {

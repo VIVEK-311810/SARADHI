@@ -4,25 +4,8 @@ import '@testing-library/jest-dom';
 process.env.REACT_APP_API_URL = 'http://localhost:3001/api';
 process.env.REACT_APP_AUTH_URL = 'http://localhost:3001';
 
-// Mock localStorage using a simple backing store
+// localStorage backing store
 let localStore = {};
-
-const localStorageMock = {
-  getItem: jest.fn((key) => {
-    return localStore[key] !== undefined ? localStore[key] : null;
-  }),
-  setItem: jest.fn((key, value) => {
-    localStore[key] = String(value);
-  }),
-  removeItem: jest.fn((key) => {
-    delete localStore[key];
-  }),
-  clear: jest.fn(() => {
-    localStore = {};
-  }),
-};
-
-Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 
 // Mock window.location
 delete window.location;
@@ -34,19 +17,20 @@ window.alert = jest.fn();
 // Mock fetch globally
 global.fetch = jest.fn();
 
-// Reset between tests - only clear call history, not implementations
+// Spy on Storage.prototype before each test (works reliably across all jsdom versions)
 beforeEach(() => {
-  // Clear localStorage store
   localStore = {};
-  // Clear mock call history (but NOT implementations)
-  localStorage.getItem.mockClear();
-  localStorage.setItem.mockClear();
-  localStorage.removeItem.mockClear();
-  localStorage.clear.mockClear();
-  // Reset fetch
+  jest.spyOn(Storage.prototype, 'getItem').mockImplementation((key) => localStore[key] ?? null);
+  jest.spyOn(Storage.prototype, 'setItem').mockImplementation((key, value) => { localStore[key] = String(value); });
+  jest.spyOn(Storage.prototype, 'removeItem').mockImplementation((key) => { delete localStore[key]; });
+  jest.spyOn(Storage.prototype, 'clear').mockImplementation(() => { localStore = {}; });
   global.fetch.mockReset();
   window.alert.mockClear();
   window.location.href = '';
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 // Suppress noisy console output in tests

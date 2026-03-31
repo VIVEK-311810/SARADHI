@@ -116,7 +116,7 @@ describe('JoinSession', () => {
     fireEvent.submit(screen.getByText('Join Session').closest('form'));
 
     await waitFor(() => {
-      expect(screen.getByText(/unable to join session/i)).toBeInTheDocument();
+      expect(screen.getByText(/failed to join session/i)).toBeInTheDocument();
     });
   });
 

@@ -25,7 +25,7 @@ describe('Header', () => {
 
   it('should render the platform name', () => {
     renderHeader('/auth');
-    expect(screen.getByText('EduPlatform')).toBeInTheDocument();
+    expect(screen.getByText('SARADHI-AI')).toBeInTheDocument();
   });
 
   it('should not show navigation buttons on auth page', () => {

@@ -349,7 +349,7 @@ export const utils = {
 
   // Format file size for display
   formatFileSize: (bytes) => {
-    if (!bytes) return 'N/A';
+    if (bytes == null) return 'N/A';
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     if (bytes === 0) return '0 Bytes';
     const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));

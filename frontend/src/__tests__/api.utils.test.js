@@ -94,7 +94,7 @@ describe('API Utilities', () => {
         status: 403,
       });
 
-      await expect(apiRequest('/test')).rejects.toThrow('Access denied');
+      await expect(apiRequest('/test')).rejects.toThrow('You do not have permission');
     });
 
     it('should throw on other HTTP errors', async () => {
@@ -103,7 +103,7 @@ describe('API Utilities', () => {
         status: 500,
       });
 
-      await expect(apiRequest('/test')).rejects.toThrow('HTTP error! status: 500');
+      await expect(apiRequest('/test')).rejects.toThrow('Server error');
     });
 
     it('should throw on network failure', async () => {
