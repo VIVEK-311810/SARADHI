@@ -45,6 +45,8 @@ const VisitSession             = lazy(() => import('./components/student/VisitSe
 const AIResourceSearch         = lazy(() => import('./components/student/AIResourceSearch'));
 const Leaderboard              = lazy(() => import('./components/student/Leaderboard'));
 const Quiz                     = lazy(() => import('./components/student/Quiz'));
+const CompetitionLobby         = lazy(() => import('./components/student/CompetitionLobby'));
+const CompetitionRoom          = lazy(() => import('./components/student/CompetitionRoom'));
 
 // Community Components
 const CommunityBoard = lazy(() => import('./components/community/CommunityBoard'));
@@ -121,6 +123,8 @@ function StudentRoutes() {
           <Route path="/student/session/:sessionId/quiz"       element={<Quiz />} />
           <Route path="/student/leaderboard"                   element={<Leaderboard />} />
           <Route path="/student/leaderboard/:sessionId"        element={<Leaderboard />} />
+          <Route path="/student/competition"                   element={<CompetitionLobby />} />
+          <Route path="/student/competition/room/:roomCode"    element={<CompetitionRoom />} />
           <Route path="/community"                             element={<CommunityBoard />} />
           <Route path="/community/session/:sessionId"          element={<CommunityBoard />} />
           <Route path="/community/tickets/:ticketId"           element={<TicketDetail />} />

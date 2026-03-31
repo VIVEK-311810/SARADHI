@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiRequest } from '../../utils/api';
+import Leaderboard from './Leaderboard';
 
 const Quiz = () => {
   const { sessionId } = useParams();
@@ -212,6 +213,7 @@ const Quiz = () => {
           <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-3">Review Answers</h2>
           <div className="space-y-3 sm:space-y-4">
             {answers.map((a, qi) => (
+
               <div key={qi} className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-sm rounded-xl border border-slate-200/60 dark:border-slate-700/60 p-4 sm:p-5">
                 <div className="flex items-start gap-3 mb-3">
                   <span className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${a.isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
@@ -250,6 +252,28 @@ const Quiz = () => {
                 )}
               </div>
             ))}
+          </div>
+
+          {/* Session Leaderboard */}
+          <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-3 mt-8">
+            How You Stack Up — Session Leaderboard
+          </h2>
+          <Leaderboard sessionId={sessionId} embedded={true} />
+
+          {/* Post-quiz navigation */}
+          <div className="flex flex-col sm:flex-row gap-3 mt-6">
+            <button
+              onClick={handleRetry}
+              className="flex-1 py-2.5 px-6 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 active:bg-primary-800 transition-colors text-sm sm:text-base"
+            >
+              Retake Quiz
+            </button>
+            <button
+              onClick={() => navigate('/student/dashboard')}
+              className="flex-1 py-2.5 px-6 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-sm sm:text-base"
+            >
+              Back to Dashboard
+            </button>
           </div>
         </div>
       </div>

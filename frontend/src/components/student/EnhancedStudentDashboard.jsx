@@ -323,6 +323,13 @@ const EnhancedStudentDashboard = () => {
                     <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 font-mono">{session.session_id} · {session.teacher_name}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => navigate(`/student/competition?session=${session.session_id}`)}
+                      className="bg-coral-500 hover:bg-coral-600 active:bg-coral-700 text-white"
+                    >
+                      ⚔ Compete
+                    </Button>
                     {session.is_live && (
                       <Button
                         size="sm"

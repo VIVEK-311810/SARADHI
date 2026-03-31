@@ -90,9 +90,10 @@ const getRankIcon = (rank) => {
   return `#${rank}`;
 };
 
-const Leaderboard = () => {
+const Leaderboard = ({ embedded = false, sessionId: sessionIdProp } = {}) => {
   const navigate = useNavigate();
-  const { sessionId } = useParams();
+  const { sessionId: paramSessionId } = useParams();
+  const sessionId = sessionIdProp || paramSessionId;
   const currentUser = utils.getCurrentUser();
 
   const [leaderboard, setLeaderboard] = useState([]);
@@ -103,7 +104,7 @@ const Leaderboard = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!currentUser || currentUser.role !== 'student') {
+    if (!embedded && (!currentUser || currentUser.role !== 'student')) {
       navigate('/auth');
       return;
     }
@@ -145,7 +146,7 @@ const Leaderboard = () => {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-4">
+      <div className={embedded ? 'space-y-4' : 'max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-4'}>
         <StatCardsSkeleton count={4} />
         <LeaderboardSkeleton rows={8} />
       </div>
@@ -153,6 +154,83 @@ const Leaderboard = () => {
   }
 
   const levelInfo = myXP?.level || myStats?.level;
+
+  // ── Embedded mode: only My Stats + table, no outer chrome ────────────────
+  if (embedded) {
+    return (
+      <div className="space-y-4">
+        {myStats && (
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-card border border-slate-200/80 dark:border-slate-700/80 p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100">Your Stats</h2>
+              {levelInfo && <LevelBadge level={levelInfo.level} title={levelInfo.title} />}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+              <div className="text-center p-3 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
+                <p className="text-2xl sm:text-3xl font-bold text-primary-600 dark:text-primary-400">{myXP?.totalXP || 0}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400">Total XP</p>
+              </div>
+              <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                <p className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400">#{myStats.rank}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400">Your Rank</p>
+              </div>
+              <div className="text-center p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
+                <p className="text-2xl sm:text-3xl font-bold text-teal-600 dark:text-teal-400">{myStats.totalPoints || 0}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400">Session Pts</p>
+              </div>
+              <div className="text-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                <p className="text-2xl sm:text-3xl font-bold text-orange-600 dark:text-orange-400">{myStats.totalStudents || 1}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400">Students</p>
+              </div>
+            </div>
+          </div>
+        )}
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm text-center">{error}</div>
+        )}
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-card border border-slate-200/80 dark:border-slate-700/80 overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Session Rankings</h3>
+          </div>
+          {leaderboard.length > 0 ? (
+            <div className="divide-y divide-slate-100 dark:divide-slate-700">
+              {leaderboard.map((entry) => {
+                const isMe = String(entry.studentId) === String(currentUser?.id);
+                return (
+                  <div
+                    key={entry.studentId}
+                    className={`flex items-center p-3 sm:p-4 transition-colors duration-150 ${
+                      isMe ? 'bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold border-2 text-xs flex-shrink-0 ${getRankStyle(entry.rank)}`}>
+                      {getRankIcon(entry.rank)}
+                    </div>
+                    <div className="ml-3 flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-slate-900 dark:text-slate-100 text-sm truncate">{entry.studentName}</p>
+                        {isMe && <span className="text-xs bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-400 px-1.5 py-0.5 rounded-full">You</span>}
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{entry.correctAnswers || 0}/{entry.totalAnswers || 0} correct</p>
+                    </div>
+                    <div className="text-right flex-shrink-0 ml-2">
+                      <p className="text-lg font-bold text-primary-600 dark:text-primary-400">{entry.points || 0}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">pts</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-8 text-center text-slate-500 dark:text-slate-400">
+              <p className="text-3xl mb-3">&#127942;</p>
+              <p className="text-sm">No rankings yet for this session.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
