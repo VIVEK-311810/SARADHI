@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { CheckCircle2, XCircle, Circle } from 'lucide-react';
 import { toast } from 'sonner';
 import LoadingSpinner from '../shared/LoadingSpinner';
 import { apiRequest, studentAPI, safeParseUser } from '../../utils/api';
@@ -638,47 +637,6 @@ const EnhancedStudentSession = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const getOptionColor = (index) => {
-    // When results are revealed, show correctness via color + border-l-4 shape cue
-    if (showResults) {
-      const isCorrect = parseInt(activePoll.correct_answer) === parseInt(index);
-      const isSelected = selectedOption === index;
-
-      if (isCorrect) {
-        return 'bg-green-100 border-green-500 text-green-900 border-l-4 dark:bg-green-900/20 dark:border-green-500 dark:text-green-100';
-      }
-      if (isSelected && !isCorrect) {
-        return 'bg-red-100 border-red-500 text-red-900 border-l-4 dark:bg-red-900/20 dark:border-red-500 dark:text-red-100';
-      }
-      return 'bg-slate-50 border-slate-300 text-slate-600 dark:bg-slate-700/50 dark:border-slate-600 dark:text-slate-400';
-    }
-
-    // Before results are revealed
-    return selectedOption === index
-      ? 'bg-primary-100 border-primary-500 text-primary-900 border-l-4 dark:bg-primary-900/30 dark:border-primary-400 dark:text-primary-100'
-      : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700';
-  };
-
-  // Returns an icon providing a shape-based cue alongside the color cue (colour-blind accessible)
-  const getOptionIcon = (index) => {
-    if (showResults) {
-      const isCorrect = parseInt(activePoll.correct_answer) === parseInt(index);
-      const isSelected = selectedOption === index;
-
-      if (isCorrect) {
-        return <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-green-600 dark:text-green-400" />;
-      }
-      if (isSelected && !isCorrect) {
-        return <XCircle className="w-5 h-5 flex-shrink-0 text-red-600 dark:text-red-400" />;
-      }
-      return null;
-    }
-    // Pre-reveal: filled circle if selected, hollow if not
-    if (selectedOption === index) {
-      return <Circle className="w-4 h-4 flex-shrink-0 fill-blue-500 text-primary-500 dark:fill-blue-400 dark:text-primary-400" />;
-    }
-    return <Circle className="w-4 h-4 flex-shrink-0 text-slate-300 dark:text-slate-600" />;
-  };
 
   if (loading) {
     return <LoadingSpinner text="Joining session..." />;
