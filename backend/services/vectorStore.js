@@ -24,6 +24,7 @@ class VectorStore {
           // Pinecone rejects null — use empty string / 0 as sentinels
           page_number: chunk.pageNumber ?? 0,
           section_title: chunk.sectionTitle || '',
+          content_type: chunk.contentType || 'text',
           // Denormalized fields — eliminates N+1 lookups during search
           resource_title: resourceMeta.title || '',
           file_name: resourceMeta.fileName || '',
@@ -47,6 +48,7 @@ class VectorStore {
         token_count: chunk.tokenCount,
         page_number: chunk.pageNumber || null,
         section_title: chunk.sectionTitle || null,
+        content_type: chunk.contentType || 'text',
         pinecone_vector_id: `${resourceId}_chunk_${i}`
       }));
 
@@ -97,6 +99,7 @@ class VectorStore {
         resource_title: match.metadata.resource_title || null,
         file_name: match.metadata.file_name || null,
         resource_type: match.metadata.resource_type || null,
+        content_type: match.metadata.content_type || 'text',
       }));
     } catch (error) {
       logger.error('Error searching vectors', { error: error.message });

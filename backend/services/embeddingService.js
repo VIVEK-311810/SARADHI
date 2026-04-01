@@ -107,34 +107,50 @@ class EmbeddingService {
     }
   }
 
+  /**
+   * Word-based chunking that treats LaTeX blocks ($$...$$, \begin...\end) and
+   * code fences (```...```) as atomic tokens — they are never split across chunks.
+   */
   chunkText(text, maxTokens = 512, overlap = 50) {
     if (!text || text.trim().length === 0) {
       return [];
     }
 
-    // Simple word-based chunking (approximate tokens)
-    // 1 token ≈ 0.75 words (English average)
+    // Step 1: extract atomic blocks (equations + code fences) and replace with
+    //         single placeholder "words" so the word-splitter keeps them intact.
+    const atomics = [];
+    const ATOM = '\x00ATOM\x00';
+
+    const safe = text
+      .replace(/\$\$[\s\S]+?\$\$/g, m => { atomics.push(m); return `${ATOM}${atomics.length - 1}${ATOM}`; })
+      .replace(/\\begin\{[^}]+\}[\s\S]+?\\end\{[^}]+\}/g, m => { atomics.push(m); return `${ATOM}${atomics.length - 1}${ATOM}`; })
+      .replace(/```[\s\S]*?```/g, m => { atomics.push(m); return `${ATOM}${atomics.length - 1}${ATOM}`; });
+
+    // Step 2: standard word-based chunking on the placeholder text
     const maxWords = Math.floor(maxTokens * 0.75);
     const overlapWords = Math.floor(overlap * 0.75);
-
-    const words = text.split(/\s+/).filter(word => word.length > 0);
+    const words = safe.split(/\s+/).filter(w => w.length > 0);
     const chunks = [];
 
     let i = 0;
     while (i < words.length) {
       const chunkWords = words.slice(i, i + maxWords);
-      const chunk = chunkWords.join(' ');
+      // Step 3: restore atomic blocks in each chunk
+      const restored = chunkWords.join(' ').replace(
+        new RegExp(`${ATOM}(\\d+)${ATOM}`, 'g'),
+        (_, idx) => atomics[parseInt(idx)] || ''
+      );
 
-      if (chunk.trim().length > 0) {
+      if (restored.trim().length > 0) {
         chunks.push({
-          text: chunk,
+          text: restored,
           startIndex: i,
           endIndex: Math.min(i + maxWords, words.length),
-          tokenCount: this.estimateTokens(chunk)
+          tokenCount: this.estimateTokens(restored),
         });
       }
 
-      i += maxWords - overlapWords; // Move forward with overlap
+      i += maxWords - overlapWords;
     }
 
     return chunks;

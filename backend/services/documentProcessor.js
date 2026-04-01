@@ -193,6 +193,7 @@ class DocumentProcessor {
           sectionTitle: currentSection,
           chunkIndex: chunks.length,
           tokenCount: this.estimateTokens(chunkText),
+          contentType: this.detectContentType(chunkText),
         });
 
         // Keep overlap: take the last paragraph(s) that fit within overlapTokens
@@ -220,6 +221,7 @@ class DocumentProcessor {
             sectionTitle: currentSection,
             chunkIndex: chunks.length,
             tokenCount: this.estimateTokens(sentChunk),
+            contentType: this.detectContentType(sentChunk),
           });
         }
         currentChunk = [];
@@ -240,6 +242,7 @@ class DocumentProcessor {
         sectionTitle: currentSection,
         chunkIndex: chunks.length,
         tokenCount: this.estimateTokens(chunkText),
+        contentType: this.detectContentType(chunkText),
       });
     }
 
@@ -249,16 +252,78 @@ class DocumentProcessor {
   }
 
   /**
-   * Split text into paragraphs based on double newlines, headings, and other natural boundaries
+   * Classify a chunk's dominant content type.
+   * Returns 'equation' | 'code' | 'table' | 'text'
+   */
+  detectContentType(text) {
+    const t = text.trim();
+
+    // Display math blocks: $$...$$ or \begin{equation}...\end{equation}
+    if (/\$\$[\s\S]+?\$\$/.test(t)) return 'equation';
+    if (/\\begin\{(equation|align|gather|math|displaymath|multline)\*?\}/.test(t)) return 'equation';
+
+    // Code fences: ```...``` or 4-space indented blocks
+    if (/^```[\s\S]*```$/m.test(t)) return 'code';
+    if (/^(    |\t)/.test(t) && t.split('\n').filter(l => l.trim()).every(l => /^(    |\t)/.test(l))) {
+      return 'code';
+    }
+
+    // Markdown / ASCII tables: lines with multiple | characters
+    const lines = t.split('\n').filter(l => l.trim());
+    const tableLines = lines.filter(l => (l.match(/\|/g) || []).length >= 2);
+    if (tableLines.length >= 2 && tableLines.length / lines.length > 0.5) return 'table';
+
+    // Heavily equation-rich text: many LaTeX commands
+    const latexCommands = (t.match(/\\[a-zA-Z]+/g) || []).length;
+    const inlineMath = (t.match(/\$[^$\n]{1,80}\$/g) || []).length;
+    if (latexCommands + inlineMath * 2 > 5) return 'equation';
+
+    return 'text';
+  }
+
+  /**
+   * Split text into paragraphs, treating LaTeX blocks and code fences as atomic units
+   * so they are never split mid-equation or mid-block.
    */
   splitIntoParagraphs(text) {
-    // Split on double newlines, keeping heading detection possible
-    const rawParagraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+    // Replace display math blocks ($$...$$) and code fences (```...```) with
+    // single-paragraph placeholders so the double-newline split doesn't break them.
+    // We then re-expand after splitting.
 
-    return rawParagraphs.map(p => ({
-      text: p.trim(),
-      isHeading: this.isSectionHeading(p),
-    }));
+    const atomics = [];
+    const PLACEHOLDER = '\x00ATOMIC\x00';
+
+    // Order matters: longer/outer patterns first (display math before inline)
+    const protectedText = text
+      // display math: $$...$$ (may span multiple lines)
+      .replace(/\$\$[\s\S]+?\$\$/g, match => {
+        atomics.push(match);
+        return `\n\n${PLACEHOLDER}${atomics.length - 1}\n\n`;
+      })
+      // LaTeX environments: \begin{...}...\end{...}
+      .replace(/\\begin\{[^}]+\}[\s\S]+?\\end\{[^}]+\}/g, match => {
+        atomics.push(match);
+        return `\n\n${PLACEHOLDER}${atomics.length - 1}\n\n`;
+      })
+      // code fences: ```...```
+      .replace(/```[\s\S]*?```/g, match => {
+        atomics.push(match);
+        return `\n\n${PLACEHOLDER}${atomics.length - 1}\n\n`;
+      });
+
+    const rawParagraphs = protectedText.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+
+    return rawParagraphs.map(p => {
+      // Re-expand atomics
+      let expanded = p.trim().replace(
+        new RegExp(`${PLACEHOLDER}(\\d+)`, 'g'),
+        (_, idx) => atomics[parseInt(idx)] || ''
+      );
+      return {
+        text: expanded,
+        isHeading: this.isSectionHeading(expanded),
+      };
+    });
   }
 
   /**
@@ -283,10 +348,23 @@ class DocumentProcessor {
   }
 
   /**
-   * Split a large paragraph by sentences to fit within maxTokens
+   * Split a large paragraph by sentences to fit within maxTokens.
+   * Inline math ($...$) is treated as an atomic unit — sentence splitting
+   * never breaks in the middle of an equation.
    */
   splitLargeParagraph(text, maxTokens) {
-    const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+    // Temporarily replace inline math with placeholders so ". " inside $...$ isn't
+    // treated as a sentence boundary (e.g. "F = ma. where a = 9.81 m/s²")
+    const inlineMaths = [];
+    const safe = text.replace(/\$[^$\n]{1,200}\$/g, match => {
+      inlineMaths.push(match);
+      return `\x00M${inlineMaths.length - 1}\x00`;
+    });
+    const rawSentences = safe.match(/[^.!?]+[.!?]+/g) || [safe];
+    // Restore inline math in each sentence
+    const sentences = rawSentences.map(s =>
+      s.replace(/\x00M(\d+)\x00/g, (_, i) => inlineMaths[parseInt(i)] || '')
+    );
     const chunks = [];
     let current = [];
     let currentTokens = 0;

@@ -152,7 +152,20 @@ class RAGService {
       .map((chunk, idx) => {
         const source = chunk.resource_title || chunk.file_name || 'Unknown';
         const page = chunk.pageNumber ? ` (Page ${chunk.pageNumber})` : '';
-        return `[Source ${idx + 1}: ${source}${page}]\n${chunk.text}`;
+        const typeTag = chunk.content_type && chunk.content_type !== 'text'
+          ? ` [${chunk.content_type.toUpperCase()}]`
+          : '';
+        const header = `[Source ${idx + 1}: ${source}${page}${typeTag}]`;
+
+        // Wrap equations in a block fence so Mistral preserves the LaTeX
+        if (chunk.content_type === 'equation') {
+          return `${header}\n${chunk.text}`;
+        }
+        // Wrap code blocks in markdown fences if not already fenced
+        if (chunk.content_type === 'code' && !chunk.text.trim().startsWith('```')) {
+          return `${header}\n\`\`\`\n${chunk.text}\n\`\`\``;
+        }
+        return `${header}\n${chunk.text}`;
       })
       .join('\n\n---\n\n');
   }
