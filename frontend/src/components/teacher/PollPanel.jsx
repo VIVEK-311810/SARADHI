@@ -5,12 +5,19 @@ import LatexRenderer from '../shared/LatexRenderer';
 import SolutionStepsBuilder from './SolutionStepsBuilder';
 
 const QUESTION_TYPES = [
-  { id: 'mcq',          label: 'MCQ',         icon: '⊙', desc: 'Multiple choice, one correct' },
-  { id: 'true_false',   label: 'True/False',  icon: '⊤', desc: 'True or False answer' },
-  { id: 'fill_blank',   label: 'Fill Blank',  icon: '▭', desc: 'Type the missing word' },
-  { id: 'numeric',      label: 'Numeric',     icon: '#', desc: 'Numerical answer with tolerance' },
-  { id: 'short_answer', label: 'Short Ans',   icon: '✎', desc: 'Free text, teacher grades' },
-  { id: 'code',         label: 'Code',        icon: '</>', desc: 'Code block + MCQ/fill answer' },
+  // Phase 1
+  { id: 'mcq',            label: 'MCQ',          icon: '⊙',  desc: 'Multiple choice, one correct' },
+  { id: 'true_false',     label: 'True/False',   icon: '⊤',  desc: 'True or False answer' },
+  { id: 'fill_blank',     label: 'Fill Blank',   icon: '▭',  desc: 'Type the missing word' },
+  { id: 'numeric',        label: 'Numeric',      icon: '#',  desc: 'Numerical answer with tolerance' },
+  { id: 'short_answer',   label: 'Short Ans',    icon: '✎',  desc: 'Free text, teacher grades' },
+  { id: 'code',           label: 'Code',         icon: '</>', desc: 'Code block + MCQ/fill answer' },
+  // Phase 2
+  { id: 'multi_correct',    label: 'Multi ✓',     icon: '☑',  desc: 'Multiple correct options (JEE/NEET style)' },
+  { id: 'one_word',         label: 'One Word',    icon: 'W',  desc: 'Single word answer' },
+  { id: 'assertion_reason', label: 'A & R',       icon: 'AR', desc: 'Assertion-Reason (4 fixed options)' },
+  { id: 'match_following',  label: 'Match',       icon: '⇌',  desc: 'Match the Following' },
+  { id: 'ordering',         label: 'Order',       icon: '↕',  desc: 'Arrange in correct sequence' },
 ];
 
 const SUBJECTS = [
@@ -51,6 +58,23 @@ const emptyPoll = {
   codeBlock: '',
   codeLanguage: 'python',
   codeMode: 'mcq',
+  // Multi-correct (Phase 2)
+  correctOptions: [],
+  markingScheme: 'all_or_nothing',
+  // Assertion-Reason (Phase 2)
+  assertion: '',
+  reason: '',
+  arCorrectAnswer: 0,
+  // Match the Following (Phase 2)
+  leftItems: ['', ''],
+  rightItems: ['', ''],
+  correctPairs: {},
+  // Ordering (Phase 2)
+  orderItems: ['', '', ''],
+  correctOrder: [],
+  // Negative marking (Phase 2)
+  negativeMarking: false,
+  negativeValue: 0.25,
   // Meta
   justification: '',
   timeLimit: 60,
@@ -111,6 +135,11 @@ const PollPanel = ({
   };
 
   // ── build payload ──────────────────────────────────────────────────────────
+  const negMeta = (extra = {}) =>
+    poll.negativeMarking
+      ? { ...extra, negative_marking: true, negative_value: poll.negativeValue }
+      : extra;
+
   const buildPayload = () => {
     const base = {
       session_id: sessionId,
@@ -133,29 +162,26 @@ const PollPanel = ({
       const filtered = poll.questionType === 'true_false'
         ? ['True', 'False']
         : poll.options.filter(o => o.trim());
-      return { ...base, options: filtered, correct_answer: poll.correctAnswer };
+      return { ...base, options: filtered, correct_answer: poll.correctAnswer,
+        options_metadata: negMeta() };
     }
 
     if (poll.questionType === 'fill_blank') {
       const accepted = poll.acceptedAnswers.filter(a => a.trim());
       return {
-        ...base,
-        options: [],
-        correct_answer: null,
-        options_metadata: { accepted_answers: accepted },
+        ...base, options: [], correct_answer: null,
+        options_metadata: negMeta({ accepted_answers: accepted }),
       };
     }
 
     if (poll.questionType === 'numeric') {
       return {
-        ...base,
-        options: [],
-        correct_answer: null,
-        options_metadata: {
+        ...base, options: [], correct_answer: null,
+        options_metadata: negMeta({
           correct_value: parseFloat(poll.correctValue),
           tolerance: parseFloat(poll.tolerance) || 0,
           unit: poll.unit || null,
-        },
+        }),
       };
     }
 
@@ -166,16 +192,70 @@ const PollPanel = ({
     if (poll.questionType === 'code') {
       const filtered = poll.codeMode === 'mcq' ? poll.options.filter(o => o.trim()) : [];
       return {
-        ...base,
-        options: filtered,
+        ...base, options: filtered,
         correct_answer: poll.codeMode === 'mcq' ? poll.correctAnswer : null,
-        options_metadata: {
+        options_metadata: negMeta({
           code: poll.codeBlock,
           language: poll.codeLanguage,
           code_mode: poll.codeMode,
           accepted_answers: poll.codeMode === 'fill_blank'
             ? poll.acceptedAnswers.filter(a => a.trim())
             : undefined,
+        }),
+      };
+    }
+
+    // ── Phase 2 ───────────────────────────────────────────────────────────────
+
+    if (poll.questionType === 'multi_correct') {
+      const filtered = poll.options.filter(o => o.trim());
+      return {
+        ...base, options: filtered, correct_answer: null,
+        options_metadata: negMeta({
+          correct_options: poll.correctOptions,
+          marking_scheme: poll.markingScheme,
+        }),
+      };
+    }
+
+    if (poll.questionType === 'one_word') {
+      const accepted = poll.acceptedAnswers.filter(a => a.trim());
+      return {
+        ...base, options: [], correct_answer: null,
+        options_metadata: negMeta({ accepted_answers: accepted }),
+      };
+    }
+
+    if (poll.questionType === 'assertion_reason') {
+      return {
+        ...base, options: [], correct_answer: poll.arCorrectAnswer,
+        options_metadata: negMeta({
+          assertion: poll.assertion,
+          reason: poll.reason,
+        }),
+      };
+    }
+
+    if (poll.questionType === 'match_following') {
+      const left = poll.leftItems.filter(i => i.trim());
+      const right = poll.rightItems.filter(i => i.trim());
+      return {
+        ...base, options: [], correct_answer: null,
+        options_metadata: negMeta({
+          left_items: left,
+          right_items: right,
+          correct_pairs: poll.correctPairs,
+        }),
+      };
+    }
+
+    if (poll.questionType === 'ordering') {
+      const items = poll.orderItems.filter(i => i.trim());
+      return {
+        ...base, options: items, correct_answer: null,
+        options_metadata: {
+          items,
+          correct_order: poll.correctOrder.length ? poll.correctOrder : items.map((_, i) => i),
         },
       };
     }
@@ -242,7 +322,7 @@ const PollPanel = ({
           {/* Question type selector */}
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Question Type</label>
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+            <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
               {QUESTION_TYPES.map(qt => (
                 <button
                   key={qt.id}
@@ -255,7 +335,7 @@ const PollPanel = ({
                       : 'border-slate-200 dark:border-slate-600 text-slate-500 hover:border-slate-400'}`}
                 >
                   <span className="text-base">{qt.icon}</span>
-                  <span>{qt.label}</span>
+                  <span className="leading-tight text-center">{qt.label}</span>
                 </button>
               ))}
             </div>
@@ -303,6 +383,39 @@ const PollPanel = ({
                 className="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded
                   bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500" />
             </div>
+          </div>
+
+          {/* Negative marking */}
+          <div className="flex flex-wrap items-center gap-4">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={poll.negativeMarking}
+                onChange={e => set('negativeMarking', e.target.checked)}
+                className="w-4 h-4 rounded text-primary-600"
+              />
+              <span className="text-sm text-slate-700 dark:text-slate-300">Negative marking</span>
+            </label>
+            {poll.negativeMarking && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500">Penalty:</span>
+                {[{v:0.25,l:'−¼ (GATE)'},{v:0.33,l:'−⅓'},{v:1,l:'−1 (JEE/NEET)'}].map(p => (
+                  <button key={p.v} type="button"
+                    onClick={() => set('negativeValue', p.v)}
+                    className={`px-2 py-1 text-xs rounded border transition-colors
+                      ${poll.negativeValue === p.v
+                        ? 'bg-red-100 dark:bg-red-900/30 text-red-700 border-red-400'
+                        : 'border-slate-200 dark:border-slate-600 text-slate-500 hover:border-slate-400'}`}>
+                    {p.l}
+                  </button>
+                ))}
+                <input type="number" step="0.01" min="0" max="10" value={poll.negativeValue}
+                  onChange={e => set('negativeValue', parseFloat(e.target.value) || 0)}
+                  className="w-16 px-2 py-1 text-xs border border-slate-300 dark:border-slate-600 rounded
+                    bg-white dark:bg-slate-700 dark:text-white focus:outline-none"
+                />
+              </div>
+            )}
           </div>
 
           {/* Question text */}
@@ -667,6 +780,259 @@ function AnswerConfig({ poll, set }) {
               className="text-xs text-primary-600 hover:underline">+ Add alternate output</button>
           </div>
         )}
+      </div>
+    );
+  }
+
+  if (qt === 'multi_correct') {
+    return (
+      <div>
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+          Options * <span className="text-xs font-normal text-slate-400">(check all correct)</span>
+        </label>
+        {poll.options.map((opt, i) => (
+          <div key={i} className="flex items-center gap-2 mb-2">
+            <input type="checkbox"
+              checked={poll.correctOptions.includes(i)}
+              onChange={() => {
+                const next = poll.correctOptions.includes(i)
+                  ? poll.correctOptions.filter(x => x !== i)
+                  : [...poll.correctOptions, i];
+                set('correctOptions', next);
+              }}
+              className="w-4 h-4 rounded text-primary-600"
+            />
+            <input type="text" value={opt}
+              onChange={e => { const o = [...poll.options]; o[i] = e.target.value; set('options', o); }}
+              placeholder={`Option ${String.fromCharCode(65 + i)}`}
+              className="flex-1 px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded
+                bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500"
+            />
+          </div>
+        ))}
+        <div className="mt-2">
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Marking Scheme</label>
+          <div className="flex gap-2 flex-wrap">
+            {[
+              {v:'all_or_nothing', l:'All-or-Nothing'},
+              {v:'jee_advanced',   l:'JEE Advanced (+4/−2/0)'},
+              {v:'per_correct',    l:'Per Correct'},
+            ].map(s => (
+              <button key={s.v} type="button" onClick={() => set('markingScheme', s.v)}
+                className={`px-3 py-1 text-xs rounded-lg border-2 transition-colors font-medium
+                  ${poll.markingScheme === s.v
+                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700'
+                    : 'border-slate-200 dark:border-slate-600 text-slate-500 hover:border-slate-400'}`}>
+                {s.l}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (qt === 'one_word') {
+    return (
+      <div>
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+          Accepted Answers <span className="text-xs font-normal text-slate-400">(case-insensitive)</span>
+        </label>
+        {poll.acceptedAnswers.map((ans, i) => (
+          <div key={i} className="flex gap-2 mb-2">
+            <input type="text" value={ans}
+              onChange={e => { const a = [...poll.acceptedAnswers]; a[i] = e.target.value; set('acceptedAnswers', a); }}
+              placeholder={`Accepted answer ${i + 1}`}
+              maxLength={50}
+              className="flex-1 px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded
+                bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500"
+            />
+            {poll.acceptedAnswers.length > 1 && (
+              <button type="button" onClick={() => set('acceptedAnswers', poll.acceptedAnswers.filter((_, j) => j !== i))}
+                className="text-red-400 hover:text-red-600 px-2">✕</button>
+            )}
+          </div>
+        ))}
+        <button type="button" onClick={() => set('acceptedAnswers', [...poll.acceptedAnswers, ''])}
+          className="text-xs text-primary-600 hover:underline">+ Add alternate</button>
+      </div>
+    );
+  }
+
+  if (qt === 'assertion_reason') {
+    const fixedOpts = [
+      'Both A and R true, R explains A',
+      'Both A and R true, R does NOT explain A',
+      'A is true, R is false',
+      'A is false, R is true',
+    ];
+    return (
+      <div className="space-y-3">
+        <div>
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Assertion (A)</label>
+          <textarea value={poll.assertion} onChange={e => set('assertion', e.target.value)}
+            rows={2} placeholder="State the assertion..."
+            className="w-full p-2.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg
+              bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Reason (R)</label>
+          <textarea value={poll.reason} onChange={e => set('reason', e.target.value)}
+            rows={2} placeholder="State the reason..."
+            className="w-full p-2.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg
+              bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Correct Option</label>
+          {fixedOpts.map((label, i) => (
+            <button key={i} type="button" onClick={() => set('arCorrectAnswer', i)}
+              className={`w-full text-left px-3 py-2 text-xs rounded-lg border mb-1 transition-colors
+                ${poll.arCorrectAnswer === i
+                  ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700'
+                  : 'border-slate-200 dark:border-slate-600 text-slate-500 hover:border-slate-400'}`}>
+              {String.fromCharCode(65 + i)}. {label}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (qt === 'match_following') {
+    return (
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Left Column</label>
+            {poll.leftItems.map((item, i) => (
+              <div key={i} className="flex gap-1 mb-1">
+                <span className="w-5 flex-shrink-0 text-xs font-bold text-slate-500 pt-2">
+                  {String.fromCharCode(65 + i)}.
+                </span>
+                <input type="text" value={item}
+                  onChange={e => { const a = [...poll.leftItems]; a[i] = e.target.value; set('leftItems', a); }}
+                  placeholder={`Item ${i + 1}`}
+                  className="flex-1 px-2 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded
+                    bg-white dark:bg-slate-700 dark:text-white focus:outline-none"
+                />
+                {poll.leftItems.length > 2 && (
+                  <button type="button" onClick={() => set('leftItems', poll.leftItems.filter((_, j) => j !== i))}
+                    className="text-red-400 hover:text-red-600 text-xs px-1">✕</button>
+                )}
+              </div>
+            ))}
+            <button type="button" onClick={() => set('leftItems', [...poll.leftItems, ''])}
+              className="text-xs text-primary-600 hover:underline mt-1">+ Add</button>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Right Column</label>
+            {poll.rightItems.map((item, i) => (
+              <div key={i} className="flex gap-1 mb-1">
+                <span className="w-5 flex-shrink-0 text-xs font-bold text-slate-500 pt-2">
+                  {String.fromCharCode(112 + i)}.
+                </span>
+                <input type="text" value={item}
+                  onChange={e => { const a = [...poll.rightItems]; a[i] = e.target.value; set('rightItems', a); }}
+                  placeholder={`Item ${i + 1}`}
+                  className="flex-1 px-2 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded
+                    bg-white dark:bg-slate-700 dark:text-white focus:outline-none"
+                />
+                {poll.rightItems.length > 2 && (
+                  <button type="button" onClick={() => set('rightItems', poll.rightItems.filter((_, j) => j !== i))}
+                    className="text-red-400 hover:text-red-600 text-xs px-1">✕</button>
+                )}
+              </div>
+            ))}
+            <button type="button" onClick={() => set('rightItems', [...poll.rightItems, ''])}
+              className="text-xs text-primary-600 hover:underline mt-1">+ Add</button>
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+            Correct Pairs <span className="font-normal">(Left → Right)</span>
+          </label>
+          {poll.leftItems.map((left, li) => (
+            left.trim() ? (
+              <div key={li} className="flex items-center gap-2 mb-1 text-xs">
+                <span className="font-medium text-slate-700 dark:text-slate-300 w-24 truncate">
+                  {String.fromCharCode(65 + li)}. {left}
+                </span>
+                <span className="text-slate-400">→</span>
+                <select
+                  value={poll.correctPairs[String(li)] ?? ''}
+                  onChange={e => set('correctPairs', { ...poll.correctPairs, [String(li)]: e.target.value })}
+                  className="flex-1 px-2 py-1 border border-slate-300 dark:border-slate-600 rounded
+                    bg-white dark:bg-slate-700 dark:text-white text-xs focus:outline-none"
+                >
+                  <option value="">— choose —</option>
+                  {poll.rightItems.map((right, ri) => right.trim() ? (
+                    <option key={ri} value={String(ri)}>
+                      {String.fromCharCode(112 + ri)}. {right}
+                    </option>
+                  ) : null)}
+                </select>
+              </div>
+            ) : null
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (qt === 'ordering') {
+    return (
+      <div className="space-y-3">
+        <div>
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+            Items to order <span className="font-normal">(enter in ANY order — students will reorder them)</span>
+          </label>
+          {poll.orderItems.map((item, i) => (
+            <div key={i} className="flex gap-2 mb-1">
+              <input type="text" value={item}
+                onChange={e => {
+                  const a = [...poll.orderItems]; a[i] = e.target.value; set('orderItems', a);
+                  // Reset correct order when items change
+                  set('correctOrder', []);
+                }}
+                placeholder={`Item ${i + 1}`}
+                className="flex-1 px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded
+                  bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500"
+              />
+              {poll.orderItems.length > 2 && (
+                <button type="button"
+                  onClick={() => { set('orderItems', poll.orderItems.filter((_, j) => j !== i)); set('correctOrder', []); }}
+                  className="text-red-400 hover:text-red-600 px-2">✕</button>
+              )}
+            </div>
+          ))}
+          <button type="button" onClick={() => set('orderItems', [...poll.orderItems, ''])}
+            className="text-xs text-primary-600 hover:underline">+ Add item</button>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+            Correct sequence <span className="font-normal">(enter indices 0,1,2,... in correct order)</span>
+          </label>
+          <div className="flex gap-1 flex-wrap">
+            {poll.orderItems.map((item, i) => item.trim() ? (
+              <span key={i} className="px-2 py-1 text-xs bg-slate-100 dark:bg-slate-700 rounded border border-slate-200 dark:border-slate-600">
+                [{i}] {item}
+              </span>
+            ) : null)}
+          </div>
+          <input type="text"
+            value={poll.correctOrder.join(',')}
+            onChange={e => {
+              const parsed = e.target.value.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+              set('correctOrder', parsed);
+            }}
+            placeholder="e.g. 2,0,3,1"
+            className="mt-1 w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded
+              bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500"
+          />
+          <p className="text-xs text-slate-400 mt-1">
+            Enter indices in the correct order (e.g. if item 2 is first, start with 2)
+          </p>
+        </div>
       </div>
     );
   }

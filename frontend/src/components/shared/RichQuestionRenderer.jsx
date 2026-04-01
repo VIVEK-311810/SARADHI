@@ -1,6 +1,8 @@
 import React from 'react';
 import LatexRenderer from './LatexRenderer';
 import CodeBlock from './CodeBlock';
+import MatchingInput from './MatchingInput';
+import OrderingInput from './OrderingInput';
 
 /**
  * Universal question renderer for all Phase 1 question types.
@@ -119,6 +121,53 @@ export default function RichQuestionRenderer({ poll, answerData = {}, onAnswer, 
           options={options}
           answerData={answerData}
           onAnswer={onAnswer}
+          disabled={disabled}
+        />
+      )}
+
+      {question_type === 'multi_correct' && (
+        <MultiCorrectInput
+          options={options}
+          selected={answerData.selected_options || []}
+          onSelect={sel => onAnswer({ selected_options: sel })}
+          disabled={disabled}
+        />
+      )}
+
+      {question_type === 'one_word' && (
+        <FillBlankInput
+          value={answerData.text || ''}
+          onChange={text => onAnswer({ text })}
+          disabled={disabled}
+          placeholder="One-word answer..."
+          maxLength={50}
+        />
+      )}
+
+      {question_type === 'assertion_reason' && (
+        <AssertionReasonInput
+          meta={meta}
+          selected={answerData.selected_option}
+          onSelect={i => onAnswer({ selected_option: i })}
+          disabled={disabled}
+        />
+      )}
+
+      {question_type === 'match_following' && (
+        <MatchingInput
+          leftItems={meta.left_items || []}
+          rightItems={meta.right_items || []}
+          pairs={answerData.pairs || {}}
+          onChange={pairs => onAnswer({ pairs })}
+          disabled={disabled}
+        />
+      )}
+
+      {question_type === 'ordering' && (
+        <OrderingInput
+          items={meta.items || options}
+          order={answerData.order || []}
+          onChange={order => onAnswer({ order })}
           disabled={disabled}
         />
       )}
@@ -269,11 +318,9 @@ function CodeQuestionInput({ meta, options, answerData, onAnswer, disabled }) {
   const mode = meta.code_mode || 'mcq';
   return (
     <div className="space-y-3">
-      {/* Code block */}
       {meta.code && (
         <CodeBlock code={meta.code} language={meta.language || 'javascript'} />
       )}
-      {/* Answer input */}
       {mode === 'mcq' ? (
         <MCQInput
           options={options}
@@ -289,6 +336,71 @@ function CodeQuestionInput({ meta, options, answerData, onAnswer, disabled }) {
           placeholder="Type the output or missing value..."
         />
       )}
+    </div>
+  );
+}
+
+function MultiCorrectInput({ options, selected, onSelect, disabled }) {
+  const toggle = (i) => {
+    if (disabled) return;
+    const next = selected.includes(i) ? selected.filter(x => x !== i) : [...selected, i];
+    onSelect(next);
+  };
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Select all correct options</p>
+      {options.map((opt, i) => {
+        const checked = selected.includes(i);
+        return (
+          <button
+            key={i}
+            onClick={() => toggle(i)}
+            disabled={disabled}
+            className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-all duration-150 flex items-center gap-3
+              ${checked
+                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                : 'border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500'
+              }
+              ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+          >
+            <span className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center text-xs
+              ${checked ? 'border-blue-500 bg-blue-500 text-white' : 'border-gray-400'}`}>
+              {checked ? '✓' : ''}
+            </span>
+            <span className="flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-semibold
+              border-gray-300 text-gray-500">
+              {String.fromCharCode(65 + i)}
+            </span>
+            <LatexRenderer text={opt} />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function AssertionReasonInput({ meta, selected, onSelect, disabled }) {
+  const assertion = meta.assertion || '';
+  const reason = meta.reason || '';
+  const fixedOptions = [
+    'Both A and R are true, and R is the correct explanation of A',
+    'Both A and R are true, but R is NOT the correct explanation of A',
+    'A is true, but R is false',
+    'A is false, but R is true',
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+        <p className="text-sm">
+          <span className="font-bold">Assertion (A):</span>{' '}
+          <LatexRenderer text={assertion} />
+        </p>
+        <p className="text-sm">
+          <span className="font-bold">Reason (R):</span>{' '}
+          <LatexRenderer text={reason} />
+        </p>
+      </div>
+      <MCQInput options={fixedOptions} selected={selected} onSelect={onSelect} disabled={disabled} />
     </div>
   );
 }

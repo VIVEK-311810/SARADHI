@@ -35,6 +35,57 @@ function gradeResponse(questionType, answerData, poll) {
       return Math.abs(Number(answerData.value) - Number(correct)) <= Number(tolerance);
     }
 
+    case 'multi_correct': {
+      // answerData.selected_options = [0, 2, ...] (indices)
+      const correct = meta.correct_options || [];
+      const selected = answerData.selected_options || [];
+      if (!correct.length) return null;
+      const scheme = meta.marking_scheme || 'all_or_nothing';
+      const correctSet = new Set(correct.map(Number));
+      const selectedSet = new Set(selected.map(Number));
+      // All-or-nothing: exact match
+      if (scheme === 'all_or_nothing') {
+        return correctSet.size === selectedSet.size &&
+          [...correctSet].every(i => selectedSet.has(i));
+      }
+      // JEE Advanced: +4 all correct, -2 any wrong selected, 0 partial correct only
+      if (scheme === 'jee_advanced') {
+        const allCorrect = correctSet.size === selectedSet.size &&
+          [...correctSet].every(i => selectedSet.has(i));
+        if (allCorrect) return true;
+        const anyWrong = [...selectedSet].some(i => !correctSet.has(i));
+        return anyWrong ? false : null; // null = partial (handled separately in scoring)
+      }
+      // Per-correct: each correct option selected scores, no penalty for wrong
+      const anySelected = [...selectedSet].some(i => correctSet.has(i));
+      return anySelected ? null : false; // null = partial marks
+    }
+
+    case 'assertion_reason':
+      // correct_answer is 0-3 index into fixed options A/B/C/D
+      return poll.correct_answer !== null
+        ? answerData.selected_option === poll.correct_answer
+        : null;
+
+    case 'match_following': {
+      // answerData.pairs = { "0": "1", "1": "3", ... } left-idx → right-idx
+      const correctPairs = meta.correct_pairs || {};
+      const studentPairs = answerData.pairs || {};
+      if (!Object.keys(correctPairs).length) return null;
+      const allCorrect = Object.entries(correctPairs).every(
+        ([l, r]) => String(studentPairs[l]) === String(r)
+      );
+      return allCorrect ? true : false;
+    }
+
+    case 'ordering': {
+      // answerData.order = [2, 0, 3, 1] — indices in student's chosen order
+      const correctOrder = meta.correct_order || [];
+      const studentOrder = answerData.order || [];
+      if (!correctOrder.length) return null;
+      return JSON.stringify(correctOrder.map(Number)) === JSON.stringify(studentOrder.map(Number));
+    }
+
     case 'short_answer':
     case 'essay':
     case 'differentiate':
