@@ -8,6 +8,58 @@ const { calculatePoints } = require('./gamification');
 // Track in-progress reveals to prevent race-condition double broadcasts
 const revealInProgress = new Set();
 
+// ── gradeResponse ─────────────────────────────────────────────────────────────
+// Returns: true (correct) | false (wrong) | null (manual grading required)
+function gradeResponse(questionType, answerData, poll) {
+  const meta = poll.options_metadata || {};
+  switch (questionType) {
+    case 'mcq':
+    case 'true_false':
+      return poll.correct_answer !== null
+        ? answerData.selected_option === poll.correct_answer
+        : null;
+
+    case 'fill_blank':
+    case 'one_word': {
+      const accepted = meta.accepted_answers || [];
+      if (!accepted.length || answerData.text == null) return false;
+      return accepted.some(
+        a => a.toLowerCase().trim() === String(answerData.text).toLowerCase().trim()
+      );
+    }
+
+    case 'numeric': {
+      const tolerance = meta.tolerance ?? 0;
+      const correct = meta.correct_value;
+      if (correct == null || answerData.value == null) return false;
+      return Math.abs(Number(answerData.value) - Number(correct)) <= Number(tolerance);
+    }
+
+    case 'short_answer':
+    case 'essay':
+    case 'differentiate':
+      return null; // teacher manual grading
+
+    case 'code': {
+      const mode = meta.code_mode || 'mcq';
+      if (mode === 'mcq') {
+        return poll.correct_answer !== null
+          ? answerData.selected_option === poll.correct_answer
+          : null;
+      }
+      // fill_blank mode
+      const accepted = meta.accepted_answers || [];
+      if (!accepted.length || answerData.text == null) return false;
+      return accepted.some(
+        a => a.toLowerCase().trim() === String(answerData.text).toLowerCase().trim()
+      );
+    }
+
+    default:
+      return null;
+  }
+}
+
 // Helper: resolve string session_id → numeric id
 async function getNumericSessionId(stringSessionId) {
   const result = await pool.query(
@@ -20,15 +72,27 @@ async function getNumericSessionId(stringSessionId) {
 // POST / — Create a new poll (teacher only)
 router.post('/', authenticate, authorize('teacher'), async (req, res) => {
   try {
-    const { session_id, question, options, correct_answer, justification, time_limit, difficulty } = req.body;
+    const {
+      session_id, question, options, correct_answer, justification, time_limit, difficulty,
+      // rich question type fields
+      question_type, question_image_url, question_latex, options_metadata,
+      solution_steps, subject_tag, difficulty_level, marks, blooms_level, topic, sub_topic, cluster_id
+    } = req.body;
 
-    if (!session_id || !question || !options || !Array.isArray(options) || options.length < 2) {
-      return res.status(400).json({ error: 'Missing required fields or invalid options' });
+    const qType = question_type || 'mcq';
+
+    // options required for MCQ/true_false/code; optional for others
+    const optionsRequired = ['mcq', 'true_false', 'code'].includes(qType);
+    if (!session_id || !question) {
+      return res.status(400).json({ error: 'Missing required fields' });
     }
-    if (question.length > 1000) {
-      return res.status(400).json({ error: 'Question too long (max 1000 chars)' });
+    if (optionsRequired && (!options || !Array.isArray(options) || options.length < 2)) {
+      return res.status(400).json({ error: 'Options required for this question type (min 2)' });
     }
-    if (options.length > 6) {
+    if (question.length > 2000) {
+      return res.status(400).json({ error: 'Question too long (max 2000 chars)' });
+    }
+    if (options && options.length > 6) {
       return res.status(400).json({ error: 'Maximum 6 options allowed' });
     }
     const limit = time_limit || 60;
@@ -52,8 +116,22 @@ router.post('/', authenticate, authorize('teacher'), async (req, res) => {
 
     const pollDifficulty = [1, 2, 3].includes(parseInt(difficulty)) ? parseInt(difficulty) : 1;
     const result = await pool.query(
-      'INSERT INTO polls (session_id, question, options, correct_answer, justification, time_limit, is_active, difficulty) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
-      [numericSessionId, question, JSON.stringify(options), correct_answer, justification, limit, false, pollDifficulty]
+      `INSERT INTO polls (
+        session_id, question, options, correct_answer, justification, time_limit, is_active, difficulty,
+        question_type, question_image_url, question_latex, options_metadata,
+        solution_steps, subject_tag, difficulty_level, marks, blooms_level, topic, sub_topic, cluster_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+      RETURNING *`,
+      [
+        numericSessionId, question,
+        options ? JSON.stringify(options) : null,
+        correct_answer, justification, limit, false, pollDifficulty,
+        qType, question_image_url || null, question_latex || null,
+        options_metadata ? JSON.stringify(options_metadata) : null,
+        solution_steps ? JSON.stringify(solution_steps) : null,
+        subject_tag || null, difficulty_level || 'medium',
+        marks || 1, blooms_level || null, topic || null, sub_topic || null, cluster_id || null
+      ]
     );
 
     res.status(201).json(result.rows[0]);
@@ -188,12 +266,14 @@ router.put('/:pollId/close', authenticate, authorize('teacher'), async (req, res
 router.post('/:pollId/respond', authenticate, authorize('student'), async (req, res) => {
   try {
     const { pollId } = req.params;
-    const { selected_option, response_time } = req.body;
+    const { selected_option, answer_data, response_time } = req.body;
     // Always use authenticated user's ID — prevents IDOR (student acting as another student)
     const student_id = req.user.id;
 
-    if (selected_option === undefined) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    // Support both legacy selected_option and new answer_data
+    const resolvedAnswerData = answer_data || (selected_option !== undefined ? { selected_option } : null);
+    if (resolvedAnswerData === null) {
+      return res.status(400).json({ error: 'Missing answer data' });
     }
 
     // Check poll exists and is active
@@ -225,12 +305,17 @@ router.post('/:pollId/respond', authenticate, authorize('student'), async (req, 
       return res.status(403).json({ error: 'Student not part of this session' });
     }
 
-    const isCorrect = poll.correct_answer !== null ? selected_option === poll.correct_answer : null;
+    const questionType = poll.question_type || 'mcq';
+    const isCorrect = gradeResponse(questionType, resolvedAnswerData, poll);
+
+    // For legacy MCQ compatibility, extract selected_option from answer_data
+    const legacySelectedOption = resolvedAnswerData.selected_option ?? null;
 
     // Insert response
     const result = await pool.query(
-      'INSERT INTO poll_responses (poll_id, student_id, selected_option, is_correct, response_time) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [pollId, student_id, selected_option, isCorrect, response_time || 0]
+      `INSERT INTO poll_responses (poll_id, student_id, selected_option, is_correct, response_time, answer_data)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [pollId, student_id, legacySelectedOption, isCorrect, response_time || 0, JSON.stringify(resolvedAnswerData)]
     );
 
     // Check if all participants responded → early reveal (non-blocking)

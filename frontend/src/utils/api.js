@@ -160,11 +160,11 @@ export const studentAPI = {
     apiRequest(`/students/${studentId}/active-polls`),
 
   // Submit poll response
-  submitPollResponse: (studentId, pollId, selectedOption, responseTime) =>
+  submitPollResponse: (studentId, pollId, answerData, responseTime) =>
     apiRequest(`/students/${studentId}/polls/${pollId}/respond`, {
       method: 'POST',
       body: JSON.stringify({
-        selected_option: selectedOption,
+        answer_data: answerData,
         response_time: responseTime,
       }),
     }),

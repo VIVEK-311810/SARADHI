@@ -17,15 +17,20 @@ async function getNumericSessionId(stringSessionId) {
 // POST / — Create a new session (teacher only)
 router.post('/', authenticate, authorize('teacher'), async (req, res) => {
   try {
-    const { title, course_name } = req.body;
+    const { title, course_name, subject } = req.body;
     const teacher_id = req.user.id; // Always use authenticated user — prevents IDOR
     if (!title || !course_name) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    const VALID_SUBJECTS = ['math','physics','chemistry','biology','cs','ece','mechanical','civil','english','history','economics','art','business'];
+    const validatedSubject = subject && VALID_SUBJECTS.includes(subject.toLowerCase())
+      ? subject.toLowerCase()
+      : null;
+
     const result = await pool.query(
-      'INSERT INTO sessions (title, course_name, teacher_id, is_active) VALUES ($1, $2, $3, $4) RETURNING *',
-      [title, course_name, teacher_id, true]
+      'INSERT INTO sessions (title, course_name, teacher_id, is_active, subject) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [title, course_name, teacher_id, true, validatedSubject]
     );
 
     res.status(201).json(result.rows[0]);

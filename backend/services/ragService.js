@@ -10,7 +10,7 @@ class RAGService {
    * Generate a contextual answer from retrieved chunks using Mistral Large
    */
   async generateAnswer(query, retrievedChunks, options = {}) {
-    const { queryType = 'general', conversationHistory = [], mode = 'answer' } = options;
+    const { queryType = 'general', conversationHistory = [], mode = 'answer', subject = null } = options;
 
     if (!retrievedChunks || retrievedChunks.length === 0) {
       return {
@@ -24,7 +24,7 @@ class RAGService {
 
     try {
       const context = this.buildContext(retrievedChunks);
-      const messages = this.buildMessages(query, context, queryType, conversationHistory, mode);
+      const messages = this.buildMessages(query, context, queryType, conversationHistory, mode, subject);
       const maxTokens = mode === 'explain' ? 4096 : 2048;
 
       const result = await mistralClient.chatComplete(this.model, messages, { maxTokens });
@@ -60,7 +60,7 @@ class RAGService {
    * @param {express.Response} res - Express response object for SSE
    */
   async generateAnswerStream(query, retrievedChunks, res, options = {}) {
-    const { queryType = 'general', conversationHistory = [], mode = 'answer' } = options;
+    const { queryType = 'general', conversationHistory = [], mode = 'answer', subject = null } = options;
 
     if (!retrievedChunks || retrievedChunks.length === 0) {
       this.sendSSE(res, 'token', { text: 'I could not find any relevant information in the session materials to answer your question.' });
@@ -70,7 +70,7 @@ class RAGService {
     }
 
     const context = this.buildContext(retrievedChunks);
-    const messages = this.buildMessages(query, context, queryType, conversationHistory, mode);
+    const messages = this.buildMessages(query, context, queryType, conversationHistory, mode, subject);
     const maxTokens = mode === 'explain' ? 4096 : 2048;
 
     let fullText = '';
@@ -160,8 +160,29 @@ class RAGService {
   /**
    * Build the messages array for Mistral chat API
    */
-  buildMessages(query, context, queryType, conversationHistory, mode) {
+  // Returns a short subject-specific hint appended to system prompts
+  subjectHint(subject) {
+    const hints = {
+      math:       'Prefer step-by-step mathematical derivations. Use LaTeX notation where helpful (e.g. $E = mc^2$).',
+      physics:    'Include relevant equations and units. Distinguish between vectors and scalars.',
+      chemistry:  'Name compounds correctly. Reference periodic trends and reaction types where relevant.',
+      biology:    'Use precise biological terminology. Link molecular mechanisms to physiological outcomes.',
+      cs:         'Include pseudocode or code snippets where helpful. Reference time/space complexity when relevant.',
+      ece:        'Reference circuit laws and signal domains (time/frequency) where applicable.',
+      mechanical: 'Apply engineering principles; include free body diagrams or force analysis where useful.',
+      civil:      'Reference structural concepts, loads, and material properties where relevant.',
+      english:    'Discuss literary devices, themes, and rhetorical techniques where appropriate.',
+      history:    'Situate events in their historical context; distinguish primary from secondary causes.',
+      economics:  'Reference supply/demand, market structures, and macroeconomic indicators where relevant.',
+      art:        'Discuss visual elements, design principles, and art movements where appropriate.',
+      business:   'Frame answers in terms of business strategy, finance, or management principles.',
+    };
+    return subject && hints[subject] ? `\n\nSubject context: ${hints[subject]}` : '';
+  }
+
+  buildMessages(query, context, queryType, conversationHistory, mode, subject = null) {
     let systemPrompt;
+    const subjectAddendum = this.subjectHint(subject);
 
     if (mode === 'explain') {
       systemPrompt = `You are an educational AI tutor at SASTRA University. When explaining a concept, follow this exact structure:
@@ -178,7 +199,7 @@ class RAGService {
 
 Use the provided course materials as your source. Always cite which document the information comes from. If the materials don't cover the topic, say so clearly.
 
-After your explanation, suggest exactly 3 follow-up questions wrapped in <suggestions>["q1", "q2", "q3"]</suggestions> tags.`;
+After your explanation, suggest exactly 3 follow-up questions wrapped in <suggestions>["q1", "q2", "q3"]</suggestions> tags.${subjectAddendum}`;
 
     } else if (mode === 'summarize') {
       systemPrompt = `You are an AI study assistant at SASTRA University. Summarize the provided content clearly and concisely. Structure your summary as:
@@ -192,7 +213,7 @@ After your explanation, suggest exactly 3 follow-up questions wrapped in <sugges
 
 **Detailed Summary:** A more thorough explanation of the content.
 
-After your summary, suggest exactly 3 follow-up questions wrapped in <suggestions>["q1", "q2", "q3"]</suggestions> tags.`;
+After your summary, suggest exactly 3 follow-up questions wrapped in <suggestions>["q1", "q2", "q3"]</suggestions> tags.${subjectAddendum}`;
 
     } else {
       systemPrompt = `You are an AI study assistant for SASTRA University. Your job is to help students learn by answering their questions using the provided course materials.
@@ -204,7 +225,7 @@ Rules:
 - Keep answers clear, educational, and appropriate for university students.
 - For factual questions, be precise. For conceptual questions, explain thoroughly.
 
-After your answer, suggest exactly 3 follow-up questions the student might want to ask, wrapped in <suggestions>["q1", "q2", "q3"]</suggestions> tags.`;
+After your answer, suggest exactly 3 follow-up questions the student might want to ask, wrapped in <suggestions>["q1", "q2", "q3"]</suggestions> tags.${subjectAddendum}`;
     }
 
     const messages = [{ role: 'system', content: systemPrompt }];

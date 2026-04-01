@@ -7,6 +7,8 @@ import { apiRequest, studentAPI, safeParseUser } from '../../utils/api';
 import { Badge } from '../ui/badge';
 import { isDemoMode, DemoWebSocket } from '../../utils/demoData';
 import KnowledgeCard from './KnowledgeCard';
+import RichQuestionRenderer from '../shared/RichQuestionRenderer';
+import SolutionStepsViewer from './SolutionStepsViewer';
 
 // WebSocket URL configuration
 const WS_BASE_URL = process.env.REACT_APP_API_URL ?
@@ -22,7 +24,7 @@ const EnhancedStudentSession = () => {
   const [activePoll, setActivePoll] = useState(null);
 
   // State related to poll interaction
-  const [selectedOption, setSelectedOption] = useState(null);
+  const [answerData, setAnswerData] = useState({});
   const [hasResponded, setHasResponded] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [submissionResult, setSubmissionResult] = useState(null);
@@ -201,7 +203,7 @@ const EnhancedStudentSession = () => {
           setPollEndTime(data.poll_end_time);
           setTimeLeft(remaining);
           setHasResponded(false);
-          setSelectedOption(null);
+          setAnswerData({});
           setShowResults(false);
           setSubmissionResult(null);
           setPendingReveal(null);
@@ -315,7 +317,7 @@ const EnhancedStudentSession = () => {
             window.dispatchEvent(new CustomEvent('saradhi:notification', { detail: { type: 'poll', title: 'New poll — answer now!', body: data.poll.question } }));
             setActivePoll(data.poll);
             setHasResponded(false);
-            setSelectedOption(null);
+            setAnswerData({});
             setShowResults(false);
             setSubmissionResult(null);
             setPendingReveal(null);
@@ -558,8 +560,17 @@ const EnhancedStudentSession = () => {
     } catch (_) {}
   };
 
+  const hasPollAnswer = (data, questionType) => {
+    if (!data || Object.keys(data).length === 0) return false;
+    const qt = questionType || 'mcq';
+    if (qt === 'mcq' || qt === 'true_false') return data.selected_option !== undefined;
+    if (qt === 'numeric') return data.value !== undefined && data.value !== '';
+    if (qt === 'code') return data.selected_option !== undefined || !!(data.text?.trim());
+    return !!(data.text?.trim());
+  };
+
   const submitResponse = async () => {
-    if (selectedOption === null || hasResponded || pollLoading) return;
+    if (!hasPollAnswer(answerData, activePoll?.question_type) || hasResponded || pollLoading) return;
     setPollLoading(true);
 
     try {
@@ -576,7 +587,7 @@ const EnhancedStudentSession = () => {
       const result = await studentAPI.submitPollResponse(
         currentUser.id,
         activePoll.id,
-        selectedOption,
+        answerData,
         responseTimeMs
       );
 
@@ -596,7 +607,7 @@ const EnhancedStudentSession = () => {
     setTimeout(() => {
       setActivePoll(null);
       setShowResults(false);
-      setSelectedOption(null);
+      setAnswerData({});
       setHasResponded(false);
       setPendingReveal(null);
       pendingRevealRef.current = null;
@@ -914,26 +925,16 @@ const EnhancedStudentSession = () => {
           </div>
 
           <div className="mb-4 sm:mb-6">
-            <h3 className="text-base sm:text-lg font-medium text-slate-900 dark:text-slate-100 mb-3 sm:mb-4">{activePoll.question}</h3>
-            <div className="space-y-2 sm:space-y-3">
-              {activePoll.options && activePoll.options.map((option, index) => (
-                <button
-                  key={index}
-                  onClick={() => !hasResponded && setSelectedOption(index)}
-                  disabled={hasResponded || timeLeft <= 0}
-                  className={`w-full text-left p-3 sm:p-4 border-2 rounded-lg transition-all duration-200 min-h-[52px] flex items-center gap-3 ${getOptionColor(index)} ${hasResponded || timeLeft <= 0 ? 'cursor-not-allowed opacity-75' : 'cursor-pointer active:scale-[0.98]'}`}
-                >
-                  {getOptionIcon(index)}
-                  <span>
-                    <span className="font-medium">{String.fromCharCode(65 + index)}.</span> {option}
-                  </span>
-                </button>
-              ))}
-            </div>
+            <RichQuestionRenderer
+              poll={activePoll}
+              answerData={answerData}
+              onAnswer={setAnswerData}
+              disabled={hasResponded || timeLeft <= 0}
+            />
           </div>
 
           {/* Submit button */}
-          {selectedOption !== null && !hasResponded && timeLeft > 0 && (
+          {hasPollAnswer(answerData, activePoll?.question_type) && !hasResponded && timeLeft > 0 && (
             <div className="mt-4">
               <button
                 onClick={submitResponse}
@@ -967,49 +968,103 @@ const EnhancedStudentSession = () => {
           )}
 
           {/* Results revealed — show correct/wrong + justification */}
-          {hasResponded && submissionResult && showResults && (
-            <div className={`border rounded-lg p-3 sm:p-4 mt-4 ${submissionResult.is_correct ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
-              <div className="flex items-center">
-                <svg className={`h-5 w-5 sm:h-6 sm:w-6 mr-2 flex-shrink-0 ${submissionResult.is_correct ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  {submissionResult.is_correct ? (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  ) : (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  )}
-                </svg>
-                <span className={`font-medium text-sm sm:text-base ${submissionResult.is_correct ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300'}`}>
-                  {submissionResult.is_correct ? 'Correct! Well done!' : 'Incorrect, but good try!'}
-                </span>
-              </div>
-              <div className={`mt-3 text-xs sm:text-sm ${submissionResult.is_correct ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                <strong>Correct Answer:</strong> {String.fromCharCode(65 + activePoll.correct_answer)}. {activePoll.options[activePoll.correct_answer]}
-              </div>
-              {activePoll.justification && (
-                <div className={`mt-3 text-xs sm:text-sm ${submissionResult.is_correct ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                  <strong>Explanation:</strong> {activePoll.justification}
+          {hasResponded && submissionResult && showResults && (() => {
+            const isManual = submissionResult.is_correct === null;
+            const isCorrect = submissionResult.is_correct === true;
+            const colorCls = isManual
+              ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+              : isCorrect
+                ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800';
+            const textCls = isManual
+              ? 'text-blue-800 dark:text-blue-300'
+              : isCorrect ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300';
+            const subTextCls = isManual
+              ? 'text-blue-700 dark:text-blue-400'
+              : isCorrect ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400';
+            const qt = activePoll.question_type || 'mcq';
+            const meta = activePoll.options_metadata || {};
+            let correctAnswerLine = null;
+            if (qt === 'mcq' || qt === 'true_false') {
+              const idx = activePoll.correct_answer;
+              const label = qt === 'true_false'
+                ? activePoll.options?.[idx]
+                : `${String.fromCharCode(65 + idx)}. ${activePoll.options?.[idx]}`;
+              correctAnswerLine = <><strong>Correct Answer:</strong> {label}</>;
+            } else if (qt === 'fill_blank' || qt === 'one_word') {
+              correctAnswerLine = <><strong>Accepted:</strong> {(meta.accepted_answers || []).join(' / ')}</>;
+            } else if (qt === 'numeric') {
+              correctAnswerLine = <><strong>Correct Value:</strong> {meta.correct_value}{meta.unit ? ` ${meta.unit}` : ''} (±{meta.tolerance ?? 0})</>;
+            } else if (qt === 'code') {
+              if (meta.code_mode === 'fill_blank') {
+                correctAnswerLine = <><strong>Accepted:</strong> {(meta.accepted_answers || []).join(' / ')}</>;
+              } else {
+                const idx = activePoll.correct_answer;
+                correctAnswerLine = <><strong>Correct:</strong> {String.fromCharCode(65 + idx)}. {activePoll.options?.[idx]}</>;
+              }
+            }
+            return (
+              <div className={`border rounded-lg p-3 sm:p-4 mt-4 ${colorCls}`}>
+                <div className="flex items-center">
+                  <svg className={`h-5 w-5 sm:h-6 sm:w-6 mr-2 flex-shrink-0 ${textCls}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    {isManual
+                      ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      : isCorrect
+                        ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    }
+                  </svg>
+                  <span className={`font-medium text-sm sm:text-base ${textCls}`}>
+                    {isManual ? 'Submitted! Your answer will be reviewed.' : isCorrect ? 'Correct! Well done!' : 'Incorrect, but good try!'}
+                  </span>
                 </div>
-              )}
-            </div>
-          )}
+                {correctAnswerLine && (
+                  <div className={`mt-3 text-xs sm:text-sm ${subTextCls}`}>{correctAnswerLine}</div>
+                )}
+                {activePoll.justification && (
+                  <div className={`mt-3 text-xs sm:text-sm ${subTextCls}`}>
+                    <strong>Explanation:</strong> {activePoll.justification}
+                  </div>
+                )}
+                {activePoll.solution_steps && activePoll.solution_steps.length > 0 && (
+                  <SolutionStepsViewer steps={activePoll.solution_steps} />
+                )}
+              </div>
+            );
+          })()}
 
           {/* Time's up without answering */}
           {timeLeft === 0 && !hasResponded && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 sm:p-4 text-center text-red-700 dark:text-red-400 mt-4">
               <p className="font-medium text-sm sm:text-base">Time's up! You can no longer respond to this poll.</p>
-              {showResults && (
-                <>
-                  <div className="mt-3 text-xs sm:text-sm text-red-700 dark:text-red-400">
-                    <strong>Correct Answer:</strong>{' '}
-                    {String.fromCharCode(65 + activePoll.correct_answer)}.{' '}
-                    {activePoll.options[activePoll.correct_answer]}
-                  </div>
-                  {activePoll.justification && (
-                    <div className="mt-3 text-xs sm:text-sm text-red-700 dark:text-red-400">
-                      <strong>Explanation:</strong> {activePoll.justification}
-                    </div>
-                  )}
-                </>
-              )}
+              {showResults && (() => {
+                const qt = activePoll.question_type || 'mcq';
+                const meta = activePoll.options_metadata || {};
+                let correctAnswerLine = null;
+                if (qt === 'mcq' || qt === 'true_false') {
+                  const idx = activePoll.correct_answer;
+                  const label = qt === 'true_false'
+                    ? activePoll.options?.[idx]
+                    : `${String.fromCharCode(65 + idx)}. ${activePoll.options?.[idx]}`;
+                  correctAnswerLine = <><strong>Correct Answer:</strong> {label}</>;
+                } else if (qt === 'fill_blank' || qt === 'one_word') {
+                  correctAnswerLine = <><strong>Accepted:</strong> {(meta.accepted_answers || []).join(' / ')}</>;
+                } else if (qt === 'numeric') {
+                  correctAnswerLine = <><strong>Correct Value:</strong> {meta.correct_value}{meta.unit ? ` ${meta.unit}` : ''}</>;
+                }
+                return (
+                  <>
+                    {correctAnswerLine && (
+                      <div className="mt-3 text-xs sm:text-sm text-red-700 dark:text-red-400">{correctAnswerLine}</div>
+                    )}
+                    {activePoll.justification && (
+                      <div className="mt-3 text-xs sm:text-sm text-red-700 dark:text-red-400">
+                        <strong>Explanation:</strong> {activePoll.justification}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
 

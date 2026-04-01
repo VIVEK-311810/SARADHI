@@ -39,6 +39,22 @@ async function getRecentConversationHistory(studentId, sessionId, pairLimit = 3)
   }
 }
 
+/**
+ * Fetch the subject of a session for subject-aware AI prompting.
+ * Returns null if the session has no subject or if the query fails.
+ */
+async function getSessionSubject(sessionId) {
+  try {
+    const result = await pool.query(
+      'SELECT subject FROM sessions WHERE session_id = $1 LIMIT 1',
+      [sessionId.toUpperCase()]
+    );
+    return result.rows[0]?.subject || null;
+  } catch {
+    return null;
+  }
+}
+
 // POST /api/ai-search/session/:sessionId - Enhanced search with query classification
 router.post('/session/:sessionId', authenticate, async (req, res) => {
   try {
@@ -336,8 +352,11 @@ async function handleFileSpecificQuestion(req, res, sessionId, fileName, query, 
     // Fetch recent conversation history to support follow-up questions
     const conversationHistory = await getRecentConversationHistory(req.user.id, sessionId);
 
+    // Fetch session subject for subject-aware prompting
+    const sessionSubject = await getSessionSubject(sessionId);
+
     // Generate RAG answer
-    const result = await ragService.generateAnswer(query, enrichedChunks, { queryType: 'specific_file', conversationHistory });
+    const result = await ragService.generateAnswer(query, enrichedChunks, { queryType: 'specific_file', conversationHistory, subject: sessionSubject });
 
     // Log search
     await supabase
@@ -406,8 +425,11 @@ async function handleGeneralQuestion(req, res, sessionId, query, top_k) {
     // Fetch recent conversation history to support follow-up questions
     const conversationHistory = await getRecentConversationHistory(req.user.id, sessionId);
 
+    // Fetch session subject for subject-aware prompting
+    const sessionSubject = await getSessionSubject(sessionId);
+
     // Generate RAG answer
-    const result = await ragService.generateAnswer(query, enrichedChunks, { queryType: 'general', conversationHistory });
+    const result = await ragService.generateAnswer(query, enrichedChunks, { queryType: 'general', conversationHistory, subject: sessionSubject });
 
     // Log search — single batch insert, non-blocking
     if (enrichedChunks.length > 0) {
