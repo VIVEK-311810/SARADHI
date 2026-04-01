@@ -3,9 +3,11 @@ import LatexRenderer from './LatexRenderer';
 import CodeBlock from './CodeBlock';
 import MatchingInput from './MatchingInput';
 import OrderingInput from './OrderingInput';
+import DifferentiateTable from './DifferentiateTable';
+import ImageWithMarkers from './ImageWithMarkers';
 
 /**
- * Universal question renderer for all Phase 1 question types.
+ * Universal question renderer for all question types (Phase 1–3).
  *
  * Props:
  *   poll            — full poll object from backend
@@ -172,6 +174,37 @@ export default function RichQuestionRenderer({ poll, answerData = {}, onAnswer, 
         />
       )}
 
+      {question_type === 'essay' && (
+        <EssayInput
+          value={answerData.text || ''}
+          onChange={text => onAnswer({ text })}
+          disabled={disabled}
+          wordLimit={meta.word_limit}
+          rubric={meta.rubric}
+        />
+      )}
+
+      {question_type === 'differentiate' && (
+        <DifferentiateTable
+          colA={meta.col_a || 'A'}
+          colB={meta.col_b || 'B'}
+          rows={meta.rows || []}
+          cells={answerData.cells || []}
+          onChange={cells => onAnswer({ cells })}
+          disabled={disabled}
+        />
+      )}
+
+      {question_type === 'diagram_labeling' && meta.image_url && (
+        <ImageWithMarkers
+          imageUrl={meta.image_url}
+          markers={meta.markers || []}
+          labels={answerData.labels || {}}
+          onChange={labels => onAnswer({ labels })}
+          disabled={disabled}
+        />
+      )}
+
       {/* Negative marking warning */}
       {meta.negative_marking && !disabled && (
         <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
@@ -288,12 +321,25 @@ function ShortAnswerInput({ value, onChange, disabled }) {
   );
 }
 
-function EssayInput({ value, onChange, disabled, wordLimit }) {
+function EssayInput({ value, onChange, disabled, wordLimit, rubric = [] }) {
   const wordCount = value.trim() ? value.trim().split(/\s+/).length : 0;
   const overLimit = wordLimit && wordCount > wordLimit;
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-2">
+      {rubric.length > 0 && (
+        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">Marking Rubric</p>
+          <ul className="space-y-0.5">
+            {rubric.map((r, i) => (
+              <li key={i} className="flex justify-between text-xs text-blue-600 dark:text-blue-400">
+                <span>{r.criterion}</span>
+                <span className="font-medium">{r.marks} pts</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <textarea
         value={value}
         onChange={e => onChange(e.target.value)}

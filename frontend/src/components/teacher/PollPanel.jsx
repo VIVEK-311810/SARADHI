@@ -3,6 +3,8 @@ import { toast } from 'sonner';
 import { pollAPI } from '../../utils/api';
 import LatexRenderer from '../shared/LatexRenderer';
 import SolutionStepsBuilder from './SolutionStepsBuilder';
+import RubricBuilder from './RubricBuilder';
+import DiagramMarkerEditor from './DiagramMarkerEditor';
 
 const QUESTION_TYPES = [
   // Phase 1
@@ -18,6 +20,10 @@ const QUESTION_TYPES = [
   { id: 'assertion_reason', label: 'A & R',       icon: 'AR', desc: 'Assertion-Reason (4 fixed options)' },
   { id: 'match_following',  label: 'Match',       icon: '⇌',  desc: 'Match the Following' },
   { id: 'ordering',         label: 'Order',       icon: '↕',  desc: 'Arrange in correct sequence' },
+  // Phase 3
+  { id: 'essay',            label: 'Essay',       icon: '📝', desc: 'Long answer with optional rubric' },
+  { id: 'differentiate',    label: 'Diff. Table', icon: '⇔',  desc: 'Differentiate Between (2-column table)' },
+  { id: 'diagram_labeling', label: 'Diagram',     icon: '🖼',  desc: 'Label parts of a diagram' },
 ];
 
 const SUBJECTS = [
@@ -72,6 +78,16 @@ const emptyPoll = {
   // Ordering (Phase 2)
   orderItems: ['', '', ''],
   correctOrder: [],
+  // Essay with rubric (Phase 3)
+  essayWordLimit: '',
+  rubric: [],
+  // Differentiate Between (Phase 3)
+  diffColA: '',
+  diffColB: '',
+  diffRows: [''],
+  // Diagram Labeling (Phase 3)
+  diagramImageUrl: '',
+  diagramMarkers: [],
   // Negative marking (Phase 2)
   negativeMarking: false,
   negativeValue: 0.25,
@@ -256,6 +272,39 @@ const PollPanel = ({
         options_metadata: {
           items,
           correct_order: poll.correctOrder.length ? poll.correctOrder : items.map((_, i) => i),
+        },
+      };
+    }
+
+    // ── Phase 3 ───────────────────────────────────────────────────────────────
+
+    if (poll.questionType === 'essay') {
+      return {
+        ...base, options: [], correct_answer: null,
+        options_metadata: {
+          word_limit: poll.essayWordLimit ? parseInt(poll.essayWordLimit) : null,
+          rubric: poll.rubric.filter(r => r.criterion.trim()),
+        },
+      };
+    }
+
+    if (poll.questionType === 'differentiate') {
+      return {
+        ...base, options: [], correct_answer: null,
+        options_metadata: {
+          col_a: poll.diffColA,
+          col_b: poll.diffColB,
+          rows: poll.diffRows.filter(r => r.trim()),
+        },
+      };
+    }
+
+    if (poll.questionType === 'diagram_labeling') {
+      return {
+        ...base, options: [], correct_answer: null,
+        options_metadata: {
+          image_url: poll.diagramImageUrl,
+          markers: poll.diagramMarkers,
         },
       };
     }
@@ -991,7 +1040,6 @@ function AnswerConfig({ poll, set }) {
               <input type="text" value={item}
                 onChange={e => {
                   const a = [...poll.orderItems]; a[i] = e.target.value; set('orderItems', a);
-                  // Reset correct order when items change
                   set('correctOrder', []);
                 }}
                 placeholder={`Item ${i + 1}`}
@@ -1033,6 +1081,103 @@ function AnswerConfig({ poll, set }) {
             Enter indices in the correct order (e.g. if item 2 is first, start with 2)
           </p>
         </div>
+      </div>
+    );
+  }
+
+  // ── Phase 3 ──────────────────────────────────────────────────────────────────
+
+  if (qt === 'essay') {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Word limit</label>
+          <input type="number" min="50" max="5000" value={poll.essayWordLimit}
+            onChange={e => set('essayWordLimit', e.target.value)}
+            placeholder="e.g. 500 (optional)"
+            className="w-36 px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded
+              bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+            Rubric <span className="text-xs font-normal text-slate-400">(optional — shown to students)</span>
+          </label>
+          <RubricBuilder rubric={poll.rubric} onChange={r => set('rubric', r)} />
+        </div>
+        <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg text-sm text-amber-700 dark:text-amber-300">
+          📝 Essay — teacher grades manually after the poll ends.
+        </div>
+      </div>
+    );
+  }
+
+  if (qt === 'differentiate') {
+    return (
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Column A header *</label>
+            <input type="text" value={poll.diffColA} onChange={e => set('diffColA', e.target.value)}
+              placeholder="e.g. Plant Cell"
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded
+                bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Column B header *</label>
+            <input type="text" value={poll.diffColB} onChange={e => set('diffColB', e.target.value)}
+              placeholder="e.g. Animal Cell"
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded
+                bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500" />
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+            Row criteria <span className="font-normal">(basis for comparison)</span>
+          </label>
+          {poll.diffRows.map((row, i) => (
+            <div key={i} className="flex gap-2 mb-1">
+              <input type="text" value={row}
+                onChange={e => { const a = [...poll.diffRows]; a[i] = e.target.value; set('diffRows', a); }}
+                placeholder={`Criterion ${i + 1} (e.g. Cell wall)`}
+                className="flex-1 px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded
+                  bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500"
+              />
+              {poll.diffRows.length > 1 && (
+                <button type="button" onClick={() => set('diffRows', poll.diffRows.filter((_, j) => j !== i))}
+                  className="text-red-400 hover:text-red-600 px-2">✕</button>
+              )}
+            </div>
+          ))}
+          <button type="button" onClick={() => set('diffRows', [...poll.diffRows, ''])}
+            className="text-xs text-primary-600 hover:underline">+ Add row</button>
+        </div>
+        <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg text-xs text-amber-700 dark:text-amber-300">
+          ⇔ Differentiate — teacher grades manually after the poll ends.
+        </div>
+      </div>
+    );
+  }
+
+  if (qt === 'diagram_labeling') {
+    return (
+      <div className="space-y-3">
+        <div>
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+            Diagram image URL *
+          </label>
+          <input type="url" value={poll.diagramImageUrl}
+            onChange={e => { set('diagramImageUrl', e.target.value); set('diagramMarkers', []); }}
+            placeholder="https://... (image URL for the diagram)"
+            className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded
+              bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500"
+          />
+        </div>
+        <DiagramMarkerEditor
+          imageUrl={poll.diagramImageUrl}
+          markers={poll.diagramMarkers}
+          onChange={m => set('diagramMarkers', m)}
+        />
       </div>
     );
   }

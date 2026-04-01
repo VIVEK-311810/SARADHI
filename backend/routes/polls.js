@@ -91,6 +91,18 @@ function gradeResponse(questionType, answerData, poll) {
     case 'differentiate':
       return null; // teacher manual grading
 
+    case 'diagram_labeling': {
+      // answerData.labels = { "0": "Mitochondria", "1": "Nucleus", ... }
+      const markers = meta.markers || [];
+      if (!markers.length) return null;
+      const labels = answerData.labels || {};
+      const allCorrect = markers.every(
+        m => String(labels[String(m.id)] || '').toLowerCase().trim() ===
+             String(m.correct_label || '').toLowerCase().trim()
+      );
+      return allCorrect ? true : false;
+    }
+
     case 'code': {
       const mode = meta.code_mode || 'mcq';
       if (mode === 'mcq') {
