@@ -118,6 +118,41 @@ function gradeResponse(questionType, answerData, poll) {
       );
     }
 
+    case 'truth_table': {
+      // answerData.cells = { "0-2": "1", "1-2": "0", ... } rowIndex-colIndex → "0"|"1"
+      const rows = meta.rows || [];
+      const studentCells = answerData.cells || {};
+      let allCorrect = true;
+      let hasAny = false;
+      for (let r = 0; r < rows.length; r++) {
+        const row = rows[r];
+        for (let c = 0; c < row.length; c++) {
+          if (row[c].editable) {
+            hasAny = true;
+            const key = `${r}-${c}`;
+            if (String(studentCells[key]) !== String(row[c].value)) {
+              allCorrect = false;
+            }
+          }
+        }
+      }
+      if (!hasAny) return null;
+      return allCorrect ? true : false;
+    }
+
+    case 'code_trace': {
+      // answerData.trace = { "0": "x", "1": "y", ... } stepIndex → student answer
+      const steps = meta.steps || [];
+      if (!steps.length) return null;
+      const trace = answerData.trace || {};
+      const allCorrect = steps.every((step, i) => {
+        const student = String(trace[String(i)] || '').toLowerCase().trim();
+        const correct = String(step.correct_answer || '').toLowerCase().trim();
+        return student === correct;
+      });
+      return allCorrect ? true : false;
+    }
+
     default:
       return null;
   }
@@ -664,6 +699,86 @@ router.put('/:pollId', authenticate, authorize('teacher'), async (req, res) => {
     res.json(result.rows[0]);
   } catch (error) {
     logger.error('Error updating poll', { error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── Cluster routes ────────────────────────────────────────────────────────────
+
+// POST /clusters — create a passage/case-study cluster
+router.post('/clusters', authenticate, authorize('teacher'), async (req, res) => {
+  try {
+    const { session_id, title, passage, passage_image_url, passage_latex } = req.body;
+    if (!session_id || !passage) {
+      return res.status(400).json({ error: 'session_id and passage are required' });
+    }
+    // resolve session_id (string) → numeric id
+    const sessionRow = await pool.query(
+      'SELECT id FROM sessions WHERE session_id = $1',
+      [session_id]
+    );
+    if (sessionRow.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    const numericSessionId = sessionRow.rows[0].id;
+    const result = await pool.query(
+      `INSERT INTO poll_clusters (session_id, title, passage, passage_image_url, passage_latex)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [numericSessionId, title || null, passage, passage_image_url || null, passage_latex || null]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    logger.error('Error creating cluster', { error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /clusters/:clusterId — get cluster with its sub-polls
+router.get('/clusters/:clusterId', authenticate, async (req, res) => {
+  try {
+    const { clusterId } = req.params;
+    const clusterResult = await pool.query(
+      'SELECT * FROM poll_clusters WHERE id = $1',
+      [clusterId]
+    );
+    if (clusterResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Cluster not found' });
+    }
+    const pollsResult = await pool.query(
+      'SELECT * FROM polls WHERE cluster_id = $1 ORDER BY created_at ASC',
+      [clusterId]
+    );
+    res.json({ ...clusterResult.rows[0], sub_polls: pollsResult.rows });
+  } catch (error) {
+    logger.error('Error fetching cluster', { error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /session/:sessionId/clusters — list all clusters for a session
+router.get('/session/:sessionId/clusters', authenticate, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const sessionRow = await pool.query(
+      'SELECT id FROM sessions WHERE session_id = $1',
+      [sessionId]
+    );
+    if (sessionRow.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    const numericId = sessionRow.rows[0].id;
+    const result = await pool.query(
+      `SELECT pc.*, COUNT(p.id) as sub_poll_count
+       FROM poll_clusters pc
+       LEFT JOIN polls p ON p.cluster_id = pc.id
+       WHERE pc.session_id = $1
+       GROUP BY pc.id
+       ORDER BY pc.created_at ASC`,
+      [numericId]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    logger.error('Error listing clusters', { error: error.message });
     res.status(500).json({ error: 'Internal server error' });
   }
 });

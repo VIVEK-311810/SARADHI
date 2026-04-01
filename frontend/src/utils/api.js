@@ -357,11 +357,24 @@ export const utils = {
   },
 };
 
+export const clusterAPI = {
+  createCluster: (data) =>
+    apiRequest('/polls/clusters', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getCluster: (clusterId) =>
+    apiRequest(`/polls/clusters/${clusterId}`),
+  getSessionClusters: (sessionId) =>
+    apiRequest(`/polls/session/${sessionId}/clusters`),
+};
+
 export default {
   authAPI,
   studentAPI,
   sessionAPI,
   pollAPI,
+  clusterAPI,
   resourceAPI,
   aiAssistantAPI,
   utils,

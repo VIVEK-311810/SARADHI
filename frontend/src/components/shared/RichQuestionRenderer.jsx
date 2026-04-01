@@ -5,6 +5,7 @@ import MatchingInput from './MatchingInput';
 import OrderingInput from './OrderingInput';
 import DifferentiateTable from './DifferentiateTable';
 import ImageWithMarkers from './ImageWithMarkers';
+import TruthTableInput from './TruthTableInput';
 
 /**
  * Universal question renderer for all question types (Phase 1–3).
@@ -201,6 +202,25 @@ export default function RichQuestionRenderer({ poll, answerData = {}, onAnswer, 
           markers={meta.markers || []}
           labels={answerData.labels || {}}
           onChange={labels => onAnswer({ labels })}
+          disabled={disabled}
+        />
+      )}
+
+      {question_type === 'truth_table' && (
+        <TruthTableInput
+          headers={meta.headers || []}
+          rows={meta.rows || []}
+          answers={answerData.cells || {}}
+          onChange={cells => onAnswer({ cells })}
+          disabled={disabled}
+        />
+      )}
+
+      {question_type === 'code_trace' && (
+        <CodeTraceInput
+          meta={meta}
+          trace={answerData.trace || {}}
+          onChange={trace => onAnswer({ trace })}
           disabled={disabled}
         />
       )}
@@ -421,6 +441,51 @@ function MultiCorrectInput({ options, selected, onSelect, disabled }) {
           </button>
         );
       })}
+    </div>
+  );
+}
+
+function CodeTraceInput({ meta, trace, onChange, disabled }) {
+  const steps = meta.steps || [];
+  const update = (i, val) => onChange({ ...trace, [String(i)]: val });
+  return (
+    <div className="space-y-3">
+      {meta.code && (
+        <CodeBlock code={meta.code} language={meta.language || 'python'} />
+      )}
+      <p className="text-xs text-slate-500 dark:text-slate-400">
+        Trace through the code and fill in each step:
+      </p>
+      <div className="space-y-2">
+        {steps.map((step, i) => (
+          <div key={i} className="flex items-start gap-3">
+            <span className="flex-shrink-0 mt-2 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700
+              text-slate-600 dark:text-slate-300 text-xs font-bold flex items-center justify-center">
+              {i + 1}
+            </span>
+            <div className="flex-1 space-y-1">
+              {step.line_label && (
+                <p className="text-xs font-mono text-slate-500 dark:text-slate-400">
+                  Line {step.line_label}
+                </p>
+              )}
+              <p className="text-sm text-slate-700 dark:text-slate-300">
+                <LatexRenderer text={step.question} />
+              </p>
+              <input
+                type="text"
+                value={trace[String(i)] || ''}
+                onChange={e => update(i, e.target.value)}
+                disabled={disabled}
+                placeholder="Your answer..."
+                className="w-full px-3 py-1.5 text-sm rounded-lg border-2 border-gray-200
+                  dark:border-gray-700 bg-white dark:bg-gray-800 focus:border-blue-500
+                  focus:outline-none transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

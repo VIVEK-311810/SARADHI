@@ -8,6 +8,7 @@ import { isDemoMode, DemoWebSocket } from '../../utils/demoData';
 import KnowledgeCard from './KnowledgeCard';
 import RichQuestionRenderer from '../shared/RichQuestionRenderer';
 import SolutionStepsViewer from './SolutionStepsViewer';
+import PassageView from './PassageView';
 
 // WebSocket URL configuration
 const WS_BASE_URL = process.env.REACT_APP_API_URL ?
@@ -21,6 +22,7 @@ const EnhancedStudentSession = () => {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activePoll, setActivePoll] = useState(null);
+  const [activeCluster, setActiveCluster] = useState(null); // passage/case-study cluster
 
   // State related to poll interaction
   const [answerData, setAnswerData] = useState({});
@@ -315,6 +317,7 @@ const EnhancedStudentSession = () => {
             if (!data.poll) break;
             window.dispatchEvent(new CustomEvent('saradhi:notification', { detail: { type: 'poll', title: 'New poll — answer now!', body: data.poll.question } }));
             setActivePoll(data.poll);
+            setActiveCluster(data.cluster || null);
             setHasResponded(false);
             setAnswerData({});
             setShowResults(false);
@@ -345,6 +348,7 @@ const EnhancedStudentSession = () => {
           break;
         case 'poll-deactivated':
           setActivePoll(null);
+          setActiveCluster(null);
           setPollEndTime(null);
           setPendingReveal(null);
           pollEndTimeRef.current = null;
@@ -881,6 +885,8 @@ const EnhancedStudentSession = () => {
               </div>
             )}
           </div>
+
+          {activeCluster && <PassageView cluster={activeCluster} />}
 
           <div className="mb-4 sm:mb-6">
             <RichQuestionRenderer
