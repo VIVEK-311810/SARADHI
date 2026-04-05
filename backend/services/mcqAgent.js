@@ -164,40 +164,57 @@ async function parseAndStore(state) {
   }
   const numericSessionId = sessionResult.rows[0].id;
 
+  const VALID_TYPES = [
+    'mcq', 'true_false', 'fill_blank', 'numeric', 'short_answer', 'essay', 'code',
+    'multi_correct', 'assertion_reason', 'match_following', 'ordering',
+    'diagram_labeling', 'truth_table', 'code_trace', 'differentiate',
+  ];
+
   const insertedMCQs = [];
   for (const q of questions) {
+    // Skip questions with no question text — would violate NOT NULL constraint
+    if (!q.question || typeof q.question !== 'string' || !q.question.trim()) {
+      console.warn(`[MCQAgent] Skipping question with no text (type: ${q.type})`);
+      continue;
+    }
+
     const meta = q.options_metadata || {};
+    const qType = VALID_TYPES.includes(q.type) ? q.type : 'mcq';
 
     // Backward-compat: derive legacy options[] + correct_answer for MCQ/TF
     let legacyOptions = null;
     let legacyCorrect = null;
-    if (q.type === 'mcq' && Array.isArray(meta.options) && meta.options.length === 4) {
+    if (qType === 'mcq' && Array.isArray(meta.options) && meta.options.length >= 2) {
       legacyOptions = JSON.stringify(meta.options);
       legacyCorrect = meta.correct ?? 0;
-    } else if (q.type === 'true_false') {
+    } else if (qType === 'true_false') {
       legacyOptions = JSON.stringify(['True', 'False']);
       legacyCorrect = meta.correct ?? 0;
     }
 
     const diffNum = parseInt(q.difficulty);
-    const res = await pool.query(
-      `INSERT INTO generated_mcqs
-         (session_id, question, options, correct_answer, justification, difficulty,
-          question_type, options_metadata, blooms_level)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-      [
-        numericSessionId,
-        q.question,
-        legacyOptions,
-        legacyCorrect,
-        q.justification || '',
-        [1, 2, 3].includes(diffNum) ? diffNum : 1,
-        q.type || 'mcq',
-        JSON.stringify(meta),
-        q.blooms_level || null,
-      ]
-    );
-    insertedMCQs.push(res.rows[0]);
+    try {
+      const res = await pool.query(
+        `INSERT INTO generated_mcqs
+           (session_id, question, options, correct_answer, justification, difficulty,
+            question_type, options_metadata, blooms_level)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+        [
+          numericSessionId,
+          q.question.trim(),
+          legacyOptions,
+          legacyCorrect,
+          q.justification || '',
+          [1, 2, 3].includes(diffNum) ? diffNum : 1,
+          qType,
+          JSON.stringify(meta),
+          q.blooms_level || null,
+        ]
+      );
+      insertedMCQs.push(res.rows[0]);
+    } catch (insertErr) {
+      console.warn(`[MCQAgent] Failed to insert question "${q.question.substring(0, 50)}": ${insertErr.message}`);
+    }
   }
 
   console.log(`[MCQAgent] ✓ Stored ${insertedMCQs.length} questions for session: ${state.sessionId}`);

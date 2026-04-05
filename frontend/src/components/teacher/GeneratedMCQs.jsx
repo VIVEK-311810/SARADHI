@@ -193,10 +193,11 @@ const GeneratedMCQs = ({ sessionId, generatedMCQs, onMCQsSent }) => {
 
   const handleSaveEdit = async () => {
     // Persist edit to backend so it survives page refresh
+    let syncedToServer = false;
     try {
       const token = localStorage.getItem('authToken');
       const options = Array.isArray(editingMCQ.options) ? editingMCQ.options : JSON.parse(editingMCQ.options);
-      await fetch(`${API_BASE_URL}/generated-mcqs/${editingMCQ.tempId}`, {
+      const response = await fetch(`${API_BASE_URL}/generated-mcqs/${editingMCQ.tempId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -210,14 +211,19 @@ const GeneratedMCQs = ({ sessionId, generatedMCQs, onMCQsSent }) => {
           time_limit: editingMCQ.time_limit || 60,
         }),
       });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || `Server returned ${response.status}`);
+      }
+      syncedToServer = true;
     } catch (error) {
       console.error('Error persisting MCQ edit:', error);
-      toast.warning('Edit saved locally but failed to sync with server');
+      toast.warning('Edit saved locally but failed to sync with server: ' + error.message);
     }
 
     setMcqs(mcqs.map(mcq =>
       mcq.tempId === editingMCQ.tempId
-        ? { ...editingMCQ, isEdited: true }
+        ? { ...editingMCQ, isEdited: syncedToServer }
         : mcq
     ));
     setEditingMCQ(null);
@@ -313,8 +319,10 @@ const GeneratedMCQs = ({ sessionId, generatedMCQs, onMCQsSent }) => {
         toast.warning('MCQ activated but WebSocket not connected');
       }
 
-      // ✅ mark this mcq as sent
+      // ✅ mark this mcq as sent in local state AND in the DB
+      // Without the DB update, sent_to_students stays FALSE and the MCQ reappears after a refresh
       setSentIds(prev => new Set(prev).add(mcq.tempId));
+      deleteMCQ(mcq.tempId); // fire-and-forget — clean up DB row so it won't reappear on refresh
 
       // ✅ fetch poll stats right after sending
       const intervalId = setInterval(async () => {

@@ -55,6 +55,16 @@ const TeacherAnalytics = () => {
         fetch(`${API_URL}/analytics/teacher/${currentUser.id}/sessions`, { headers })
       ]);
 
+      // Check each response individually — a 401/403/500 must not be silently swallowed
+      if (!overviewRes.ok || !pollsRes.ok || !trendsRes.ok || !sessionsRes.ok) {
+        const failedStatus = [overviewRes, pollsRes, trendsRes, sessionsRes].find(r => !r.ok)?.status;
+        if (failedStatus === 401 || failedStatus === 403) {
+          navigate('/auth');
+          return;
+        }
+        throw new Error(`Analytics request failed (${failedStatus})`);
+      }
+
       const [overviewData, pollsData, trendsData, sessionsData] = await Promise.all([
         overviewRes.json(),
         pollsRes.json(),
