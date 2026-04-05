@@ -2,10 +2,19 @@ import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { pollAPI } from '../../utils/api';
 import LatexRenderer from '../shared/LatexRenderer';
+import RichQuestionRenderer from '../shared/RichQuestionRenderer';
 import SolutionStepsBuilder from './SolutionStepsBuilder';
 import RubricBuilder from './RubricBuilder';
 import DiagramMarkerEditor from './DiagramMarkerEditor';
 import ClusterBuilder from './ClusterBuilder';
+
+const TYPE_TIME_DEFAULTS = {
+  true_false: 20, mcq: 45, fill_blank: 30, one_word: 25,
+  numeric: 60, short_answer: 120, code: 120, multi_correct: 60,
+  assertion_reason: 60, match_following: 90, ordering: 75,
+  essay: 300, differentiate: 180, diagram_labeling: 120,
+  truth_table: 120, code_trace: 180,
+};
 
 const QUESTION_TYPES = [
   // Phase 1
@@ -85,6 +94,9 @@ const emptyPoll = {
   // Essay with rubric (Phase 3)
   essayWordLimit: '',
   rubric: [],
+  // Short answer grading hints
+  shortAnswerRubric: '',
+  shortAnswerKeyPoints: '',
   // Differentiate Between (Phase 3)
   diffColA: '',
   diffColB: '',
@@ -129,9 +141,16 @@ const formatTimeAgo = (ts) => {
 const PollPanel = ({
   sessionId, polls, activePoll, liveResponseCount, onlineCount,
   presentCount, stuckCount, wsRef, setActivePoll, setLiveResponseCount, onPollsChange,
+  initialData,
 }) => {
-  const [poll, setPoll] = useState({ ...emptyPoll });
+  const [poll, setPoll] = useState({ ...emptyPoll, ...(initialData || {}) });
   const [showCluster, setShowCluster] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+
+  // When parent passes new initialData (reuse question), reset the form
+  React.useEffect(() => {
+    if (initialData) setPoll({ ...emptyPoll, ...initialData });
+  }, [initialData]);
 
   const set = (field, value) => setPoll(p => ({ ...p, [field]: value }));
 
@@ -217,7 +236,13 @@ const PollPanel = ({
     }
 
     if (poll.questionType === 'short_answer') {
-      return { ...base, options: [], correct_answer: null };
+      return {
+        ...base, options: [], correct_answer: null,
+        options_metadata: {
+          rubric: poll.shortAnswerRubric?.trim() || null,
+          key_points: poll.shortAnswerKeyPoints?.trim() || null,
+        },
+      };
     }
 
     if (poll.questionType === 'code') {
@@ -438,7 +463,7 @@ const PollPanel = ({
                 <button
                   key={qt.id}
                   type="button"
-                  onClick={() => set('questionType', qt.id)}
+                  onClick={() => { set('questionType', qt.id); set('timeLimit', TYPE_TIME_DEFAULTS[qt.id] || 60); }}
                   title={qt.desc}
                   className={`py-2 px-1 rounded-lg border-2 text-xs font-medium transition-all flex flex-col items-center gap-1
                     ${poll.questionType === qt.id
@@ -656,18 +681,88 @@ const PollPanel = ({
             )}
           </div>
 
-          <button type="submit"
-            className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-lg font-medium text-sm">
-            Create &amp; Activate Poll
-          </button>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setShowPreview(true)}
+              className="px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+            >
+              👁 Preview
+            </button>
+            <button type="submit"
+              className="flex-1 sm:flex-none bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-lg font-medium text-sm">
+              Create &amp; Activate Poll
+            </button>
+          </div>
         </form>
       </div>
+
+      {/* ── Student View Preview Modal ── */}
+      {showPreview && (() => {
+        const payload = buildPayload();
+        const previewPoll = {
+          ...payload,
+          id: 'preview',
+          options: Array.isArray(payload.options) ? payload.options : [],
+          options_metadata: payload.options_metadata || null,
+        };
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-700">
+                <div>
+                  <h3 className="font-semibold text-slate-900 dark:text-white">Student View Preview</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">This is exactly what students will see</p>
+                </div>
+                <button onClick={() => setShowPreview(false)}
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl leading-none">✕</button>
+              </div>
+              <div className="p-5">
+                <RichQuestionRenderer
+                  poll={previewPoll}
+                  answerData={{}}
+                  onAnswer={() => {}}
+                  disabled={false}
+                />
+                <p className="mt-4 text-center text-xs text-slate-400 dark:text-slate-500 italic">
+                  Preview only — answers are not saved
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Active polls list ── */}
       {polls.length > 0 && (
         <div className="space-y-3">
-          {polls.filter(p => p.isActive || p.is_active).map(p => (
+          {polls.filter(p => p.isActive || p.is_active).map(p => {
+            const TYPE_GUIDANCE = {
+              mcq:              '⊙ Students select one of four options.',
+              true_false:       '⊤ Students answer True or False.',
+              fill_blank:       '▭ Students type the missing word or phrase.',
+              one_word:         'W Students type a single word.',
+              numeric:          '# Students enter a number — tolerance is applied.',
+              short_answer:     '✎ Students type a short response. Grade manually after closing.',
+              essay:            '📝 Students write a long answer. Use the rubric to grade after.',
+              multi_correct:    '☑ Students select all correct options (JEE-style).',
+              assertion_reason: 'AR Students evaluate assertion + reason with four fixed options.',
+              match_following:  '⇌ Students match each left item to the correct right item.',
+              ordering:         '↕ Students arrange items in the correct order.',
+              differentiate:    '⇔ Students fill a two-column comparison table.',
+              diagram_labeling: '🖼 Students label parts of the uploaded diagram.',
+              truth_table:      '⊤⊥ Students complete missing cells in the logic table.',
+              code_trace:       '⟶ Students trace code execution step-by-step.',
+              code:             '</> Students see a code block and choose/type the answer.',
+            };
+            const guidance = TYPE_GUIDANCE[p.question_type] || null;
+            return (
             <div key={p.id} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-4">
+              {guidance && (
+                <div className="mb-3 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 rounded-lg px-3 py-1.5">
+                  <span>{guidance}</span>
+                </div>
+              )}
               <div className="flex justify-between items-start gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
@@ -681,19 +776,40 @@ const PollPanel = ({
                     )}
                   </div>
                   <p className="font-medium text-slate-900 dark:text-white text-sm">{p.question}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    {liveResponseCount} response{liveResponseCount !== 1 ? 's' : ''} · {formatTimeAgo(p.activated_at || p.created_at)}
-                  </p>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {liveResponseCount} response{liveResponseCount !== 1 ? 's' : ''} · {formatTimeAgo(p.activated_at || p.created_at)}
+                    </p>
+                    {['essay', 'short_answer'].includes(p.question_type) && liveResponseCount > 0 && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">
+                        ✎ Manual grading needed after closing
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <button
-                  onClick={() => handleDeactivate(p.id)}
-                  className="flex-shrink-0 bg-red-100 dark:bg-red-900/30 hover:bg-red-200 text-red-800 dark:text-red-300 text-sm font-medium py-1.5 px-3 rounded-lg transition-colors"
-                >
-                  End Poll
-                </button>
+                <div className="flex flex-col gap-1.5 shrink-0">
+                  <button
+                    onClick={async () => {
+                      try {
+                        await pollAPI.revealPoll(p.id);
+                        toast.success('Answers revealed to students');
+                      } catch { toast.error('Failed to reveal answers'); }
+                    }}
+                    className="bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 text-amber-800 dark:text-amber-300 text-xs font-medium py-1.5 px-3 rounded-lg transition-colors whitespace-nowrap"
+                  >
+                    Reveal Now
+                  </button>
+                  <button
+                    onClick={() => handleDeactivate(p.id)}
+                    className="bg-red-100 dark:bg-red-900/30 hover:bg-red-200 text-red-800 dark:text-red-300 text-xs font-medium py-1.5 px-3 rounded-lg transition-colors whitespace-nowrap"
+                  >
+                    End Poll
+                  </button>
+                </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -817,8 +933,36 @@ function AnswerConfig({ poll, set }) {
 
   if (qt === 'short_answer') {
     return (
-      <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg text-sm text-amber-700 dark:text-amber-300">
-        ✎ Short Answer — students write free text. You will grade responses manually after the poll ends.
+      <div className="space-y-3">
+        <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg text-sm text-amber-700 dark:text-amber-300">
+          ✎ Short Answer — students write free text. You will grade responses manually after the poll ends.
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+            Key Points <span className="text-xs font-normal text-slate-400">(optional — used by AI grader)</span>
+          </label>
+          <textarea
+            value={poll.shortAnswerKeyPoints}
+            onChange={e => set('shortAnswerKeyPoints', e.target.value)}
+            rows={2}
+            placeholder="e.g. Must mention Newton's 3rd law, action-reaction pair..."
+            className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg
+              bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+            Grading Rubric <span className="text-xs font-normal text-slate-400">(optional — shown to AI grader)</span>
+          </label>
+          <textarea
+            value={poll.shortAnswerRubric}
+            onChange={e => set('shortAnswerRubric', e.target.value)}
+            rows={2}
+            placeholder="e.g. 1 mark for definition, 1 mark for example, deduct for incorrect units..."
+            className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg
+              bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none"
+          />
+        </div>
       </div>
     );
   }
@@ -972,38 +1116,70 @@ function AnswerConfig({ poll, set }) {
 
   if (qt === 'assertion_reason') {
     const fixedOpts = [
-      'Both A and R true, R explains A',
-      'Both A and R true, R does NOT explain A',
-      'A is true, R is false',
-      'A is false, R is true',
+      { label: 'Both A and R true, R explains A',         short: 'A✓ R✓ — R explains A' },
+      { label: 'Both A and R true, R does NOT explain A', short: 'A✓ R✓ — R doesn\'t explain A' },
+      { label: 'A is true, R is false',                  short: 'A✓ R✗' },
+      { label: 'A is false, R is true',                  short: 'A✗ R✓' },
     ];
+    const hasPreview = poll.assertion.trim() || poll.reason.trim();
     return (
       <div className="space-y-3">
+        {/* Assertion field */}
         <div>
-          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Assertion (A)</label>
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+            Assertion (A) <span className="text-slate-400 font-normal">— statement to evaluate</span>
+          </label>
           <textarea value={poll.assertion} onChange={e => set('assertion', e.target.value)}
-            rows={2} placeholder="State the assertion..."
+            rows={2} placeholder="State the assertion (e.g. 'The boiling point of water is 100°C at 1 atm')"
             className="w-full p-2.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg
               bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none" />
         </div>
+
+        {/* Reason field */}
         <div>
-          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Reason (R)</label>
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+            Reason (R) <span className="text-slate-400 font-normal">— explanation to evaluate</span>
+          </label>
           <textarea value={poll.reason} onChange={e => set('reason', e.target.value)}
-            rows={2} placeholder="State the reason..."
+            rows={2} placeholder="State the reason (e.g. 'Water molecules have strong intermolecular hydrogen bonds')"
             className="w-full p-2.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg
               bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none" />
         </div>
+
+        {/* Live preview */}
+        {hasPreview && (
+          <div className="rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50 p-3 text-sm">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Student preview</p>
+            {poll.assertion.trim() && (
+              <p className="mb-1.5 text-slate-800 dark:text-slate-200">
+                <span className="font-bold text-primary-600 dark:text-primary-400">A: </span>{poll.assertion}
+              </p>
+            )}
+            {poll.reason.trim() && (
+              <p className="text-slate-800 dark:text-slate-200">
+                <span className="font-bold text-amber-600 dark:text-amber-400">R: </span>{poll.reason}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Correct option picker */}
         <div>
-          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Correct Option</label>
-          {fixedOpts.map((label, i) => (
-            <button key={i} type="button" onClick={() => set('arCorrectAnswer', i)}
-              className={`w-full text-left px-3 py-2 text-xs rounded-lg border mb-1 transition-colors
-                ${poll.arCorrectAnswer === i
-                  ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700'
-                  : 'border-slate-200 dark:border-slate-600 text-slate-500 hover:border-slate-400'}`}>
-              {String.fromCharCode(65 + i)}. {label}
-            </button>
-          ))}
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">Correct Option</label>
+          <div className="grid grid-cols-2 gap-1.5">
+            {fixedOpts.map((opt, i) => (
+              <button key={i} type="button" onClick={() => set('arCorrectAnswer', i)}
+                className={`text-left px-3 py-2 text-xs rounded-lg border transition-colors
+                  ${poll.arCorrectAnswer === i
+                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 font-semibold'
+                    : 'border-slate-200 dark:border-slate-600 text-slate-500 hover:border-slate-400'}`}>
+                <span className="font-bold mr-1">{String.fromCharCode(65 + i)}.</span>{opt.short}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-xs text-slate-400">
+            Full text: {fixedOpts[poll.arCorrectAnswer]?.label}
+          </p>
         </div>
       </div>
     );

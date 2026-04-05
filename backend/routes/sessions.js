@@ -116,7 +116,7 @@ router.post('/:sessionId/join', authenticate, authorize('student'), async (req, 
     const student_id = req.user.id; // Always use authenticated user — prevents IDOR
 
     const sessionResult = await pool.query(
-      'SELECT id, session_id, title, course_name, is_active, is_live FROM sessions WHERE session_id = $1',
+      'SELECT id, session_id, title, course_name, is_active, is_live, locked_at, lock_after_minutes, live_started_at FROM sessions WHERE session_id = $1',
       [sessionId.toUpperCase()]
     );
     if (sessionResult.rows.length === 0) {
@@ -131,15 +131,24 @@ router.post('/:sessionId/join', authenticate, authorize('student'), async (req, 
       return res.status(403).json({ error: 'Class is not live yet. Wait for your teacher to start the class.' });
     }
 
+    // Check if returning participant FIRST — returning students bypass lock
     const existing = await pool.query(
       'SELECT * FROM session_participants WHERE session_id = $1 AND student_id = $2',
       [session.id, student_id]
     );
-    if (existing.rows.length > 0) {
+    const isReturning = existing.rows.length > 0;
+    if (isReturning) {
       return res.status(200).json({
         message: 'Already joined session',
         session: { id: session.id, session_id: session.session_id, title: session.title, course_name: session.course_name, is_active: session.is_active, is_live: session.is_live }
       });
+    }
+
+    // Lock check: only applies to first-time joiners
+    const autoLocked = session.lock_after_minutes && session.live_started_at &&
+      (Date.now() - new Date(session.live_started_at).getTime()) / 60000 > session.lock_after_minutes;
+    if (session.locked_at || autoLocked) {
+      return res.status(403).json({ error: 'Session is locked. New students cannot join at this time.' });
     }
 
     await pool.query(
@@ -167,10 +176,20 @@ router.get('/:sessionId/participants', authenticate, async (req, res) => {
     }
 
     const result = await pool.query(`
-      SELECT sp.student_id as id, u.full_name as name, u.email, sp.joined_at, sp.is_active
+      SELECT
+        sp.student_id as id,
+        u.full_name as name,
+        u.email,
+        sp.joined_at,
+        sp.is_active,
+        COALESCE(SUM(pr.tab_switches), 0)::int AS total_tab_switches,
+        COUNT(pr.id)::int AS polls_answered
       FROM session_participants sp
       JOIN users u ON sp.student_id = u.id
+      LEFT JOIN polls p ON p.session_id = sp.session_id
+      LEFT JOIN poll_responses pr ON pr.poll_id = p.id AND pr.student_id = sp.student_id
       WHERE sp.session_id = $1
+      GROUP BY sp.student_id, u.full_name, u.email, sp.joined_at, sp.is_active
       ORDER BY sp.joined_at DESC
     `, [numericSessionId]);
 
@@ -328,6 +347,99 @@ router.get('/:sessionId/notes', authenticate, async (req, res) => {
     res.json({ status: notes_status || 'none', url: notes_url, generatedAt: notes_generated_at, error: notes_error });
   } catch (error) {
     logger.error('Error fetching notes status', { error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /:sessionId/lock — Teacher locks/unlocks session to prevent new joiners
+router.patch('/:sessionId/lock', authenticate, authorize('teacher'), async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { locked } = req.body;
+
+    if (typeof locked !== 'boolean') {
+      return res.status(400).json({ error: 'locked must be a boolean' });
+    }
+
+    const result = await pool.query(
+      `UPDATE sessions
+       SET locked_at = CASE WHEN $1 = TRUE THEN NOW() ELSE NULL END
+       WHERE session_id = $2 AND teacher_id = $3
+       RETURNING id, session_id, locked_at`,
+      [locked, sessionId.toUpperCase(), req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found or access denied' });
+    }
+
+    logger.info(`Session ${locked ? 'locked' : 'unlocked'}`, { sessionId: sessionId.toUpperCase(), teacherId: req.user.id });
+    res.json({ success: true, locked: !!result.rows[0].locked_at, locked_at: result.rows[0].locked_at });
+  } catch (error) {
+    logger.error('Error toggling session lock', { error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /:sessionId/generate-summary — AI-generate a post-class session summary (teacher only)
+router.post('/:sessionId/generate-summary', authenticate, authorize('teacher'), async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const numericSessionId = await getNumericSessionId(sessionId);
+    if (numericSessionId === null) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    // IDOR: verify teacher owns this session
+    const ownerCheck = await pool.query(
+      'SELECT id FROM sessions WHERE id=$1 AND teacher_id=$2',
+      [numericSessionId, req.user.id]
+    );
+    if (ownerCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Mark as generating
+    await pool.query(
+      `UPDATE sessions SET summary_status='generating' WHERE id=$1`,
+      [numericSessionId]
+    );
+
+    // Run async — don't block response
+    const sessionSummaryService = require('../services/sessionSummaryService');
+    sessionSummaryService.generateSessionSummary(numericSessionId)
+      .catch(err => {
+        logger.error('Session summary generation failed', { error: err.message, sessionId: numericSessionId });
+        pool.query(`UPDATE sessions SET summary_status='failed' WHERE id=$1`, [numericSessionId]).catch(() => {});
+      });
+
+    res.json({ success: true, status: 'generating' });
+  } catch (error) {
+    logger.error('Error starting session summary', { error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /:sessionId/summary — Get AI session summary (teacher only)
+router.get('/:sessionId/summary', authenticate, authorize('teacher'), async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const result = await pool.query(
+      `SELECT summary_text, summary_status, summary_generated_at
+       FROM sessions WHERE session_id=$1 AND teacher_id=$2`,
+      [sessionId.toUpperCase(), req.user.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found or access denied' });
+    }
+    const { summary_text, summary_status, summary_generated_at } = result.rows[0];
+    res.json({
+      status: summary_status || 'none',
+      summary: summary_text,
+      generated_at: summary_generated_at,
+    });
+  } catch (error) {
+    logger.error('Error fetching session summary', { error: error.message });
     res.status(500).json({ error: 'Internal server error' });
   }
 });

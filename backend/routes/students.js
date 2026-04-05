@@ -157,6 +157,37 @@ router.get('/:studentId/stats', authenticate, async (req, res) => {
   }
 });
 
+// GET /api/students/:studentId/type-accuracy
+// Accuracy breakdown by question_type (for student analytics)
+router.get('/:studentId/type-accuracy', authenticate, async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    if (!authorizeStudentAccess(req, res, studentId)) return;
+
+    const result = await pool.query(`
+      SELECT
+        COALESCE(p.question_type, 'mcq') AS question_type,
+        COUNT(*) AS answered,
+        SUM(CASE WHEN pr.is_correct = true THEN 1 ELSE 0 END) AS correct,
+        ROUND(
+          SUM(CASE WHEN pr.is_correct = true THEN 1 ELSE 0 END)::DECIMAL /
+          NULLIF(COUNT(*), 0) * 100, 1
+        ) AS accuracy
+      FROM poll_responses pr
+      JOIN polls p ON pr.poll_id = p.id
+      WHERE pr.student_id = $1
+        AND pr.is_correct IS NOT NULL
+      GROUP BY COALESCE(p.question_type, 'mcq')
+      ORDER BY answered DESC
+    `, [studentId]);
+
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    logger.error('Error fetching student type accuracy', { error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/students/:studentId/active-polls
 // Get active polls for student's sessions
 router.get('/:studentId/active-polls', authenticate, async (req, res) => {

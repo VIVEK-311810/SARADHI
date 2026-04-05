@@ -75,7 +75,11 @@ export const apiRequest = async (endpoint, options = {}) => {
     }
 
     if (!response.ok) {
-      const message = HTTP_ERROR_MESSAGES[response.status] || `Request failed (${response.status})`;
+      let message = HTTP_ERROR_MESSAGES[response.status] || `Request failed (${response.status})`;
+      try {
+        const body = await response.json();
+        if (body?.error) message = body.error;
+      } catch { /* ignore parse errors */ }
       throw new Error(message);
     }
 
@@ -160,12 +164,14 @@ export const studentAPI = {
     apiRequest(`/students/${studentId}/active-polls`),
 
   // Submit poll response
-  submitPollResponse: (studentId, pollId, answerData, responseTime) =>
+  submitPollResponse: (studentId, pollId, answerData, responseTime, tabSwitches = 0, timeFocusedMs = null) =>
     apiRequest(`/students/${studentId}/polls/${pollId}/respond`, {
       method: 'POST',
       body: JSON.stringify({
         answer_data: answerData,
         response_time: responseTime,
+        tab_switches: tabSwitches,
+        time_focused_ms: timeFocusedMs,
       }),
     }),
 
@@ -215,6 +221,21 @@ export const sessionAPI = {
     apiRequest(`/sessions/${sessionId}`, {
       method: 'DELETE',
     }),
+
+  // Lock / unlock session (teacher only)
+  lockSession: (sessionId, locked) =>
+    apiRequest(`/sessions/${sessionId}/lock`, {
+      method: 'PATCH',
+      body: JSON.stringify({ locked }),
+    }),
+
+  // Generate AI session summary (async — fires and returns immediately)
+  generateSessionSummary: (sessionId) =>
+    apiRequest(`/sessions/${sessionId}/generate-summary`, { method: 'POST' }),
+
+  // Get AI session summary status + text
+  getSessionSummary: (sessionId) =>
+    apiRequest(`/sessions/${sessionId}/summary`),
 };
 
 // Poll API functions
@@ -248,7 +269,11 @@ export const pollAPI = {
   
   // Get Poll Stats
   getPollStats: (pollId) =>
-    apiRequest(`/polls/${pollId}/stats`)
+    apiRequest(`/polls/${pollId}/stats`),
+
+  // Manually reveal answers to all students mid-poll
+  revealPoll: (pollId) =>
+    apiRequest(`/polls/${pollId}/reveal`, { method: 'POST' }),
 };
 
 // Resource API functions

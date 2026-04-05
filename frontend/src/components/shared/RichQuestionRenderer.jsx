@@ -115,6 +115,7 @@ export default function RichQuestionRenderer({ poll, answerData = {}, onAnswer, 
           onChange={text => onAnswer({ text })}
           disabled={disabled}
           wordLimit={meta.word_limit}
+          rubric={Array.isArray(meta.rubric) ? meta.rubric : []}
         />
       )}
 
@@ -134,16 +135,6 @@ export default function RichQuestionRenderer({ poll, answerData = {}, onAnswer, 
           selected={answerData.selected_options || []}
           onSelect={sel => onAnswer({ selected_options: sel })}
           disabled={disabled}
-        />
-      )}
-
-      {question_type === 'one_word' && (
-        <FillBlankInput
-          value={answerData.text || ''}
-          onChange={text => onAnswer({ text })}
-          disabled={disabled}
-          placeholder="One-word answer..."
-          maxLength={50}
         />
       )}
 
@@ -172,16 +163,6 @@ export default function RichQuestionRenderer({ poll, answerData = {}, onAnswer, 
           order={answerData.order || []}
           onChange={order => onAnswer({ order })}
           disabled={disabled}
-        />
-      )}
-
-      {question_type === 'essay' && (
-        <EssayInput
-          value={answerData.text || ''}
-          onChange={text => onAnswer({ text })}
-          disabled={disabled}
-          wordLimit={meta.word_limit}
-          rubric={meta.rubric}
         />
       )}
 

@@ -53,25 +53,59 @@ async function retrieveContext(state) {
   }
 }
 
-// ── Node 2: Generate MCQs via Mistral ─────────────────────────────────────────
-const MCQ_SYSTEM = `You are an expert MCQ generator for educational content.
+// ── Node 2: Generate questions via Mistral ────────────────────────────────────
+const MCQ_SYSTEM = `You are an AI question generator for university lectures. Generate 3-4 questions of MIXED types to test different cognitive levels. Use the transcript and course materials as content.
 
-Based on the transcript and course materials provided, generate 3-4 high-quality multiple-choice questions with 4 options (A, B, C, D), the correct answer, a concise justification, and a difficulty level based on Bloom's Taxonomy (1=Remember, 2=Understand/Apply, 3=Analyze/Evaluate).
+SUPPORTED TYPES (pick appropriate ones based on the content):
+- mcq: 4-option multiple choice
+- true_false: statement that is true or false
+- fill_blank: short fill-in-the-blank (1-3 word answer, use ___ in the question)
+- numeric: numerical answer with tolerance
+- assertion_reason: one assertion + one reason, 4 fixed options (A=both correct+reason explains, B=both correct+reason doesn't explain, C=assertion correct+reason wrong, D=assertion wrong)
 
-Format your output STRICTLY as:
+Output ONLY a valid JSON array — no markdown fences, no explanation outside the array.
 
----MCQ1---
-Question: [Your question here]
-A. [Option A]
-B. [Option B]
-C. [Option C]
-D. [Option D]
-Correct Answer: [A/B/C/D]
-Justification: [Concise justification here]
-Difficulty: [1/2/3]
-Source: [Transcript/Additional Resource]
+[
+  {
+    "type": "mcq",
+    "question": "...",
+    "question_latex": null,
+    "options_metadata": {
+      "options": ["option A", "option B", "option C", "option D"],
+      "correct": 0
+    },
+    "blooms_level": "Remember",
+    "difficulty": 1,
+    "justification": "..."
+  },
+  {
+    "type": "true_false",
+    "question": "...",
+    "options_metadata": { "correct": 0 },
+    "blooms_level": "Understand",
+    "difficulty": 1,
+    "justification": "..."
+  },
+  {
+    "type": "fill_blank",
+    "question": "The ___ law states ...",
+    "options_metadata": { "accepted_answers": ["Newton", "newton's second"] },
+    "blooms_level": "Remember",
+    "difficulty": 1,
+    "justification": "..."
+  },
+  {
+    "type": "numeric",
+    "question": "Calculate ...",
+    "options_metadata": { "correct_value": 9.81, "tolerance": 0.1, "unit": "m/s2" },
+    "blooms_level": "Apply",
+    "difficulty": 2,
+    "justification": "..."
+  }
+]
 
-(Continue with ---MCQ2---, ---MCQ3---, ---MCQ4--- as needed)`;
+blooms_level must be one of: Remember, Understand, Apply, Analyze, Evaluate, Create
+difficulty: 1=easy, 2=medium, 3=hard`;
 
 const MCQ_HUMAN = `Transcript Segment:
 {transcript}
@@ -79,7 +113,7 @@ const MCQ_HUMAN = `Transcript Segment:
 Course Materials Context:
 {context}
 
-Generate 3-4 MCQs based on BOTH the transcript AND the course materials context above.`;
+Generate 3-4 mixed-type questions based on BOTH the transcript AND the course materials context above. Output ONLY the JSON array.`;
 
 async function generateMCQs(state) {
   const prompt = ChatPromptTemplate.fromMessages([
@@ -95,56 +129,27 @@ async function generateMCQs(state) {
   return { mcqText };
 }
 
-// ── Node 3: Parse text → objects, store in DB, broadcast ─────────────────────
-function parseMCQOutput(text) {
-  const mcqs = [];
-  const blocks = text.split(/---MCQ\d+---/).filter(b => b.trim().length > 0);
-
-  for (const block of blocks) {
-    let question = '', optionA = '', optionB = '', optionC = '', optionD = '';
-    let correctAnswer = '', justification = '', difficulty = '1';
-    let currentSection = '';
-
-    for (const rawLine of block.split('\n')) {
-      const line = rawLine.replace(/\*\*/g, '').trim();
-      if (!line) continue;
-
-      if (line.startsWith('Question:'))           { question = line.slice('Question:'.length).trim();       currentSection = 'question'; }
-      else if (line.startsWith('A.'))              { optionA = line.slice(2).trim();                         currentSection = ''; }
-      else if (line.startsWith('B.'))              { optionB = line.slice(2).trim();                         currentSection = ''; }
-      else if (line.startsWith('C.'))              { optionC = line.slice(2).trim();                         currentSection = ''; }
-      else if (line.startsWith('D.'))              { optionD = line.slice(2).trim();                         currentSection = ''; }
-      else if (line.startsWith('Correct Answer:')) { correctAnswer = line.slice('Correct Answer:'.length).trim(); currentSection = ''; }
-      else if (line.startsWith('Justification:'))  { justification = line.slice('Justification:'.length).trim(); currentSection = 'justification'; }
-      else if (line.startsWith('Difficulty:'))     { difficulty = line.slice('Difficulty:'.length).trim();   currentSection = ''; }
-      else if (line.startsWith('Source:'))         { currentSection = ''; }
-      else if (currentSection === 'question')      { question += ' ' + line; }
-      else if (currentSection === 'justification') { justification += ' ' + line; }
+// ── Node 3: Parse JSON → objects, store in DB, broadcast ─────────────────────
+function parseAIOutput(text) {
+  // Strip markdown fences if model wraps output in ```json ... ```
+  const clean = text.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim();
+  try {
+    const parsed = JSON.parse(clean);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    // Fallback: find JSON array anywhere in the text
+    const match = clean.match(/\[[\s\S]*\]/);
+    if (match) {
+      try { return JSON.parse(match[0]); } catch { return []; }
     }
-
-    if (question && optionA && optionB && optionC && optionD && correctAnswer) {
-      const diffNum = parseInt(difficulty);
-      mcqs.push({
-        question:       question.trim(),
-        option_a:       optionA,
-        option_b:       optionB,
-        option_c:       optionC,
-        option_d:       optionD,
-        correct_answer: correctAnswer.toUpperCase().charAt(0),
-        justification:  justification.trim(),
-        difficulty:     [1, 2, 3].includes(diffNum) ? diffNum : 1,
-      });
-    }
+    return [];
   }
-  return mcqs;
 }
 
-const ANSWER_INDEX = { A: 0, B: 1, C: 2, D: 3 };
-
 async function parseAndStore(state) {
-  const mcqs = parseMCQOutput(state.mcqText);
-  if (!mcqs.length) {
-    console.warn(`[MCQAgent] No MCQs parsed for session: ${state.sessionId}`);
+  const questions = parseAIOutput(state.mcqText);
+  if (!questions.length) {
+    console.warn(`[MCQAgent] No questions parsed for session: ${state.sessionId}`);
     return { mcqs: [] };
   }
 
@@ -160,24 +165,42 @@ async function parseAndStore(state) {
   const numericSessionId = sessionResult.rows[0].id;
 
   const insertedMCQs = [];
-  for (const mcq of mcqs) {
-    const correctIdx = ANSWER_INDEX[mcq.correct_answer] ?? 0;
+  for (const q of questions) {
+    const meta = q.options_metadata || {};
+
+    // Backward-compat: derive legacy options[] + correct_answer for MCQ/TF
+    let legacyOptions = null;
+    let legacyCorrect = null;
+    if (q.type === 'mcq' && Array.isArray(meta.options) && meta.options.length === 4) {
+      legacyOptions = JSON.stringify(meta.options);
+      legacyCorrect = meta.correct ?? 0;
+    } else if (q.type === 'true_false') {
+      legacyOptions = JSON.stringify(['True', 'False']);
+      legacyCorrect = meta.correct ?? 0;
+    }
+
+    const diffNum = parseInt(q.difficulty);
     const res = await pool.query(
-      `INSERT INTO generated_mcqs (session_id, question, options, correct_answer, justification, difficulty)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      `INSERT INTO generated_mcqs
+         (session_id, question, options, correct_answer, justification, difficulty,
+          question_type, options_metadata, blooms_level)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
       [
         numericSessionId,
-        mcq.question,
-        JSON.stringify([mcq.option_a, mcq.option_b, mcq.option_c, mcq.option_d]),
-        correctIdx,
-        mcq.justification,
-        mcq.difficulty || 1,
+        q.question,
+        legacyOptions,
+        legacyCorrect,
+        q.justification || '',
+        [1, 2, 3].includes(diffNum) ? diffNum : 1,
+        q.type || 'mcq',
+        JSON.stringify(meta),
+        q.blooms_level || null,
       ]
     );
     insertedMCQs.push(res.rows[0]);
   }
 
-  console.log(`[MCQAgent] ✓ Stored ${insertedMCQs.length} MCQs for session: ${state.sessionId}`);
+  console.log(`[MCQAgent] ✓ Stored ${insertedMCQs.length} questions for session: ${state.sessionId}`);
 
   if (global.broadcastToSession) {
     global.broadcastToSession(state.sessionId.toUpperCase(), {

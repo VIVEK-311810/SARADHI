@@ -9,6 +9,7 @@ import DoubtsDashboard from './DoubtsDashboard';
 import AudioRecorder from './AudioRecorder';
 import KnowledgeCards from './KnowledgeCards';
 import PollPanel from './PollPanel';
+import ManualGradingPanel from './ManualGradingPanel';
 import AttendancePanel from './AttendancePanel';
 import NotesPanel from './NotesPanel';
 import useAudioRecorder from '../../hooks/useAudioRecorder';
@@ -37,6 +38,8 @@ const EnhancedSessionManagement = () => {
   const [wsConnected, setWsConnected] = useState(false);
   const [pollStats, setPollStats] = useState({});
   const [liveResponseCount, setLiveResponseCount] = useState(0);
+  const [pollPanelInitialData, setPollPanelInitialData] = useState(null);
+  const [gradingPoll, setGradingPoll] = useState(null); // poll to manually grade
 
   // Activity tracking state
   const [lastSegmentTime, setLastSegmentTime] = useState(null);
@@ -51,6 +54,16 @@ const EnhancedSessionManagement = () => {
   const [notesStatus, setNotesStatus] = useState('none'); // 'none'|'generating'|'ready'|'failed'
   const [notesUrl, setNotesUrl] = useState(null);
   const notesPollingRef = useRef(null);
+
+  // Session lock state
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockLoading, setLockLoading] = useState(false);
+
+  // AI session summary state
+  const [summaryStatus, setSummaryStatus] = useState('none'); // 'none'|'generating'|'completed'|'failed'
+  const [summaryText, setSummaryText] = useState(null);
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
+  const summaryPollingRef = useRef(null);
 
   // Live participant count (from WebSocket)
   const [onlineCount, setOnlineCount] = useState(0);
@@ -93,6 +106,9 @@ const EnhancedSessionManagement = () => {
       }
       if (notesPollingRef.current) {
         clearInterval(notesPollingRef.current);
+      }
+      if (summaryPollingRef.current) {
+        clearInterval(summaryPollingRef.current);
       }
       if (wsRef.current) {
         wsRef.current.close();
@@ -275,6 +291,11 @@ const EnhancedSessionManagement = () => {
     try {
       const data = await sessionAPI.getSession(sessionId);
       setSession(data);
+      setIsLocked(!!data.locked_at);
+      if (data.summary_status && data.summary_status !== 'none') {
+        setSummaryStatus(data.summary_status);
+        if (data.summary_text) setSummaryText(data.summary_text);
+      }
     } catch (error) {
       console.error('Error fetching session:', error);
     } finally {
@@ -368,11 +389,60 @@ const EnhancedSessionManagement = () => {
       setSession(prev => ({ ...prev, is_live: false }));
       setNotesStatus('generating');
       startNotesPolling();
+      // Auto-kick off AI summary after class ends
+      handleGenerateSummary();
     } catch (error) {
       console.error('Error ending class:', error);
     } finally {
       setIsGoingLive(false);
     }
+  };
+
+  const handleToggleLock = async () => {
+    setLockLoading(true);
+    try {
+      const next = !isLocked;
+      await sessionAPI.lockSession(sessionId, next);
+      setIsLocked(next);
+      toast.success(next ? 'Session locked — new students cannot join.' : 'Session unlocked.');
+    } catch (error) {
+      console.error('Error toggling session lock:', error);
+      toast.error('Failed to update session lock.');
+    } finally {
+      setLockLoading(false);
+    }
+  };
+
+  const handleGenerateSummary = async () => {
+    setSummaryStatus('generating');
+    try {
+      await sessionAPI.generateSessionSummary(sessionId);
+      startSummaryPolling();
+    } catch (error) {
+      console.error('Error starting summary generation:', error);
+      setSummaryStatus('failed');
+    }
+  };
+
+  const startSummaryPolling = () => {
+    if (summaryPollingRef.current) clearInterval(summaryPollingRef.current);
+    summaryPollingRef.current = setInterval(async () => {
+      try {
+        const data = await sessionAPI.getSessionSummary(sessionId);
+        setSummaryStatus(data.status);
+        if (data.status === 'completed') {
+          setSummaryText(data.summary);
+          setSummaryExpanded(true);
+          clearInterval(summaryPollingRef.current);
+          toast.success('AI session summary ready!');
+        } else if (data.status === 'failed') {
+          clearInterval(summaryPollingRef.current);
+          toast.error('Summary generation failed.');
+        }
+      } catch (err) {
+        console.error('Summary polling error:', err);
+      }
+    }, 3000);
   };
 
   const startNotesPolling = () => {
@@ -672,6 +742,82 @@ const EnhancedSessionManagement = () => {
                 </div>
               </div>
 
+              {/* Session Lock Control */}
+              {session.is_live && (
+                <div className={`rounded-lg p-3 sm:p-4 border ${isLocked ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600'}`}>
+                  <h3 className="font-semibold text-slate-900 dark:text-white mb-2 text-sm sm:text-base">Session Access</h3>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{isLocked ? '🔒' : '🔓'}</span>
+                      <span className="text-sm text-slate-700 dark:text-slate-300">
+                        {isLocked ? 'Locked — new students cannot join' : 'Open — new students can join'}
+                      </span>
+                    </div>
+                    <button
+                      onClick={handleToggleLock}
+                      disabled={lockLoading}
+                      className={`px-4 py-2.5 sm:py-2 rounded-lg text-sm sm:text-base font-semibold w-full sm:w-auto disabled:opacity-50 text-white ${isLocked ? 'bg-green-600 hover:bg-green-700 active:bg-green-800' : 'bg-red-600 hover:bg-red-700 active:bg-red-800'}`}
+                    >
+                      {lockLoading ? 'Updating...' : isLocked ? 'Unlock Session' : 'Lock Session'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* AI Session Summary */}
+              {!session.is_live && (
+                <div className="rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 p-3 sm:p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-semibold text-indigo-900 dark:text-indigo-200 text-sm sm:text-base">AI Session Summary</h3>
+                    {summaryStatus === 'none' && (
+                      <button
+                        onClick={handleGenerateSummary}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium"
+                      >
+                        Generate Summary
+                      </button>
+                    )}
+                    {summaryStatus === 'generating' && (
+                      <span className="text-indigo-600 dark:text-indigo-400 text-sm animate-pulse">Generating…</span>
+                    )}
+                    {summaryStatus === 'completed' && (
+                      <button
+                        onClick={() => setSummaryExpanded(e => !e)}
+                        className="text-indigo-600 dark:text-indigo-400 text-sm font-medium"
+                      >
+                        {summaryExpanded ? 'Collapse ▲' : 'Expand ▼'}
+                      </button>
+                    )}
+                    {summaryStatus === 'failed' && (
+                      <button
+                        onClick={handleGenerateSummary}
+                        className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium"
+                      >
+                        Retry
+                      </button>
+                    )}
+                  </div>
+                  {summaryStatus === 'none' && (
+                    <p className="text-indigo-700 dark:text-indigo-300 text-sm">
+                      Generate an AI summary of topics covered, confusion points, and recommendations for next class.
+                    </p>
+                  )}
+                  {summaryStatus === 'generating' && (
+                    <p className="text-indigo-600 dark:text-indigo-400 text-sm animate-pulse">
+                      Analysing poll data and generating insights…
+                    </p>
+                  )}
+                  {summaryStatus === 'completed' && summaryExpanded && summaryText && (
+                    <div className="mt-2 text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed bg-white dark:bg-slate-800 rounded-lg p-3 border border-indigo-100 dark:border-indigo-900">
+                      {summaryText}
+                    </div>
+                  )}
+                  {summaryStatus === 'failed' && (
+                    <p className="text-red-600 dark:text-red-400 text-sm">Summary generation failed. Try again.</p>
+                  )}
+                </div>
+              )}
+
               <NotesPanel notesStatus={notesStatus} notesUrl={notesUrl} />
 
               <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3 sm:p-4">
@@ -735,6 +881,7 @@ const EnhancedSessionManagement = () => {
               setActivePoll={setActivePoll}
               setLiveResponseCount={setLiveResponseCount}
               onPollsChange={fetchPolls}
+              initialData={pollPanelInitialData}
             />
           )}
 
@@ -802,48 +949,12 @@ const EnhancedSessionManagement = () => {
           {/* Existing Polls Tab */}
           {activeTab === 'existing-polls' && (
             <div className="space-y-6">
-              <h3 className="text-lg font-semibold dark:text-white">All Polls & Stats</h3>
+              <PastPollsHeader polls={polls} />
 
               {polls.length === 0 ? (
                 <p className="text-slate-500 dark:text-slate-400">No polls available.</p>
               ) : (
-                <div className="space-y-4">
-                  {polls.map(poll => (
-                    <div key={poll.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4 shadow-sm">
-                      <h4 className="font-medium text-slate-900 dark:text-white mb-2">{poll.question}</h4>
-
-                      <div className="space-y-1">
-                        {poll.options.map((option, index) => (
-                          <div key={index} className="flex items-center space-x-2">
-                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
-                              index === poll.correctAnswer ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
-                            }`}>
-                              {String.fromCharCode(65 + index)}
-                            </span>
-                            <span className={index === poll.correctAnswer ? 'font-medium text-green-800 dark:text-green-300' : 'text-slate-700 dark:text-slate-300'}>
-                              {option}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                      {poll.justification &&
-                        <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                          Justification: {poll.justification}
-                        </div>}
-
-                      {pollStats[poll.id] && (
-                        <div className="mt-2 p-2 bg-slate-50 dark:bg-slate-700/50 rounded text-sm text-slate-700 dark:text-slate-300">
-                          <div>Answered: {pollStats[poll.id].answered}</div>
-                          <div>Not Answered: {pollStats[poll.id].not_answered}</div>
-                          <div>Correct Percentage: {isNaN(pollStats[poll.id].correct_percentage) ? 0 : pollStats[poll.id].correct_percentage}%</div>
-                          {pollStats[poll.id].first_correct_student_id && (
-                            <div>First Correct: {pollStats[poll.id].first_correct_student_id}</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <PastPollsList polls={polls} pollStats={pollStats} setGradingPoll={setGradingPoll} setPollPanelInitialData={setPollPanelInitialData} setActiveTab={setActiveTab} />
               )}
             </div>
           )}
@@ -871,8 +982,239 @@ const EnhancedSessionManagement = () => {
         </div>
       </div>
     </div>
+
+    {/* Manual Grading overlay */}
+    {gradingPoll && (
+      <ManualGradingPanel
+        poll={gradingPoll}
+        onClose={() => setGradingPoll(null)}
+      />
+    )}
   );
 };
+
+// ─── Past Polls Sub-components ───────────────────────────────────────────────
+
+const TYPE_FILTER_LABELS = {
+  all: 'All',
+  mcq: 'MCQ', true_false: 'T/F', fill_blank: 'Fill', numeric: 'Num',
+  short_answer: 'Short Ans', essay: 'Essay', match_following: 'Match',
+  ordering: 'Order', assertion_reason: 'A/R', code: 'Code',
+  code_trace: 'Trace', truth_table: 'Truth Table', multi_correct: 'Multi ✓',
+};
+
+function PastPollsHeader({ polls }) {
+  return (
+    <div className="flex items-center justify-between">
+      <h3 className="text-lg font-semibold dark:text-white">All Polls & Stats</h3>
+      <span className="text-xs text-slate-400">{polls.length} poll{polls.length !== 1 ? 's' : ''}</span>
+    </div>
+  );
+}
+
+function PastPollsList({ polls, pollStats, setGradingPoll, setPollPanelInitialData, setActiveTab }) {
+  const [typeFilter, setTypeFilter] = useState('all');
+
+  // Build filter options from types present in this session's polls
+  const presentTypes = ['all', ...Array.from(new Set(polls.map(p => p.question_type || 'mcq')))];
+  const filtered = typeFilter === 'all' ? polls : polls.filter(p => (p.question_type || 'mcq') === typeFilter);
+
+  return (
+    <div className="space-y-4">
+      {/* Type filter pills */}
+      {presentTypes.length > 2 && (
+        <div className="flex flex-wrap gap-1.5">
+          {presentTypes.map(t => (
+            <button
+              key={t}
+              onClick={() => setTypeFilter(t)}
+              className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
+                typeFilter === t
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+              }`}
+            >
+              {TYPE_FILTER_LABELS[t] || t.replace(/_/g, ' ')}
+              {t !== 'all' && (
+                <span className="ml-1 opacity-60">
+                  {polls.filter(p => (p.question_type || 'mcq') === t).length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {filtered.length === 0 && (
+        <p className="text-sm text-slate-400">No polls of this type.</p>
+      )}
+
+      {filtered.map(poll => {
+        const stats = pollStats[poll.id];
+        const qType = poll.question_type || 'mcq';
+        const meta = (() => { try { return typeof poll.options_metadata === 'string' ? JSON.parse(poll.options_metadata) : (poll.options_metadata || {}); } catch { return {}; } })();
+        const breakdown = stats?.type_breakdown;
+
+        const handleReuse = () => {
+          const options = typeof poll.options === 'string' ? JSON.parse(poll.options || '[]') : (poll.options || []);
+          const initialData = {
+            questionType: qType, question: poll.question,
+            questionLatex: poll.question_latex || '', questionImageUrl: poll.question_image_url || '',
+            options: options.length === 4 ? options : ['', '', '', ''],
+            correctAnswer: poll.correct_answer ?? 0,
+            acceptedAnswers: meta.accepted_answers || [''],
+            correctValue: meta.correct_value ?? '', tolerance: meta.tolerance ?? '0', unit: meta.unit || '',
+            shortAnswerRubric: typeof meta.rubric === 'string' ? meta.rubric : '',
+            shortAnswerKeyPoints: meta.key_points || '',
+            justification: poll.justification || '', timeLimit: poll.time_limit || 60,
+            bloomsLevel: poll.blooms_level || '', difficultyLevel: poll.difficulty_level || 'medium',
+            marks: poll.marks || 1, topic: poll.topic || '',
+          };
+          setPollPanelInitialData(initialData);
+          setActiveTab('polls');
+          toast.success('Question loaded into editor — edit and send!');
+        };
+
+        return (
+          <div key={poll.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="flex flex-wrap items-center gap-1.5 flex-1">
+                <h4 className="font-medium text-slate-900 dark:text-white">{poll.question}</h4>
+                {poll.question_type && poll.question_type !== 'mcq' && (
+                  <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-1.5 py-0.5 rounded">
+                    {poll.question_type.replace(/_/g, ' ')}
+                  </span>
+                )}
+                {poll.blooms_level && (
+                  <span className="text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-1.5 py-0.5 rounded">
+                    {poll.blooms_level}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {['essay', 'short_answer', 'differentiate'].includes(qType) && (
+                  <button
+                    onClick={() => setGradingPoll(poll)}
+                    className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors font-medium"
+                  >
+                    ✏ Grade
+                    {pollStats[poll.id]?.ungraded_count > 0 && (
+                      <span className="inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold rounded-full bg-amber-500 text-white">
+                        {pollStats[poll.id].ungraded_count}
+                      </span>
+                    )}
+                  </button>
+                )}
+                <button
+                  onClick={handleReuse}
+                  className="text-xs px-2.5 py-1 rounded-lg border border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors font-medium"
+                >
+                  ♻ Reuse
+                </button>
+              </div>
+            </div>
+
+            {(!poll.question_type || poll.question_type === 'mcq' || poll.question_type === 'true_false') && (
+              <div className="space-y-1">
+                {(typeof poll.options === 'string' ? JSON.parse(poll.options || '[]') : (poll.options || [])).map((option, index) => (
+                  <div key={index} className="flex items-center space-x-2">
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${
+                      index === poll.correct_answer ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+                    }`}>{String.fromCharCode(65 + index)}</span>
+                    <span className={index === poll.correct_answer ? 'font-medium text-green-800 dark:text-green-300' : 'text-slate-700 dark:text-slate-300'}>{option}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {poll.justification && (
+              <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">Justification: {poll.justification}</div>
+            )}
+
+            {stats && (
+              <div className="mt-2 p-2 bg-slate-50 dark:bg-slate-700/50 rounded text-sm text-slate-700 dark:text-slate-300 space-y-1">
+                <div className="flex flex-wrap gap-3">
+                  <span>Answered: <strong>{stats.answered}</strong></span>
+                  <span>Not answered: <strong>{stats.not_answered}</strong></span>
+                  <span>Correct: <strong>{isNaN(stats.correct_percentage) ? 0 : stats.correct_percentage}%</strong></span>
+                </div>
+                {stats.confidence_dist && (() => {
+                  const cd = stats.confidence_dist;
+                  const total = cd.low + cd.medium + cd.high;
+                  if (!total) return null;
+                  return (
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs text-slate-400 shrink-0">Confidence:</span>
+                      <div className="flex-1 flex h-2 rounded-full overflow-hidden gap-px">
+                        {cd.low > 0 && <div className="bg-red-400" style={{ width: `${Math.round(cd.low / total * 100)}%` }} title={`Low: ${cd.low}`} />}
+                        {cd.medium > 0 && <div className="bg-amber-400" style={{ width: `${Math.round(cd.medium / total * 100)}%` }} title={`Medium: ${cd.medium}`} />}
+                        {cd.high > 0 && <div className="bg-green-400" style={{ width: `${Math.round(cd.high / total * 100)}%` }} title={`High: ${cd.high}`} />}
+                      </div>
+                      <span className="text-xs text-slate-400 shrink-0">
+                        🔴{cd.low} 🟡{cd.medium} 🟢{cd.high}
+                      </span>
+                    </div>
+                  );
+                })()}
+                {breakdown?.type === 'option_frequency' && breakdown.data.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Option picks:</p>
+                    {breakdown.data.map((d, i) => {
+                      const total = breakdown.data.reduce((s, x) => s + x.count, 0);
+                      const pct = total ? Math.round((d.count / total) * 100) : 0;
+                      const isCorr = i === (poll.correct_answer ?? -1);
+                      return (
+                        <div key={i} className="flex items-center gap-2">
+                          <span className="text-xs w-5 shrink-0 text-center font-medium">{String.fromCharCode(65 + i)}</span>
+                          <div className="flex-1 bg-slate-200 dark:bg-slate-600 rounded-full h-1.5 overflow-hidden">
+                            <div className={`h-full rounded-full transition-all ${isCorr ? 'bg-green-500' : 'bg-blue-400'}`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-xs text-slate-500 w-12 text-right">{d.count} ({pct}%)</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {breakdown?.type === 'pair_accuracy' && (
+                  <div className="mt-2">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Pair accuracy:</p>
+                    <div className="space-y-1">
+                      {breakdown.data.map((d, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <span className="text-xs flex-1 truncate text-slate-600 dark:text-slate-400">{d.item}</span>
+                          <div className="w-20 bg-slate-200 dark:bg-slate-600 rounded-full h-1.5 overflow-hidden">
+                            <div className="h-full rounded-full bg-teal-500" style={{ width: `${d.pct}%` }} />
+                          </div>
+                          <span className="text-xs text-slate-500 w-10 text-right">{d.pct}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {breakdown?.type === 'position_accuracy' && (
+                  <div className="mt-2">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Position accuracy:</p>
+                    <div className="space-y-1">
+                      {breakdown.data.map((d, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <span className="text-xs text-slate-400 w-5 shrink-0">#{d.position}</span>
+                          <span className="text-xs flex-1 truncate text-slate-600 dark:text-slate-400">{d.item}</span>
+                          <div className="w-16 bg-slate-200 dark:bg-slate-600 rounded-full h-1.5 overflow-hidden">
+                            <div className="h-full rounded-full bg-orange-500" style={{ width: `${d.pct}%` }} />
+                          </div>
+                          <span className="text-xs text-slate-500 w-10 text-right">{d.pct}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 // ─── Gamification Recap Panel ───────────────────────────────────────────────
 const GamificationRecap = ({ sessionId, wsRef }) => {

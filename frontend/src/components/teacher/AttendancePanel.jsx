@@ -121,6 +121,7 @@ const AttendancePanel = ({
                 <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Student</th>
                 <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden sm:table-cell">Email</th>
                 <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden sm:table-cell">Joined At</th>
+                <th className="px-4 sm:px-6 py-3 text-center text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden md:table-cell" title="Total tab switches across all poll responses">Tab Switches</th>
                 <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   {attendanceList.length > 0 ? 'Attendance' : 'Status'}
                 </th>
@@ -148,6 +149,19 @@ const AttendancePanel = ({
                     </td>
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
                       <div className="text-sm text-slate-500 dark:text-slate-400">{formatTimeAgo(participant.joined_at)}</div>
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-center hidden md:table-cell">
+                      {participant.total_tab_switches > 0 ? (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          participant.total_tab_switches >= 3
+                            ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                            : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
+                        }`}>
+                          ⚠ {participant.total_tab_switches}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400 dark:text-slate-500">—</span>
+                      )}
                     </td>
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                       {attendanceList.length > 0 && attendanceStatus ? (

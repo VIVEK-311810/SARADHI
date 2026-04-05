@@ -8,6 +8,93 @@ import {
 
 const API_BASE_URL = process.env.REACT_APP_API_URL ;
 
+const TYPE_LABELS = {
+  mcq:              { label: 'MCQ',  color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+  true_false:       { label: 'T/F',  color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
+  fill_blank:       { label: 'Fill', color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400' },
+  numeric:          { label: 'Num',  color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' },
+  assertion_reason: { label: 'A/R',  color: 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400' },
+};
+
+function QuestionPreview({ mcq }) {
+  const raw = mcq.options_metadata;
+  const meta = raw
+    ? (typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return {}; } })() : raw)
+    : {};
+
+  switch (mcq.question_type) {
+    case 'true_false':
+      return (
+        <div className="flex gap-2 mt-2">
+          {['True', 'False'].map((opt, i) => (
+            <span key={i} className={`text-xs px-3 py-1 rounded-full font-medium border ${
+              i === meta.correct
+                ? 'bg-green-100 border-green-400 text-green-800 dark:bg-green-900/20 dark:text-green-300'
+                : 'bg-slate-50 border-slate-300 text-slate-600 dark:bg-slate-700/50 dark:text-slate-300 dark:border-slate-600'
+            }`}>{opt}{i === meta.correct ? ' ✓' : ''}</span>
+          ))}
+        </div>
+      );
+
+    case 'fill_blank':
+      return (
+        <div className="mt-2 text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-700/50 p-1.5 rounded">
+          <strong>Accepted:</strong> {(meta.accepted_answers || []).join(' / ') || '—'}
+        </div>
+      );
+
+    case 'numeric':
+      return (
+        <div className="mt-2 text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-700/50 p-1.5 rounded">
+          <strong>Answer:</strong> {meta.correct_value ?? '—'}
+          {meta.unit ? ` ${meta.unit}` : ''}
+          {meta.tolerance != null ? ` ± ${meta.tolerance}` : ''}
+        </div>
+      );
+
+    case 'assertion_reason': {
+      const arOptions = [
+        'A: Both true, R explains A',
+        "B: Both true, R doesn't explain",
+        'C: A true, R false',
+        'D: A false',
+      ];
+      return (
+        <div className="mt-2 space-y-1 text-xs">
+          <div className="p-1.5 bg-slate-50 dark:bg-slate-700/50 rounded">
+            <strong>A:</strong> {meta.assertion || '—'}
+          </div>
+          <div className="p-1.5 bg-slate-50 dark:bg-slate-700/50 rounded">
+            <strong>R:</strong> {meta.reason || '—'}
+          </div>
+          <div className="text-green-700 dark:text-green-400 font-medium">
+            ✓ {arOptions[meta.correct ?? 0]}
+          </div>
+        </div>
+      );
+    }
+
+    default: { // mcq
+      let opts = [];
+      try { opts = Array.isArray(mcq.options) ? mcq.options : JSON.parse(mcq.options || '[]'); } catch { opts = []; }
+      return (
+        <div className="space-y-1 mt-2">
+          {opts.map((option, optionIndex) => (
+            <div key={optionIndex} className={`text-xs sm:text-sm p-1.5 sm:p-2 rounded ${
+              optionIndex === mcq.correct_answer
+                ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 font-medium'
+                : 'bg-slate-50 dark:bg-slate-700/50 text-slate-700 dark:text-slate-300'
+            }`}>
+              {String.fromCharCode(65 + optionIndex)}. {option}
+              {optionIndex === mcq.correct_answer && ' ✓'}
+            </div>
+          ))}
+        </div>
+      );
+    }
+  }
+}
+
 const GeneratedMCQs = ({ sessionId, generatedMCQs, onMCQsSent }) => {
   const [mcqs, setMcqs] = useState([]);
   const [selectedMCQs, setSelectedMCQs] = useState(new Set());
@@ -195,13 +282,23 @@ const GeneratedMCQs = ({ sessionId, generatedMCQs, onMCQsSent }) => {
   const handleSendMCQ = async (mcq) => {
     setSendingIds(prev => new Set(prev).add(mcq.tempId));
     try {
+      const parsedOptions = mcq.options
+        ? (Array.isArray(mcq.options) ? mcq.options : (() => { try { return JSON.parse(mcq.options); } catch { return null; } })())
+        : null;
+      const parsedMeta = mcq.options_metadata
+        ? (typeof mcq.options_metadata === 'string' ? (() => { try { return JSON.parse(mcq.options_metadata); } catch { return undefined; } })() : mcq.options_metadata)
+        : undefined;
+
       const pollData = {
         session_id: sessionId,
         question: mcq.question,
-        options: Array.isArray(mcq.options) ? mcq.options : JSON.parse(mcq.options),
+        options: parsedOptions,
         correct_answer: mcq.correct_answer,
         justification: mcq.justification || '',
-        time_limit: mcq.time_limit || 60
+        time_limit: mcq.time_limit || 60,
+        question_type: mcq.question_type || 'mcq',
+        ...(parsedMeta !== undefined && { options_metadata: parsedMeta }),
+        ...(mcq.blooms_level && { blooms_level: mcq.blooms_level }),
       };
 
       const createdPoll = await pollAPI.createPoll(pollData);
@@ -309,8 +406,8 @@ const GeneratedMCQs = ({ sessionId, generatedMCQs, onMCQsSent }) => {
   if (!mcqs || mcqs.length === 0) {
     return (
       <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-4 sm:p-6">
-        <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 dark:text-white">Generated MCQs</h3>
-        <p className="text-slate-500 dark:text-slate-400 text-sm sm:text-base">No generated MCQs available. MCQs will appear here when generated from class transcripts.</p>
+        <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 dark:text-white">AI Questions</h3>
+        <p className="text-slate-500 dark:text-slate-400 text-sm sm:text-base">No AI questions yet. Questions will appear here when generated from class transcripts.</p>
       </div>
     );
   }
@@ -318,7 +415,7 @@ const GeneratedMCQs = ({ sessionId, generatedMCQs, onMCQsSent }) => {
   return (
     <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
-        <h3 className="text-base sm:text-lg font-semibold dark:text-white">Generated MCQs ({mcqs.length})</h3>
+        <h3 className="text-base sm:text-lg font-semibold dark:text-white">AI Questions ({mcqs.length})</h3>
         <div className="flex gap-2">
           <button
             onClick={handleSelectAll}
@@ -408,8 +505,10 @@ const GeneratedMCQs = ({ sessionId, generatedMCQs, onMCQsSent }) => {
                     className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500 disabled:opacity-50"
                   />
                 )}
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">MCQ {index + 1}</span>
+                <div className="flex items-center flex-wrap gap-1.5">
+                  <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">Q{index + 1}</span>
+                  {(() => { const t = TYPE_LABELS[mcq.question_type || 'mcq'] || TYPE_LABELS.mcq;
+                    return <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${t.color}`}>{t.label}</span>; })()}
                   {mcq.difficulty && (
                     <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
                       mcq.difficulty === 1 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
@@ -417,6 +516,11 @@ const GeneratedMCQs = ({ sessionId, generatedMCQs, onMCQsSent }) => {
                                              'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
                     }`}>
                       {mcq.difficulty === 1 ? 'Easy' : mcq.difficulty === 2 ? 'Medium' : 'Hard'}
+                    </span>
+                  )}
+                  {mcq.blooms_level && (
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400">
+                      {mcq.blooms_level}
                     </span>
                   )}
                   {mcq.isEdited && (
@@ -469,17 +573,7 @@ const GeneratedMCQs = ({ sessionId, generatedMCQs, onMCQsSent }) => {
 
             <div className="mb-3">
               <h4 className="font-medium text-slate-800 dark:text-slate-200 mb-2 text-sm sm:text-base">{mcq.question}</h4>
-              <div className="space-y-1">
-                {(Array.isArray(mcq.options) ? mcq.options : JSON.parse(mcq.options)).map((option, optionIndex) => (
-                  <div key={optionIndex} className={`text-xs sm:text-sm p-1.5 sm:p-2 rounded ${optionIndex === mcq.correct_answer
-                    ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 font-medium'
-                    : 'bg-slate-50 dark:bg-slate-700/50 text-slate-700 dark:text-slate-300'
-                    }`}>
-                    {String.fromCharCode(65 + optionIndex)}. {option}
-                    {optionIndex === mcq.correct_answer && ' ✓'}
-                  </div>
-                ))}
-              </div>
+              <QuestionPreview mcq={mcq} />
             </div>
 
             {mcq.justification && (
@@ -515,7 +609,7 @@ const GeneratedMCQs = ({ sessionId, generatedMCQs, onMCQsSent }) => {
       {editingMCQ && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-4 sm:p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto">
-            <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 dark:text-white">Edit MCQ</h3>
+            <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 dark:text-white">Edit Question</h3>
 
             <div className="space-y-3 sm:space-y-4">
               <div>
@@ -528,32 +622,38 @@ const GeneratedMCQs = ({ sessionId, generatedMCQs, onMCQsSent }) => {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Options</label>
-                {(Array.isArray(editingMCQ.options) ? editingMCQ.options : JSON.parse(editingMCQ.options)).map((option, index) => (
-                  <div key={index} className="flex items-center space-x-2 mb-2">
-                    <input
-                      type="radio"
-                      name="correct_answer"
-                      checked={editingMCQ.correct_answer === index}
-                      onChange={() => setEditingMCQ({ ...editingMCQ, correct_answer: index })}
-                      className="w-4 h-4 text-primary-600"
-                    />
-                    <input
-                      type="text"
-                      value={option}
-                      onChange={(e) => {
-                        const currentOptions = Array.isArray(editingMCQ.options) ? editingMCQ.options : JSON.parse(editingMCQ.options);
-                        const newOptions = [...currentOptions];
-                        newOptions[index] = e.target.value;
-                        setEditingMCQ({ ...editingMCQ, options: newOptions });
-                      }}
-                      className="flex-1 p-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm sm:text-base dark:bg-slate-700 dark:text-white"
-                      placeholder={`Option ${String.fromCharCode(65 + index)}`}
-                    />
-                  </div>
-                ))}
-              </div>
+              {(!editingMCQ.question_type || editingMCQ.question_type === 'mcq') ? (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Options</label>
+                  {(Array.isArray(editingMCQ.options) ? editingMCQ.options : JSON.parse(editingMCQ.options || '[]')).map((option, index) => (
+                    <div key={index} className="flex items-center space-x-2 mb-2">
+                      <input
+                        type="radio"
+                        name="correct_answer"
+                        checked={editingMCQ.correct_answer === index}
+                        onChange={() => setEditingMCQ({ ...editingMCQ, correct_answer: index })}
+                        className="w-4 h-4 text-primary-600"
+                      />
+                      <input
+                        type="text"
+                        value={option}
+                        onChange={(e) => {
+                          const currentOptions = Array.isArray(editingMCQ.options) ? editingMCQ.options : JSON.parse(editingMCQ.options);
+                          const newOptions = [...currentOptions];
+                          newOptions[index] = e.target.value;
+                          setEditingMCQ({ ...editingMCQ, options: newOptions });
+                        }}
+                        className="flex-1 p-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm sm:text-base dark:bg-slate-700 dark:text-white"
+                        placeholder={`Option ${String.fromCharCode(65 + index)}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-md text-sm text-slate-500 dark:text-slate-400">
+                  Type-specific config is auto-managed. Only question text and justification can be edited here.
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Justification</label>
