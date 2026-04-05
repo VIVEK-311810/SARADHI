@@ -571,7 +571,8 @@ router.get('/:pollId/responses', authenticate, authorize('teacher'), async (req,
     const totalResponses = responses.length;
     const correctCount = responses.filter(r => r.is_correct === true).length;
     const optionCounts = {};
-    poll.options.forEach((_, index) => {
+    const pollOptions = Array.isArray(poll.options) ? poll.options : [];
+    pollOptions.forEach((_, index) => {
       optionCounts[index] = responses.filter(r => r.selected_option === index).length;
     });
 

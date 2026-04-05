@@ -94,7 +94,8 @@ export default function ManualGradingPanel({ poll, onClose }) {
     if (targets.length === 0) { toast.error('No text responses to grade'); return; }
     setBulkLoading(true);
     setBulkProgress({ done: 0, total: targets.length });
-    let done = 0;
+    let succeeded = 0;
+    let processed = 0;
     for (const r of targets) {
       try {
         const data = await apiRequest(`/polls/${poll.id}/responses/${r.id}/suggest-grade`, { method: 'POST' });
@@ -107,14 +108,15 @@ export default function ManualGradingPanel({ poll, onClose }) {
           setResponses(prev => prev.map(p =>
             p.id === r.id ? { ...p, is_correct: suggested_correct, teacher_feedback: feedback } : p
           ));
+          succeeded++;
         }
       } catch { /* skip failed ones */ }
-      done++;
-      setBulkProgress({ done, total: targets.length });
+      processed++;
+      setBulkProgress({ done: processed, total: targets.length });
     }
     setBulkLoading(false);
     setBulkProgress(null);
-    toast.success(`AI graded ${done} responses`);
+    toast.success(`AI graded ${succeeded} of ${targets.length} responses`);
   };
 
   return (

@@ -454,7 +454,8 @@ const EnhancedStudentSession = () => {
     };
 
     websocket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
+      let data;
+      try { data = JSON.parse(event.data); } catch { return; }
 
       switch (data.type) {
         case 'poll-activated':
