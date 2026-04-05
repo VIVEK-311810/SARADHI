@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../db');
 const logger = require('../logger');
 const { authenticate, authorize } = require('../middleware/auth');
+const { aiLimiter } = require('../middleware/rateLimiter');
 const { awardSessionCompletionPoints, processSessionEndXP, generateSessionSummaries } = require('./gamification');
 
 // Helper: resolve string session_id → numeric id
@@ -176,20 +177,28 @@ router.get('/:sessionId/participants', authenticate, async (req, res) => {
     }
 
     const result = await pool.query(`
+      WITH response_stats AS (
+        SELECT
+          pr.student_id,
+          COALESCE(SUM(pr.tab_switches), 0)::int AS total_tab_switches,
+          COUNT(pr.id)::int AS polls_answered
+        FROM poll_responses pr
+        JOIN polls p ON pr.poll_id = p.id
+        WHERE p.session_id = $1
+        GROUP BY pr.student_id
+      )
       SELECT
-        sp.student_id as id,
-        u.full_name as name,
+        sp.student_id AS id,
+        u.full_name AS name,
         u.email,
         sp.joined_at,
         sp.is_active,
-        COALESCE(SUM(pr.tab_switches), 0)::int AS total_tab_switches,
-        COUNT(pr.id)::int AS polls_answered
+        COALESCE(rs.total_tab_switches, 0)::int AS total_tab_switches,
+        COALESCE(rs.polls_answered, 0)::int AS polls_answered
       FROM session_participants sp
       JOIN users u ON sp.student_id = u.id
-      LEFT JOIN polls p ON p.session_id = sp.session_id
-      LEFT JOIN poll_responses pr ON pr.poll_id = p.id AND pr.student_id = sp.student_id
+      LEFT JOIN response_stats rs ON rs.student_id = sp.student_id
       WHERE sp.session_id = $1
-      GROUP BY sp.student_id, u.full_name, u.email, sp.joined_at, sp.is_active
       ORDER BY sp.joined_at DESC
     `, [numericSessionId]);
 
@@ -382,7 +391,7 @@ router.patch('/:sessionId/lock', authenticate, authorize('teacher'), async (req,
 });
 
 // POST /:sessionId/generate-summary — AI-generate a post-class session summary (teacher only)
-router.post('/:sessionId/generate-summary', authenticate, authorize('teacher'), async (req, res) => {
+router.post('/:sessionId/generate-summary', authenticate, authorize('teacher'), aiLimiter, async (req, res) => {
   try {
     const { sessionId } = req.params;
     const numericSessionId = await getNumericSessionId(sessionId);

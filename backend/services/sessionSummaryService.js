@@ -4,8 +4,14 @@ const logger = require('../logger');
 // Reuse existing Mistral client for generation
 let mistralClient;
 try {
-  mistralClient = require('./mistralClient');
-} catch {
+  const client = require('./mistralClient');
+  if (client && typeof client.chat === 'function') {
+    mistralClient = client;
+  } else {
+    logger.warn('mistralClient loaded but missing .chat method — falling back to rule-based summary');
+  }
+} catch (err) {
+  logger.warn('mistralClient unavailable — falling back to rule-based summary', { error: err.message });
   mistralClient = null;
 }
 

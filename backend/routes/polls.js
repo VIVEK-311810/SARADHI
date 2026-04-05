@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../db');
 const logger = require('../logger');
 const { authenticate, authorize } = require('../middleware/auth');
+const { aiLimiter } = require('../middleware/rateLimiter');
 const { calculatePoints } = require('./gamification');
 const mistralClient = require('../services/mistralClient');
 
@@ -178,7 +179,12 @@ router.post('/', authenticate, authorize('teacher'), async (req, res) => {
       solution_steps, subject_tag, difficulty_level, marks, blooms_level, topic, sub_topic, cluster_id
     } = req.body;
 
-    const qType = question_type || 'mcq';
+    const VALID_QUESTION_TYPES = [
+      'mcq', 'true_false', 'fill_blank', 'numeric', 'short_answer', 'essay', 'code',
+      'multi_correct', 'assertion_reason', 'match_following', 'ordering',
+      'diagram_labeling', 'truth_table', 'code_trace', 'differentiate',
+    ];
+    const qType = VALID_QUESTION_TYPES.includes(question_type) ? question_type : 'mcq';
 
     // options required for MCQ/true_false/code; optional for others
     const optionsRequired = ['mcq', 'true_false', 'code'].includes(qType);
@@ -710,7 +716,7 @@ router.post('/:pollId/responses/:responseId/grade', authenticate, authorize('tea
 });
 
 // POST /:pollId/responses/:responseId/suggest-grade — AI grading suggestion
-router.post('/:pollId/responses/:responseId/suggest-grade', authenticate, authorize('teacher'), async (req, res) => {
+router.post('/:pollId/responses/:responseId/suggest-grade', authenticate, authorize('teacher'), aiLimiter, async (req, res) => {
   try {
     const { pollId, responseId } = req.params;
 

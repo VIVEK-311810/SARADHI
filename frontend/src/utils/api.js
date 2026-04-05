@@ -74,16 +74,19 @@ export const apiRequest = async (endpoint, options = {}) => {
       throw new Error('Authentication required');
     }
 
+    // Read body once — response body can only be consumed once
+    let body;
+    try {
+      const text = await response.text();
+      body = text ? JSON.parse(text) : null;
+    } catch { /* ignore parse errors */ }
+
     if (!response.ok) {
-      let message = HTTP_ERROR_MESSAGES[response.status] || `Request failed (${response.status})`;
-      try {
-        const body = await response.json();
-        if (body?.error) message = body.error;
-      } catch { /* ignore parse errors */ }
+      const message = body?.error || HTTP_ERROR_MESSAGES[response.status] || `Request failed (${response.status})`;
       throw new Error(message);
     }
 
-    return await response.json();
+    return body;
   } catch (error) {
     clearTimeout(timeoutId);
     if (error.name === 'AbortError') {

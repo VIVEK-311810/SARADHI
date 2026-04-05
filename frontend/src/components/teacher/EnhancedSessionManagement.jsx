@@ -431,12 +431,14 @@ const EnhancedSessionManagement = () => {
         const data = await sessionAPI.getSessionSummary(sessionId);
         setSummaryStatus(data.status);
         if (data.status === 'completed') {
+          clearInterval(summaryPollingRef.current);
+          summaryPollingRef.current = null;
           setSummaryText(data.summary);
           setSummaryExpanded(true);
-          clearInterval(summaryPollingRef.current);
           toast.success('AI session summary ready!');
         } else if (data.status === 'failed') {
           clearInterval(summaryPollingRef.current);
+          summaryPollingRef.current = null;
           toast.error('Summary generation failed.');
         }
       } catch (err) {
