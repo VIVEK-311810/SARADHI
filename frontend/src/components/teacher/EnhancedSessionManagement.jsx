@@ -295,6 +295,8 @@ const EnhancedSessionManagement = () => {
       if (data.summary_status && data.summary_status !== 'none') {
         setSummaryStatus(data.summary_status);
         if (data.summary_text) setSummaryText(data.summary_text);
+        // If generation was in progress when the page loaded, resume polling
+        if (data.summary_status === 'generating') startSummaryPolling();
       }
     } catch (error) {
       console.error('Error fetching session:', error);
@@ -419,8 +421,13 @@ const EnhancedSessionManagement = () => {
       await sessionAPI.generateSessionSummary(sessionId);
       startSummaryPolling();
     } catch (error) {
-      console.error('Error starting summary generation:', error);
-      setSummaryStatus('failed');
+      // 409 = already generating (e.g. double-click or post-refresh) — just poll for completion
+      if (error.message?.includes('already in progress')) {
+        startSummaryPolling();
+      } else {
+        console.error('Error starting summary generation:', error);
+        setSummaryStatus('failed');
+      }
     }
   };
 

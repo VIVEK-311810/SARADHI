@@ -24,11 +24,23 @@ export default function RichQuestionRenderer({ poll, answerData = {}, onAnswer, 
     question_type = 'mcq',
     question_latex,
     question_image_url,
-    options = [],
-    options_metadata = {},
+    options: rawOptions,
+    options_metadata: rawMeta,
   } = poll;
 
-  const meta = options_metadata || {};
+  // options is stored as a JSON string in TEXT columns — parse defensively
+  const options = Array.isArray(rawOptions)
+    ? rawOptions
+    : (typeof rawOptions === 'string'
+        ? (() => { try { return JSON.parse(rawOptions); } catch { return []; } })()
+        : []);
+
+  // options_metadata is JSONB so usually already an object, but guard for string form too
+  const meta = rawMeta && typeof rawMeta === 'object'
+    ? rawMeta
+    : (typeof rawMeta === 'string'
+        ? (() => { try { return JSON.parse(rawMeta); } catch { return {}; } })()
+        : {});
 
   return (
     <div className="space-y-4">
