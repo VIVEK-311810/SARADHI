@@ -209,10 +209,11 @@ router.post("/sessions/:sessionId/send-mcqs", authenticate, authorize('teacher')
       createdPolls.push(pollResult.rows[0]);
     }
 
-    // Mark MCQs as sent
+    // Mark only the validated MCQs as sent (scoped to this session — prevents cross-session mutation)
+    const validatedMcqIds = mcqsResult.rows.map(m => m.id);
     await pool.query(
       "UPDATE generated_mcqs SET sent_to_students = TRUE, sent_at = CURRENT_TIMESTAMP WHERE id = ANY($1)",
-      [mcqIds]
+      [validatedMcqIds]
     );
 
     res.status(201).json({

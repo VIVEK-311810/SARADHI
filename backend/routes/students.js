@@ -10,7 +10,8 @@ const { authenticate } = require('../middleware/auth');
 
 // Authorization helper: student can only access own data; teachers can access any student
 function authorizeStudentAccess(req, res, studentId) {
-  if (req.user.role === 'student' && req.user.id !== studentId) {
+  // req.user.id is a PostgreSQL integer; req.params values are always strings — compare as strings
+  if (req.user.role === 'student' && String(req.user.id) !== String(studentId)) {
     res.status(403).json({ error: 'Access denied. You can only view your own data.' });
     return false;
   }

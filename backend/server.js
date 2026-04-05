@@ -411,7 +411,11 @@ app.use((err, req, res, next) => {
 
   const status = err.status || err.statusCode || 500;
   logger.error('Unhandled error', { error: err.message, stack: err.stack, path: req.path });
-  res.status(status).json({ error: err.message || 'Internal server error' });
+  // Never expose raw error messages to clients in production — they can leak DB structure
+  const clientMessage = process.env.NODE_ENV === 'production'
+    ? (status < 500 ? err.message : 'Internal server error')
+    : (err.message || 'Internal server error');
+  res.status(status).json({ error: clientMessage });
 });
 
 // 404 handler
