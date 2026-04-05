@@ -13,6 +13,7 @@ import AnalyticsSection from './AnalyticsSection';
 import HowItWorksSection from './HowItWorksSection';
 import OriginSection from './OriginSection';
 import CTASection from './CTASection';
+import SalesAgentWidget from './SalesAgentWidget';
 
 const LandingPage = () => {
   useEffect(() => {
@@ -55,6 +56,8 @@ const LandingPage = () => {
         <OriginSection />
         <CTASection />
       </main>
+
+      <SalesAgentWidget />
 
       {/* Footer */}
       <footer className="bg-slate-950 border-t border-white/5 py-8 px-4">
