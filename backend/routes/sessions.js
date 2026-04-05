@@ -399,13 +399,18 @@ router.post('/:sessionId/generate-summary', authenticate, authorize('teacher'), 
       return res.status(404).json({ error: 'Session not found' });
     }
 
-    // IDOR: verify teacher owns this session
+    // IDOR: verify teacher owns this session; also grab current summary_status
     const ownerCheck = await pool.query(
-      'SELECT id FROM sessions WHERE id=$1 AND teacher_id=$2',
+      'SELECT id, summary_status FROM sessions WHERE id=$1 AND teacher_id=$2',
       [numericSessionId, req.user.id]
     );
     if (ownerCheck.rows.length === 0) {
       return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Prevent double-fire if already in progress
+    if (ownerCheck.rows[0].summary_status === 'generating') {
+      return res.status(409).json({ error: 'Summary generation already in progress' });
     }
 
     // Mark as generating

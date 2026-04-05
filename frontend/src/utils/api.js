@@ -168,7 +168,7 @@ export const studentAPI = {
 
   // Submit poll response
   submitPollResponse: (studentId, pollId, answerData, responseTime, tabSwitches = 0, timeFocusedMs = null) =>
-    apiRequest(`/students/${studentId}/polls/${pollId}/respond`, {
+    apiRequest(`/polls/${pollId}/respond`, {
       method: 'POST',
       body: JSON.stringify({
         answer_data: answerData,

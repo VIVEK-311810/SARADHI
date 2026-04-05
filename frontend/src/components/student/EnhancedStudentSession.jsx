@@ -760,10 +760,28 @@ const EnhancedStudentSession = () => {
       // Finalise proctoring counters for this submission
       const focusedMs = totalFocusedMsRef.current + (Date.now() - focusStartRef.current);
 
+      // Remap shuffled display indices back to original option indices before submitting
+      let submittedAnswerData = answerData;
+      if (optionShuffle) {
+        const qt = activePoll.question_type || 'mcq';
+        if ((qt === 'mcq' || qt === 'true_false' || qt === 'code') &&
+            answerData.selected_option !== undefined && answerData.selected_option !== null) {
+          submittedAnswerData = {
+            ...answerData,
+            selected_option: optionShuffle.shuffledIndices[answerData.selected_option],
+          };
+        } else if (qt === 'multi_correct' && Array.isArray(answerData.selected_options)) {
+          submittedAnswerData = {
+            ...answerData,
+            selected_options: answerData.selected_options.map(i => optionShuffle.shuffledIndices[i]),
+          };
+        }
+      }
+
       const result = await studentAPI.submitPollResponse(
         currentUser.id,
         activePoll.id,
-        answerData,
+        submittedAnswerData,
         responseTimeMs,
         tabSwitchCountRef.current,
         focusedMs
@@ -1144,7 +1162,9 @@ const EnhancedStudentSession = () => {
 
           <div className="mb-4 sm:mb-6">
             <RichQuestionRenderer
-              poll={activePoll}
+              poll={optionShuffle
+                ? { ...activePoll, options: optionShuffle.displayOptions }
+                : activePoll}
               answerData={answerData}
               onAnswer={setAnswerData}
               disabled={hasResponded || timeLeft <= 0}
