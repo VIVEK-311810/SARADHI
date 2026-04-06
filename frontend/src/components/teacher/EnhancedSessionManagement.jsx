@@ -524,6 +524,7 @@ const EnhancedSessionManagement = () => {
   }
 
   return (
+    <>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-4 sm:space-y-6">
       {/* Session Header */}
       <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-4 sm:p-6">
@@ -954,6 +955,7 @@ const EnhancedSessionManagement = () => {
         onClose={() => setGradingPoll(null)}
       />
     )}
+    </>
   );
 };
 
