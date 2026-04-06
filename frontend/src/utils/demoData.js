@@ -22,6 +22,15 @@ export const DEMO_SESSION = {
   teacher_id: 1,
   teacher_name: 'Dr. Rajesh Kumar',
   is_active: true,
+  is_live: true,
+  locked_at: null,
+  lock_after_minutes: null,
+  live_started_at: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+  summary_status: 'none',
+  summary_text: null,
+  summary_generated_at: null,
+  notes_status: 'none',
+  notes_url: null,
   created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
   updated_at: new Date().toISOString(),
 };
@@ -31,25 +40,80 @@ export const DEMO_POLLS = [
     id: 1001,
     session_id: DEMO_SESSION_ID,
     question: 'Which data structure uses LIFO (Last In, First Out) order?',
-    options: ['Queue', 'Stack', 'Array', 'Tree'],
+    question_type: 'mcq',
+    options: JSON.stringify(['Queue', 'Stack', 'Array', 'Tree']),
     correct_answer: 1,
     time_limit: 15,
     justification:
       'A Stack follows LIFO — the last element pushed is the first to be popped, making it ideal for undo operations, function call tracking, and expression parsing.',
     is_active: false,
     activated_at: null,
+    blooms_level: 'remember',
+    difficulty_level: 'easy',
+    marks: 1,
   },
   {
     id: 1002,
     session_id: DEMO_SESSION_ID,
     question: 'What is the time complexity of binary search?',
-    options: ['O(n)', 'O(n²)', 'O(log n)', 'O(1)'],
+    question_type: 'mcq',
+    options: JSON.stringify(['O(n)', 'O(n²)', 'O(log n)', 'O(1)']),
     correct_answer: 2,
     time_limit: 15,
     justification:
       'Binary search halves the search space at every step, giving O(log n) time — far more efficient than O(n) linear search for large sorted datasets.',
     is_active: false,
     activated_at: null,
+    blooms_level: 'understand',
+    difficulty_level: 'easy',
+    marks: 1,
+  },
+  {
+    id: 1003,
+    session_id: DEMO_SESSION_ID,
+    question: 'Which of the following are O(n log n) sorting algorithms? Select all that apply.',
+    question_type: 'multi_correct',
+    options: JSON.stringify(['Bubble Sort', 'Merge Sort', 'Quick Sort (avg)', 'Selection Sort', 'Heap Sort']),
+    options_metadata: { correct_indices: [1, 2, 4], negative_marking: false },
+    correct_answer: null,
+    time_limit: 20,
+    justification: 'Merge Sort is always O(n log n). Quick Sort is O(n log n) on average. Heap Sort is always O(n log n). Bubble and Selection Sort are O(n²).',
+    is_active: false,
+    activated_at: null,
+    blooms_level: 'analyse',
+    difficulty_level: 'medium',
+    marks: 2,
+  },
+  {
+    id: 1004,
+    session_id: DEMO_SESSION_ID,
+    question: 'A binary search tree with n nodes always has O(log n) search time.',
+    question_type: 'true_false',
+    options: JSON.stringify(['True', 'False']),
+    correct_answer: 1,
+    time_limit: 10,
+    justification: 'False — a BST degrades to O(n) when unbalanced (e.g., sorted insertions create a linked list). Only balanced BSTs like AVL or Red-Black trees guarantee O(log n).',
+    is_active: false,
+    activated_at: null,
+    blooms_level: 'evaluate',
+    difficulty_level: 'medium',
+    marks: 1,
+  },
+  {
+    id: 1005,
+    session_id: DEMO_SESSION_ID,
+    question: 'The number of edges in a complete graph with n vertices is ___.',
+    question_type: 'numeric',
+    options: null,
+    options_metadata: { correct_value: 10, tolerance: 0, unit: 'edges', show_unit: true },
+    correct_answer: null,
+    time_limit: 20,
+    justification: 'A complete graph Kₙ has n(n-1)/2 edges. For n=5: 5×4/2 = 10 edges.',
+    is_active: false,
+    activated_at: null,
+    blooms_level: 'apply',
+    difficulty_level: 'medium',
+    marks: 2,
   },
 ];
 
@@ -92,15 +156,32 @@ export const DEMO_RESOURCES = [
 ];
 
 export const DEMO_PARTICIPANTS = [
-  { id: 9999, full_name: 'Demo Student', email: '999999@sastra.ac.in', is_active: true },
-  { id: 1001, full_name: 'Arun Krishnan', email: '112345@sastra.ac.in', is_active: true },
-  { id: 1002, full_name: 'Priya Sundaram', email: '112346@sastra.ac.in', is_active: true },
-  { id: 1003, full_name: 'Karthik Rajan', email: '112347@sastra.ac.in', is_active: true },
-  { id: 1004, full_name: 'Divya Menon', email: '112348@sastra.ac.in', is_active: true },
-  { id: 1005, full_name: 'Vijay Anand', email: '112349@sastra.ac.in', is_active: true },
-  { id: 1006, full_name: 'Sowmya Nair', email: '112350@sastra.ac.in', is_active: false },
-  { id: 1007, full_name: 'Surya Prakash', email: '112351@sastra.ac.in', is_active: true },
+  { id: 9999, full_name: 'Demo Student', email: '999999@sastra.ac.in', is_active: true, total_tab_switches: 0, polls_answered: 4 },
+  { id: 1001, full_name: 'Arun Krishnan', email: '112345@sastra.ac.in', is_active: true, total_tab_switches: 2, polls_answered: 5 },
+  { id: 1002, full_name: 'Priya Sundaram', email: '112346@sastra.ac.in', is_active: true, total_tab_switches: 0, polls_answered: 5 },
+  { id: 1003, full_name: 'Karthik Rajan', email: '112347@sastra.ac.in', is_active: true, total_tab_switches: 1, polls_answered: 3 },
+  { id: 1004, full_name: 'Divya Menon', email: '112348@sastra.ac.in', is_active: true, total_tab_switches: 0, polls_answered: 4 },
+  { id: 1005, full_name: 'Vijay Anand', email: '112349@sastra.ac.in', is_active: true, total_tab_switches: 3, polls_answered: 2 },
+  { id: 1006, full_name: 'Sowmya Nair', email: '112350@sastra.ac.in', is_active: false, total_tab_switches: 0, polls_answered: 1 },
+  { id: 1007, full_name: 'Surya Prakash', email: '112351@sastra.ac.in', is_active: true, total_tab_switches: 0, polls_answered: 5 },
 ];
+
+export const DEMO_AI_SESSION_SUMMARY = {
+  status: 'completed',
+  generated_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+  summary: `TOPICS COVERED
+• Data Structures Fundamentals — Stacks (LIFO), Queues (FIFO), and their O(1) push/pop/enqueue/dequeue operations
+• Algorithm Complexity — Big-O analysis; binary search O(log n) vs linear search O(n)
+• Sorting Algorithms — Comparison of Merge Sort, Quick Sort, and Heap Sort (all O(n log n) average); Bubble and Selection Sort O(n²)
+• Graph Theory Basics — Complete graph edge formula n(n-1)/2; BST balance and worst-case degradation
+
+CONFUSION POINTS
+• BST Time Complexity (54% correct) — Many students assumed BST always gives O(log n). Clarify that only self-balancing trees (AVL, Red-Black) guarantee this; a plain BST degrades to O(n) with sorted input.
+• Multi-correct Sorting (61% correct) — Students struggled to identify all three O(n log n) algorithms simultaneously; common mistake was excluding Heap Sort.
+
+RECOMMENDATION
+Revisit BST balancing next class with a live demo of sorted insertions creating a degenerate tree. A short AVL rotation exercise would reinforce why balance matters.`,
+};
 
 export const DEMO_DASHBOARD = {
   sessions: [
@@ -887,6 +968,20 @@ export const handleDemoRequest = (endpoint, options = {}) => {
   if (ep === `/SESSIONS/${DEMO_SESSION_ID}/POLLS` && method === 'GET')
     return Promise.resolve({ polls: DEMO_POLLS });
 
+  // Session lock / unlock
+  if (ep === `/SESSIONS/${DEMO_SESSION_ID}/LOCK` && method === 'PATCH') {
+    const body = options.body ? JSON.parse(options.body) : {};
+    return Promise.resolve({ success: true, locked: !!body.locked, locked_at: body.locked ? new Date().toISOString() : null });
+  }
+
+  // AI session summary — generate
+  if (ep === `/SESSIONS/${DEMO_SESSION_ID}/GENERATE-SUMMARY` && method === 'POST')
+    return Promise.resolve({ success: true, status: 'generating' });
+
+  // AI session summary — poll status
+  if (ep === `/SESSIONS/${DEMO_SESSION_ID}/SUMMARY` && method === 'GET')
+    return Promise.resolve(DEMO_AI_SESSION_SUMMARY);
+
   // Session join / leave / activity / connection
   if (ep.startsWith(`/SESSIONS/${DEMO_SESSION_ID}`) && method === 'POST')
     return Promise.resolve({ success: true });
@@ -1159,46 +1254,33 @@ export class DemoWebSocket {
         this._emit({ type: 'participant-count-updated', count: 8, sessionId: DEMO_SESSION_ID });
       });
 
-      // ── Poll 1 fires at 5s ──
-      this._schedule(5000, () => {
-        const now = Date.now();
-        this._emit({
-          type: 'poll-activated',
-          poll: DEMO_POLLS[0],
-          poll_end_time: now + DEMO_POLLS[0].time_limit * 1000,
-          server_time: now,
-          sessionId: DEMO_SESSION_ID,
+      // Helper to fire a poll and then run a callback after reveal
+      const firePoll = (pollIndex, delayMs, afterRevealFn) => {
+        this._schedule(delayMs, () => {
+          const t = Date.now();
+          this._emit({
+            type: 'poll-activated',
+            poll: DEMO_POLLS[pollIndex],
+            poll_end_time: t + DEMO_POLLS[pollIndex].time_limit * 1000,
+            server_time: t,
+            sessionId: DEMO_SESSION_ID,
+          });
+          this._schedule(DEMO_POLLS[pollIndex].time_limit * 1000, () => {
+            this._emit({ type: 'reveal-answers', sessionId: DEMO_SESSION_ID, pollId: DEMO_POLLS[pollIndex].id });
+            if (afterRevealFn) afterRevealFn();
+          });
         });
+      };
 
-        // ── reveal-answers for poll 1 at 5+15 = 20s ──
-        this._schedule(DEMO_POLLS[0].time_limit * 1000, () => {
-          this._emit({ type: 'reveal-answers', sessionId: DEMO_SESSION_ID, pollId: DEMO_POLLS[0].id });
-
-          // ── Poll 2 fires 5s after poll 1 reveal ──
-          this._schedule(5000, () => {
-            const now2 = Date.now();
-            this._emit({
-              type: 'poll-activated',
-              poll: DEMO_POLLS[1],
-              poll_end_time: now2 + DEMO_POLLS[1].time_limit * 1000,
-              server_time: now2,
-              sessionId: DEMO_SESSION_ID,
-            });
-
-            // ── reveal-answers for poll 2 at 5+15+5+15 = 40s ──
-            this._schedule(DEMO_POLLS[1].time_limit * 1000, () => {
-              this._emit({ type: 'reveal-answers', sessionId: DEMO_SESSION_ID, pollId: DEMO_POLLS[1].id });
-
-              // ── Knowledge Cards demo — starts 6s after poll 2 reveal ──
-
-              // Step 1: Distribute cards (46s total)
+      // Poll 1 (MCQ) at 5s → Poll 2 (MCQ) → Poll 3 (multi_correct) → Poll 4 (true_false) → Knowledge Cards
+      firePoll(0, 5000, () => {
+        firePoll(1, 5000, () => {
+          firePoll(2, 5000, () => {
+            firePoll(3, 5000, () => {
+              // ── Knowledge Cards demo — starts 6s after poll 4 reveal ──
               this._schedule(6000, () => {
-                this._emit({
-                  type: 'cards-distribute',
-                  card: DEMO_KNOWLEDGE_CARDS.studentCard,
-                });
+                this._emit({ type: 'cards-distribute', card: DEMO_KNOWLEDGE_CARDS.studentCard });
 
-                // Step 2: Activate question — it's the demo student's turn! (54s total)
                 this._schedule(8000, () => {
                   this._emit({
                     type: 'card-activate-question',
@@ -1206,7 +1288,6 @@ export class DemoWebSocket {
                     questionHolderId: DEMO_KNOWLEDGE_CARDS.activeState.questionHolderId,
                   });
 
-                  // Step 3: Reveal answer holder (64s total)
                   this._schedule(10000, () => {
                     this._emit({
                       type: 'card-reveal-answer',
@@ -1215,14 +1296,8 @@ export class DemoWebSocket {
                       questionHolderId: DEMO_KNOWLEDGE_CARDS.activeState.questionHolderId,
                     });
 
-                    // Step 4: Complete the pair, open voting (72s total)
                     this._schedule(8000, () => {
-                      this._emit({
-                        type: 'cards-round-complete',
-                        voteSummary: { up: 7, down: 2 },
-                      });
-
-                      // Step 5: End the activity (82s total)
+                      this._emit({ type: 'cards-round-complete', voteSummary: { up: 7, down: 2 } });
                       this._schedule(10000, () => {
                         this._emit({ type: 'cards-activity-end' });
                       });
