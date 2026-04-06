@@ -25,6 +25,7 @@ const EnhancedTeacherDashboard = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [summaryModal, setSummaryModal] = useState(null); // { title, text }
 
   const currentUser = safeParseUser();
 
@@ -140,6 +141,24 @@ const EnhancedTeacherDashboard = () => {
   return (
     <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
 
+      {/* AI Summary Modal */}
+      {summaryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setSummaryModal(null)}>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-700">
+              <div>
+                <h2 className="font-semibold text-slate-900 dark:text-white text-base">AI Session Summary</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-xs">{summaryModal.title}</p>
+              </div>
+              <button onClick={() => setSummaryModal(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl leading-none px-1">✕</button>
+            </div>
+            <div className="overflow-y-auto px-5 py-4 text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
+              {summaryModal.text}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* End Session Dialog */}
       <AlertDialog open={!!confirmEnd} onOpenChange={(open) => !open && setConfirmEnd(null)}>
         <AlertDialogContent>
@@ -254,6 +273,11 @@ const EnhancedTeacherDashboard = () => {
                       ) : (
                         <Badge variant="ended" dot>Ended</Badge>
                       )}
+                      {session.subject && (
+                        <span className="text-xs bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 px-2 py-0.5 rounded-full font-medium capitalize">
+                          {session.subject}
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">{session.course_name}</p>
                     <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-slate-500 dark:text-slate-400">
@@ -279,6 +303,16 @@ const EnhancedTeacherDashboard = () => {
                     <Button size="sm" variant="outline" onClick={() => navigate(`/session/${session.session_id}/resources`)}>
                       Resources
                     </Button>
+                    {session.summary_status === 'completed' && session.summary_text && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setSummaryModal({ title: session.title, text: session.summary_text })}
+                        className="text-indigo-600 border-indigo-300 hover:bg-indigo-50 dark:text-indigo-400 dark:border-indigo-700 dark:hover:bg-indigo-900/20"
+                      >
+                        AI Summary
+                      </Button>
+                    )}
                     {session.is_active && (
                       <Button
                         size="sm"

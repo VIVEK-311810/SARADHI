@@ -13,7 +13,7 @@ const WebSocket = require('ws');
 const http = require('http');
 const pool = require('./db');
 const logger = require('./logger');
-const { apiLimiter, aiLimiter, aiStudentLimiter, authLimiter } = require('./middleware/rateLimiter');
+const { apiLimiter, aiLimiter, aiStudentLimiter, authLimiter, salesAgentLimiter } = require('./middleware/rateLimiter');
 const { authenticate } = require('./middleware/auth');
 const compression = require('compression');
 const { redis, redisPub, redisSub } = require('./redis');
@@ -118,6 +118,7 @@ const gamificationRouter = require('./routes/gamification');
 const communityRouter = require('./routes/community');
 const aiAssistantRouter = require('./routes/ai-assistant');
 const knowledgeCardsRouter = require('./routes/knowledge-cards');
+const salesAgentRouter = require('./routes/sales-agent');
 const healthRouter = require('./routes/health');
 const { startWorkers, stopWorkers } = require('./workers/aiWorker');
 const { setupBullBoard } = require('./workers/setup');
@@ -141,6 +142,8 @@ app.use('/api/gamification', cachePrivate(30), gamificationRouter);
 app.use('/api/community', communityRouter);
 app.use('/api/ai-assistant', aiAssistantRouter);
 app.use('/api/knowledge-cards', knowledgeCardsRouter);
+// Public sales agent — no auth required, own rate limiter
+app.use('/api/sales-agent', salesAgentLimiter, salesAgentRouter);
 app.use('/health', healthRouter);
 setupBullBoard(app);
 
@@ -408,7 +411,11 @@ app.use((err, req, res, next) => {
 
   const status = err.status || err.statusCode || 500;
   logger.error('Unhandled error', { error: err.message, stack: err.stack, path: req.path });
-  res.status(status).json({ error: err.message || 'Internal server error' });
+  // Never expose raw error messages to clients in production — they can leak DB structure
+  const clientMessage = process.env.NODE_ENV === 'production'
+    ? (status < 500 ? err.message : 'Internal server error')
+    : (err.message || 'Internal server error');
+  res.status(status).json({ error: clientMessage });
 });
 
 // 404 handler

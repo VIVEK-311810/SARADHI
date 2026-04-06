@@ -55,6 +55,16 @@ const TeacherAnalytics = () => {
         fetch(`${API_URL}/analytics/teacher/${currentUser.id}/sessions`, { headers })
       ]);
 
+      // Check each response individually — a 401/403/500 must not be silently swallowed
+      if (!overviewRes.ok || !pollsRes.ok || !trendsRes.ok || !sessionsRes.ok) {
+        const failedStatus = [overviewRes, pollsRes, trendsRes, sessionsRes].find(r => !r.ok)?.status;
+        if (failedStatus === 401 || failedStatus === 403) {
+          navigate('/auth');
+          return;
+        }
+        throw new Error(`Analytics request failed (${failedStatus})`);
+      }
+
       const [overviewData, pollsData, trendsData, sessionsData] = await Promise.all([
         overviewRes.json(),
         pollsRes.json(),
@@ -206,7 +216,7 @@ const TeacherAnalytics = () => {
         {/* Tabs */}
         <div className="border-b border-slate-200 dark:border-slate-700 mb-4 sm:mb-6 overflow-x-auto">
           <nav className="flex space-x-4 sm:space-x-8 min-w-max">
-            {['overview', 'polls', 'sessions'].map((tab) => (
+            {['overview', 'polls', 'sessions', 'blooms', 'types'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -216,7 +226,7 @@ const TeacherAnalytics = () => {
                     : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200'
                 }`}
               >
-                {tab === 'overview' ? 'Engagement Trends' : tab}
+                {tab === 'overview' ? 'Engagement Trends' : tab === 'blooms' ? "Bloom's Taxonomy" : tab === 'types' ? 'Question Types' : tab}
               </button>
             ))}
           </nav>
@@ -367,6 +377,14 @@ const TeacherAnalytics = () => {
           </div>
         )}
 
+        {activeTab === 'blooms' && (
+          <BloomsChart pollPerformance={pollPerformance} />
+        )}
+
+        {activeTab === 'types' && (
+          <QuestionTypesChart pollPerformance={pollPerformance} />
+        )}
+
         {activeTab === 'sessions' && (
           <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-4 sm:p-6">
             <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-3 sm:mb-4">Session Performance</h3>
@@ -465,5 +483,249 @@ const TeacherAnalytics = () => {
     </div>
   );
 };
+
+// ── Bloom's Taxonomy Chart ──────────────────────────────────────────────────────
+const BLOOMS_LEVELS = ['remember', 'understand', 'apply', 'analyze', 'evaluate', 'create'];
+const BLOOMS_COLORS = ['#6366F1', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+const BLOOMS_LABELS = {
+  remember: 'Remember',
+  understand: 'Understand',
+  apply: 'Apply',
+  analyze: 'Analyze',
+  evaluate: 'Evaluate',
+  create: 'Create',
+};
+
+function BloomsChart({ pollPerformance }) {
+  // Count how many polls belong to each Bloom's level
+  const counts = {};
+  BLOOMS_LEVELS.forEach(l => { counts[l] = 0; });
+  let untagged = 0;
+  (pollPerformance || []).forEach(p => {
+    if (p.blooms_level && BLOOMS_LEVELS.includes(p.blooms_level)) {
+      counts[p.blooms_level]++;
+    } else {
+      untagged++;
+    }
+  });
+
+  const chartData = BLOOMS_LEVELS.map((level, i) => ({
+    level: BLOOMS_LABELS[level],
+    count: counts[level],
+    fill: BLOOMS_COLORS[i],
+  })).filter(d => d.count > 0);
+
+  const total = (pollPerformance || []).length;
+  const tagged = total - untagged;
+
+  if (total === 0) {
+    return (
+      <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-6">
+        <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-4">Bloom's Taxonomy Distribution</h3>
+        <div className="h-64 flex flex-col items-center justify-center text-slate-500 gap-2">
+          <span className="text-3xl">🧠</span>
+          <p className="text-sm">No polls created yet.</p>
+          <p className="text-xs text-slate-400">Tag your questions with Bloom's levels when creating them.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Bar chart */}
+        <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-4 sm:p-6">
+          <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-1">Bloom's Taxonomy Distribution</h3>
+          <p className="text-xs text-slate-400 mb-4">
+            {tagged} of {total} poll{total !== 1 ? 's' : ''} tagged
+            {untagged > 0 && ` · ${untagged} untagged`}
+          </p>
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={chartData} layout="vertical" margin={{ left: 16 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" allowDecimals={false} />
+                <YAxis type="category" dataKey="level" width={80} tick={{ fontSize: 12 }} />
+                <Tooltip formatter={(v) => [v, 'Questions']} />
+                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                  {chartData.map((entry, i) => (
+                    <Cell key={i} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-slate-500 text-sm">
+              No tagged questions yet
+            </div>
+          )}
+        </div>
+
+        {/* Pie chart */}
+        <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-4 sm:p-6">
+          <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-4">Cognitive Level Mix</h3>
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={280}>
+              <PieChart>
+                <Pie data={chartData} dataKey="count" nameKey="level" cx="50%" cy="50%" outerRadius={100} label={({ level, percent }) => `${level} ${(percent * 100).toFixed(0)}%`}>
+                  {chartData.map((entry, i) => (
+                    <Cell key={i} fill={entry.fill} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v) => [v, 'Questions']} />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-slate-500 text-sm">
+              No tagged questions yet
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Level breakdown cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {BLOOMS_LEVELS.map((level, i) => (
+          <div key={level} className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-3 text-center">
+            <div className="w-8 h-8 rounded-full mx-auto mb-2 flex items-center justify-center text-white text-xs font-bold"
+              style={{ backgroundColor: BLOOMS_COLORS[i] }}>
+              {counts[level]}
+            </div>
+            <p className="text-xs font-medium text-slate-700 dark:text-slate-300 capitalize">{BLOOMS_LABELS[level]}</p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {tagged > 0 ? `${Math.round((counts[level] / tagged) * 100)}%` : '—'}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* NEP 2020 guidance note */}
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 text-sm text-blue-700 dark:text-blue-300">
+        <p className="font-semibold mb-1">NEP 2020 Recommendation</p>
+        <p className="text-xs">
+          Balance lower-order thinking (Remember, Understand) with higher-order thinking (Apply, Analyze, Evaluate, Create).
+          Aim for at least 40% of questions at Apply level or above to promote competency-based learning.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+const TYPE_META = {
+  mcq:              { label: 'MCQ',            color: '#3B82F6', desc: '4-option multiple choice' },
+  true_false:       { label: 'True / False',   color: '#8B5CF6', desc: 'Binary statement' },
+  fill_blank:       { label: 'Fill in Blank',  color: '#14B8A6', desc: 'Short text answer' },
+  numeric:          { label: 'Numeric',         color: '#F97316', desc: 'Number with tolerance' },
+  short_answer:     { label: 'Short Answer',   color: '#06B6D4', desc: 'Free text (2-3 sentences)' },
+  essay:            { label: 'Essay',           color: '#84CC16', desc: 'Long-form response' },
+  match_following:  { label: 'Match Following',color: '#EC4899', desc: 'Pair matching' },
+  ordering:         { label: 'Ordering',        color: '#EAB308', desc: 'Sequence arrangement' },
+  assertion_reason: { label: 'Assertion/Reason',color: '#F43F5E', desc: 'A+R critical thinking' },
+  code:             { label: 'Code',            color: '#6366F1', desc: 'Write code' },
+  code_trace:       { label: 'Code Trace',      color: '#0EA5E9', desc: 'Trace execution steps' },
+  truth_table:      { label: 'Truth Table',     color: '#A855F7', desc: 'Logic grid' },
+  multi_correct:    { label: 'Multi-Correct',   color: '#10B981', desc: 'Multiple right answers' },
+  passage:          { label: 'Passage',         color: '#F59E0B', desc: 'Comprehension cluster' },
+};
+
+function QuestionTypesChart({ pollPerformance }) {
+  const counts = {};
+  (pollPerformance || []).forEach(p => {
+    const qt = p.question_type || 'mcq';
+    counts[qt] = (counts[qt] || 0) + 1;
+  });
+
+  const total = (pollPerformance || []).length;
+
+  const chartData = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([type, count]) => ({
+      type,
+      label: TYPE_META[type]?.label || type,
+      count,
+      pct: total ? Math.round((count / total) * 100) : 0,
+      fill: TYPE_META[type]?.color || '#94A3B8',
+    }));
+
+  if (total === 0) {
+    return (
+      <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-6">
+        <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-4">Question Type Distribution</h3>
+        <div className="h-64 flex flex-col items-center justify-center text-slate-500 gap-2">
+          <span className="text-3xl">📊</span>
+          <p className="text-sm">No polls created yet.</p>
+          <p className="text-xs text-slate-400">Use different question types to see the distribution here.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Horizontal bar chart */}
+        <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-4 sm:p-6">
+          <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-1">Question Type Distribution</h3>
+          <p className="text-xs text-slate-400 mb-4">{total} poll{total !== 1 ? 's' : ''} across {chartData.length} type{chartData.length !== 1 ? 's' : ''}</p>
+          <ResponsiveContainer width="100%" height={Math.max(220, chartData.length * 36)}>
+            <BarChart data={chartData} layout="vertical" margin={{ left: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+              <XAxis type="number" allowDecimals={false} />
+              <YAxis type="category" dataKey="label" width={110} tick={{ fontSize: 11 }} />
+              <Tooltip formatter={(v, name, props) => [`${v} (${props.payload.pct}%)`, 'Questions']} />
+              <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                {chartData.map((entry, i) => (
+                  <Cell key={i} fill={entry.fill} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Pie chart */}
+        <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-4 sm:p-6">
+          <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-4">Type Mix</h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <PieChart>
+              <Pie data={chartData} dataKey="count" nameKey="label" cx="50%" cy="50%" outerRadius={95}
+                label={({ label, percent }) => percent > 0.05 ? `${label} ${(percent * 100).toFixed(0)}%` : ''}>
+                {chartData.map((entry, i) => (
+                  <Cell key={i} fill={entry.fill} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(v) => [v, 'Questions']} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Type breakdown cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {chartData.map((d) => (
+          <div key={d.type} className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: d.fill }} />
+              <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">{d.label}</p>
+            </div>
+            <p className="text-lg font-bold text-slate-900 dark:text-white">{d.count}</p>
+            <p className="text-xs text-slate-400">{d.pct}% of polls</p>
+            <p className="text-xs text-slate-400 mt-0.5">{TYPE_META[d.type]?.desc || ''}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Diversity note */}
+      {chartData.length < 4 && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50 rounded-xl p-4 text-sm text-blue-800 dark:text-blue-300">
+          <p className="font-semibold mb-1">Tip: Diversify Question Types</p>
+          <p className="text-xs">
+            Using only {chartData.length} question type{chartData.length !== 1 ? 's' : ''}. Try adding True/False, Fill-in-Blank, or Numeric questions to build richer assessments and address different cognitive skills.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default TeacherAnalytics;

@@ -58,7 +58,16 @@ const JoinSession = () => {
       }
     } catch (error) {
       console.error('Error joining session:', error);
-      setError('Failed to join session. Check the session code and try again.');
+      const msg = error?.message || '';
+      if (msg.toLowerCase().includes('locked')) {
+        setError('This session is locked. New students cannot join at this time.');
+      } else if (msg.toLowerCase().includes('not found') || msg.toLowerCase().includes('404')) {
+        setError('Session not found. Double-check the code and try again.');
+      } else if (msg.toLowerCase().includes('not live') || msg.toLowerCase().includes('not active')) {
+        setError('This session hasn\'t started yet. Ask your teacher to go live.');
+      } else {
+        setError(msg || 'Failed to join session. Check the session code and try again.');
+      }
     } finally {
       setLoading(false);
     }

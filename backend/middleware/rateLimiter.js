@@ -39,4 +39,13 @@ const authLimiter = rateLimit({
   message: { error: 'Too many authentication attempts, please try again later.' }
 });
 
-module.exports = { apiLimiter, aiLimiter, aiStudentLimiter, authLimiter };
+// Public sales agent limiter — unauthenticated, IP-keyed, generous window
+const salesAgentLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many questions — please wait a moment and try again.' }
+});
+
+module.exports = { apiLimiter, aiLimiter, aiStudentLimiter, authLimiter, salesAgentLimiter };

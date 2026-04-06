@@ -68,8 +68,12 @@ router.post("/generated-mcqs", validateWebhookSecret, async (req, res) => {
     for (const mcq of mcqs) {
       const { question, option_a, option_b, option_c, option_d, correct_answer, justification, difficulty } = mcq;
 
-      if (!question || !option_a || !option_b || !option_c || !option_d) {
-        logger.warn('Skipping invalid MCQ', { mcqId: mcq.id });
+      if (!question) {
+        logger.warn('Skipping invalid MCQ (no question)', { mcqId: mcq.id });
+        continue;
+      }
+      if (option_a !== undefined && (!option_a || !option_b || !option_c || !option_d)) {
+        logger.warn('Skipping invalid MCQ (incomplete options)', { mcqId: mcq.id });
         continue;
       }
 
@@ -175,20 +179,41 @@ router.post("/sessions/:sessionId/send-mcqs", authenticate, authorize('teacher')
       return res.status(404).json({ error: "No valid MCQs found" });
     }
 
-    // Convert MCQs to regular polls
+    // Convert generated questions to polls (type-aware)
     const createdPolls = [];
     for (const mcq of mcqsResult.rows) {
+      const qType = mcq.question_type || 'mcq';
+      const meta = mcq.options_metadata
+        ? (typeof mcq.options_metadata === 'string' ? JSON.parse(mcq.options_metadata) : mcq.options_metadata)
+        : {};
+
+      // Types graded via options_metadata don't need a correct_answer index
+      let correctAnswer = mcq.correct_answer;
+      if (['fill_blank', 'numeric', 'short_answer', 'assertion_reason'].includes(qType)) {
+        correctAnswer = null;
+      }
+
+      const diffLevel = mcq.difficulty === 1 ? 'easy' : mcq.difficulty === 3 ? 'hard' : 'medium';
+
       const pollResult = await pool.query(
-        "INSERT INTO polls (session_id, question, options, correct_answer, justification, time_limit, is_active) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
-        [numericSessionId, mcq.question, mcq.options, mcq.correct_answer, mcq.justification, 60, false]
+        `INSERT INTO polls
+           (session_id, question, options, correct_answer, justification, time_limit, is_active,
+            question_type, options_metadata, blooms_level, difficulty_level)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+        [
+          numericSessionId, mcq.question, mcq.options, correctAnswer,
+          mcq.justification, 60, false,
+          qType, JSON.stringify(meta), mcq.blooms_level || null, diffLevel,
+        ]
       );
       createdPolls.push(pollResult.rows[0]);
     }
 
-    // Mark MCQs as sent
+    // Mark only the validated MCQs as sent (scoped to this session — prevents cross-session mutation)
+    const validatedMcqIds = mcqsResult.rows.map(m => m.id);
     await pool.query(
       "UPDATE generated_mcqs SET sent_to_students = TRUE, sent_at = CURRENT_TIMESTAMP WHERE id = ANY($1)",
-      [mcqIds]
+      [validatedMcqIds]
     );
 
     res.status(201).json({
@@ -215,11 +240,16 @@ router.put("/generated-mcqs/:mcqId", authenticate, authorize('teacher'), async (
     const { mcqId } = req.params;
     const { question, options, correct_answer, justification, time_limit } = req.body;
 
-    if (!question || !options || !Array.isArray(options) || options.length !== 4) {
-      return res.status(400).json({ error: "Invalid question or options" });
+    if (!question) {
+      return res.status(400).json({ error: "Missing question" });
     }
 
-    if (typeof correct_answer !== 'number' || correct_answer < 0 || correct_answer >= 4) {
+    // options may be null for non-MCQ types (graded via options_metadata)
+    if (options !== null && options !== undefined && (!Array.isArray(options) || options.length !== 4)) {
+      return res.status(400).json({ error: "Invalid options (must be array of 4 or null)" });
+    }
+
+    if (options !== null && options !== undefined && (typeof correct_answer !== 'number' || correct_answer < 0 || correct_answer >= 4)) {
       return res.status(400).json({ error: "Invalid correct answer index" });
     }
 

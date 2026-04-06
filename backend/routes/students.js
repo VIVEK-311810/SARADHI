@@ -10,7 +10,8 @@ const { authenticate } = require('../middleware/auth');
 
 // Authorization helper: student can only access own data; teachers can access any student
 function authorizeStudentAccess(req, res, studentId) {
-  if (req.user.role === 'student' && req.user.id !== studentId) {
+  // req.user.id is a PostgreSQL integer; req.params values are always strings — compare as strings
+  if (req.user.role === 'student' && String(req.user.id) !== String(studentId)) {
     res.status(403).json({ error: 'Access denied. You can only view your own data.' });
     return false;
   }
@@ -153,6 +154,37 @@ router.get('/:studentId/stats', authenticate, async (req, res) => {
     });
   } catch (error) {
     logger.error('Error fetching student stats', { error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/students/:studentId/type-accuracy
+// Accuracy breakdown by question_type (for student analytics)
+router.get('/:studentId/type-accuracy', authenticate, async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    if (!authorizeStudentAccess(req, res, studentId)) return;
+
+    const result = await pool.query(`
+      SELECT
+        COALESCE(p.question_type, 'mcq') AS question_type,
+        COUNT(*) AS answered,
+        SUM(CASE WHEN pr.is_correct = true THEN 1 ELSE 0 END) AS correct,
+        ROUND(
+          SUM(CASE WHEN pr.is_correct = true THEN 1 ELSE 0 END)::DECIMAL /
+          NULLIF(COUNT(*), 0) * 100, 1
+        ) AS accuracy
+      FROM poll_responses pr
+      JOIN polls p ON pr.poll_id = p.id
+      WHERE pr.student_id = $1
+        AND pr.is_correct IS NOT NULL
+      GROUP BY COALESCE(p.question_type, 'mcq')
+      ORDER BY answered DESC
+    `, [studentId]);
+
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    logger.error('Error fetching student type accuracy', { error: error.message });
     res.status(500).json({ error: 'Internal server error' });
   }
 });

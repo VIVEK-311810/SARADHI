@@ -74,12 +74,19 @@ export const apiRequest = async (endpoint, options = {}) => {
       throw new Error('Authentication required');
     }
 
+    // Read body once — response body can only be consumed once
+    let body;
+    try {
+      const text = await response.text();
+      body = text ? JSON.parse(text) : null;
+    } catch { /* ignore parse errors */ }
+
     if (!response.ok) {
-      const message = HTTP_ERROR_MESSAGES[response.status] || `Request failed (${response.status})`;
+      const message = body?.error || HTTP_ERROR_MESSAGES[response.status] || `Request failed (${response.status})`;
       throw new Error(message);
     }
 
-    return await response.json();
+    return body;
   } catch (error) {
     clearTimeout(timeoutId);
     if (error.name === 'AbortError') {
@@ -160,12 +167,14 @@ export const studentAPI = {
     apiRequest(`/students/${studentId}/active-polls`),
 
   // Submit poll response
-  submitPollResponse: (studentId, pollId, selectedOption, responseTime) =>
-    apiRequest(`/students/${studentId}/polls/${pollId}/respond`, {
+  submitPollResponse: (studentId, pollId, answerData, responseTime, tabSwitches = 0, timeFocusedMs = null) =>
+    apiRequest(`/polls/${pollId}/respond`, {
       method: 'POST',
       body: JSON.stringify({
-        selected_option: selectedOption,
+        answer_data: answerData,
         response_time: responseTime,
+        tab_switches: tabSwitches,
+        time_focused_ms: timeFocusedMs,
       }),
     }),
 
@@ -215,6 +224,21 @@ export const sessionAPI = {
     apiRequest(`/sessions/${sessionId}`, {
       method: 'DELETE',
     }),
+
+  // Lock / unlock session (teacher only)
+  lockSession: (sessionId, locked) =>
+    apiRequest(`/sessions/${sessionId}/lock`, {
+      method: 'PATCH',
+      body: JSON.stringify({ locked }),
+    }),
+
+  // Generate AI session summary (async — fires and returns immediately)
+  generateSessionSummary: (sessionId) =>
+    apiRequest(`/sessions/${sessionId}/generate-summary`, { method: 'POST' }),
+
+  // Get AI session summary status + text
+  getSessionSummary: (sessionId) =>
+    apiRequest(`/sessions/${sessionId}/summary`),
 };
 
 // Poll API functions
@@ -248,7 +272,11 @@ export const pollAPI = {
   
   // Get Poll Stats
   getPollStats: (pollId) =>
-    apiRequest(`/polls/${pollId}/stats`)
+    apiRequest(`/polls/${pollId}/stats`),
+
+  // Manually reveal answers to all students mid-poll
+  revealPoll: (pollId) =>
+    apiRequest(`/polls/${pollId}/reveal`, { method: 'POST' }),
 };
 
 // Resource API functions
@@ -357,11 +385,24 @@ export const utils = {
   },
 };
 
+export const clusterAPI = {
+  createCluster: (data) =>
+    apiRequest('/polls/clusters', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getCluster: (clusterId) =>
+    apiRequest(`/polls/clusters/${clusterId}`),
+  getSessionClusters: (sessionId) =>
+    apiRequest(`/polls/session/${sessionId}/clusters`),
+};
+
 export default {
   authAPI,
   studentAPI,
   sessionAPI,
   pollAPI,
+  clusterAPI,
   resourceAPI,
   aiAssistantAPI,
   utils,

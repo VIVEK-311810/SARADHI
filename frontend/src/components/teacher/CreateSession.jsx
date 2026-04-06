@@ -9,7 +9,7 @@ import { Textarea } from '../ui/textarea';
 
 const CreateSession = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({ title: '', description: '', course_name: '' });
+  const [formData, setFormData] = useState({ title: '', description: '', course_name: '', subject: '' });
   const [loading, setLoading] = useState(false);
   const currentUser = safeParseUser();
 
@@ -90,6 +90,38 @@ const CreateSession = () => {
                 rows={3}
                 placeholder="Brief description of what will be covered..."
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                Subject <span className="text-slate-400 font-normal">(optional — enables subject-aware AI responses)</span>
+              </label>
+              <select
+                name="subject"
+                value={formData.subject}
+                onChange={handleChange}
+                className="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg
+                  bg-white dark:bg-slate-700 dark:text-white text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              >
+                <option value="">— Select subject (optional) —</option>
+                <optgroup label="Science & Engineering">
+                  <option value="math">Mathematics</option>
+                  <option value="physics">Physics</option>
+                  <option value="chemistry">Chemistry</option>
+                  <option value="biology">Biology</option>
+                  <option value="cs">Computer Science</option>
+                  <option value="ece">Electronics & Communication (ECE)</option>
+                  <option value="mechanical">Mechanical Engineering</option>
+                  <option value="civil">Civil Engineering</option>
+                </optgroup>
+                <optgroup label="Humanities & Commerce">
+                  <option value="english">English / Literature</option>
+                  <option value="history">History / Social Science</option>
+                  <option value="economics">Economics</option>
+                  <option value="art">Art & Design</option>
+                  <option value="business">Business / Management</option>
+                </optgroup>
+              </select>
             </div>
 
             <div className="bg-primary-50/70 dark:bg-primary-900/20 border border-primary-200/60 dark:border-primary-800/40 rounded-xl p-3 sm:p-4">

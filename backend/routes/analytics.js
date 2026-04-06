@@ -133,6 +133,9 @@ router.get('/teacher/:teacherId/poll-performance', authenticate, authorize('teac
         SUBSTRING(p.question, 1, 50) as question,
         s.title as session_title,
         s.session_id,
+        p.question_type,
+        p.blooms_level,
+        p.subject_tag,
         COUNT(pr.id) as total_responses,
         COUNT(CASE WHEN pr.is_correct THEN 1 END) as correct_responses,
         COALESCE(ROUND((COUNT(CASE WHEN pr.is_correct THEN 1 END)::DECIMAL / NULLIF(COUNT(pr.id), 0)) * 100, 1), 0) as accuracy_rate,
@@ -142,7 +145,7 @@ router.get('/teacher/:teacherId/poll-performance', authenticate, authorize('teac
       JOIN sessions s ON p.session_id = s.id
       LEFT JOIN poll_responses pr ON p.id = pr.poll_id
       WHERE s.teacher_id = $1
-      GROUP BY p.id, p.question, s.title, s.session_id, p.created_at
+      GROUP BY p.id, p.question, s.title, s.session_id, p.question_type, p.blooms_level, p.subject_tag, p.created_at
       ORDER BY p.created_at DESC
       LIMIT $2
     `, [teacherId, limit]);
@@ -154,6 +157,9 @@ router.get('/teacher/:teacherId/poll-performance', authenticate, authorize('teac
         question: row.question + (row.question.length >= 50 ? '...' : ''),
         sessionTitle: row.session_title,
         sessionId: row.session_id,
+        question_type: row.question_type,
+        blooms_level: row.blooms_level,
+        subject_tag: row.subject_tag,
         totalResponses: parseInt(row.total_responses) || 0,
         correctResponses: parseInt(row.correct_responses) || 0,
         accuracyRate: parseFloat(row.accuracy_rate) || 0,

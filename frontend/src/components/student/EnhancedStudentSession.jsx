@@ -1,12 +1,44 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { CheckCircle2, XCircle, Circle } from 'lucide-react';
 import { toast } from 'sonner';
 import LoadingSpinner from '../shared/LoadingSpinner';
 import { apiRequest, studentAPI, safeParseUser } from '../../utils/api';
 import { Badge } from '../ui/badge';
 import { isDemoMode, DemoWebSocket } from '../../utils/demoData';
 import KnowledgeCard from './KnowledgeCard';
+import RichQuestionRenderer from '../shared/RichQuestionRenderer';
+import SolutionStepsViewer from './SolutionStepsViewer';
+import PassageView from './PassageView';
+
+// ── Option shuffle utilities (deterministic per student+poll) ─────────────────
+function seededShuffle(arr, seed) {
+  let s = seed;
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    s = (s * 1664525 + 1013904223) & 0xffffffff;
+    const j = Math.abs(s) % (i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function getOptionSeed(pollId, studentId) {
+  const str = `${pollId}-${studentId}`;
+  return str.split('').reduce((acc, c) => (acc * 31 + c.charCodeAt(0)) & 0xffffffff, 0);
+}
+
+// Compute shuffle map for MCQ / multi_correct types.
+// Returns { displayOptions, shuffledIndices } where shuffledIndices[displayPos] = originalIndex.
+function computeOptionShuffle(poll, userId) {
+  if (!poll || !['mcq', 'multi_correct'].includes(poll.question_type)) return null;
+  const opts = typeof poll.options === 'string' ? JSON.parse(poll.options) : poll.options;
+  if (!opts?.length) return null;
+  const seed = getOptionSeed(poll.id, userId || 0);
+  const originalIndices = opts.map((_, i) => i);
+  const shuffledIndices = seededShuffle(originalIndices, seed);
+  return { displayOptions: shuffledIndices.map(i => opts[i]), shuffledIndices };
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 // WebSocket URL configuration
 const WS_BASE_URL = process.env.REACT_APP_API_URL ?
@@ -20,9 +52,10 @@ const EnhancedStudentSession = () => {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activePoll, setActivePoll] = useState(null);
+  const [activeCluster, setActiveCluster] = useState(null); // passage/case-study cluster
 
   // State related to poll interaction
-  const [selectedOption, setSelectedOption] = useState(null);
+  const [answerData, setAnswerData] = useState({});
   const [hasResponded, setHasResponded] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [submissionResult, setSubmissionResult] = useState(null);
@@ -78,12 +111,31 @@ const EnhancedStudentSession = () => {
   const [liveMcqs, setLiveMcqs] = useState([]);
   const [mcqsExpanded, setMcqsExpanded] = useState(false);
 
+  // Cluster sub-question progress (passage / case-study)
+  const [clusterInfo, setClusterInfo] = useState(null); // { sub_polls: [], title, ... }
+
+  // Confidence rating (local only — after submit, before reveal)
+  const [confidence, setConfidence] = useState(null); // 'low' | 'medium' | 'high'
+  // Hint visibility (shown after 60% of timer elapses without answering)
+  const [hintVisible, setHintVisible] = useState(false);
+  // Scratch pad (local textarea for numeric/code/essay types)
+  const [scratchText, setScratchText] = useState('');
+  const [scratchOpen, setScratchOpen] = useState(false);
+
   // Doubt drawer state
   const [doubtDrawerOpen, setDoubtDrawerOpen] = useState(false);
   const [doubtTitle, setDoubtTitle] = useState('');
   const [doubtContent, setDoubtContent] = useState('');
   const [doubtSubmitting, setDoubtSubmitting] = useState(false);
   const [doubtSuccess, setDoubtSuccess] = useState(false);
+
+  // Option shuffle for MCQ / multi_correct (deterministic per student+poll)
+  const [optionShuffle, setOptionShuffle] = useState(null); // { displayOptions, shuffledIndices }
+
+  // Proctoring refs (not state — avoids re-renders in tick handlers)
+  const tabSwitchCountRef = useRef(0);
+  const focusStartRef = useRef(Date.now());
+  const totalFocusedMsRef = useRef(0);
 
   useEffect(() => {
     if (!sessionId || sessionId === 'undefined' || sessionId === 'null') {
@@ -149,25 +201,121 @@ const EnhancedStudentSession = () => {
     return () => clearInterval(timer);
   }, [activePoll, pollEndTime]);
 
-  // Visibility change handler for background tabs
+  // Fetch cluster sub-poll list when a cluster poll activates (for progress indicator)
+  useEffect(() => {
+    if (!activePoll?.cluster_id) {
+      setClusterInfo(null);
+      return;
+    }
+    apiRequest(`/polls/clusters/${activePoll.cluster_id}`)
+      .then(data => setClusterInfo(data))
+      .catch(() => setClusterInfo(null));
+  }, [activePoll?.cluster_id]);
+
+  // Visibility change handler — tab sync + proctoring detection
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && activePoll && pollEndTimeRef.current) {
-        const adjustedNow = Date.now() + clockOffsetRef.current;
-        const remaining = Math.max(0, Math.floor((pollEndTimeRef.current - adjustedNow) / 1000));
-        setTimeLeft(remaining);
-
-        if (remaining <= 0 && pendingRevealRef.current) {
-          setShowResults(true);
-          setPendingReveal(null);
-          pendingRevealRef.current = null;
+      if (document.visibilityState === 'hidden') {
+        // Tab left during an active unanswered poll — count as a violation
+        if (activePoll && !hasResponded) {
+          tabSwitchCountRef.current += 1;
+          totalFocusedMsRef.current += Date.now() - focusStartRef.current;
+          const count = tabSwitchCountRef.current;
+          if (count <= 3) {
+            toast.warning(`Tab switch detected (${count}/3). Your activity is being logged.`, { duration: 4000 });
+          }
+        }
+      } else if (document.visibilityState === 'visible') {
+        focusStartRef.current = Date.now();
+        // Resync timer on return
+        if (activePoll && pollEndTimeRef.current) {
+          const adjustedNow = Date.now() + clockOffsetRef.current;
+          const remaining = Math.max(0, Math.floor((pollEndTimeRef.current - adjustedNow) / 1000));
+          setTimeLeft(remaining);
+          if (remaining <= 0 && pendingRevealRef.current) {
+            setShowResults(true);
+            setPendingReveal(null);
+            pendingRevealRef.current = null;
+          }
         }
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [activePoll, pollEndTime, clockOffset, pendingReveal]);
+  }, [activePoll, hasResponded, pollEndTime, clockOffset, pendingReveal]);
+
+  // Keyboard shortcuts for active polls
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Don't intercept when typing in an input/textarea
+      if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+      if (!activePoll || hasResponded || timeLeft <= 0) return;
+      const qt = activePoll.question_type || 'mcq';
+
+      if (qt === 'mcq' || qt === 'code') {
+        const idx = ['a', 'b', 'c', 'd'].indexOf(e.key.toLowerCase());
+        if (idx !== -1 && activePoll.options?.[idx] !== undefined) {
+          setAnswerData({ selected_option: idx });
+        }
+      }
+      if (qt === 'true_false') {
+        if (e.key.toLowerCase() === 't') setAnswerData({ selected_option: 0 });
+        if (e.key.toLowerCase() === 'f') setAnswerData({ selected_option: 1 });
+      }
+      if (qt === 'assertion_reason') {
+        const idx = ['a', 'b', 'c', 'd'].indexOf(e.key.toLowerCase());
+        if (idx !== -1) setAnswerData({ selected_option: idx });
+      }
+      if (qt === 'multi_correct') {
+        const idx = ['a', 'b', 'c', 'd'].indexOf(e.key.toLowerCase());
+        if (idx !== -1 && activePoll.options?.[idx] !== undefined) {
+          setAnswerData(prev => {
+            const cur = prev.selected_options || [];
+            const next = cur.includes(idx) ? cur.filter(x => x !== idx) : [...cur, idx];
+            return { selected_options: next };
+          });
+        }
+      }
+      if (e.key === 'Enter' && hasPollAnswer(answerData, qt) && !pollLoading) {
+        submitResponse();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activePoll, hasResponded, timeLeft, answerData, pollLoading]);
+
+  // Reset scratch pad, hint, proctoring + compute option shuffle when poll changes
+  useEffect(() => {
+    setScratchText('');
+    setScratchOpen(false);
+    setConfidence(null);
+    setHintVisible(false);
+    // Reset proctoring counters for the new poll
+    tabSwitchCountRef.current = 0;
+    focusStartRef.current = Date.now();
+    totalFocusedMsRef.current = 0;
+    // Compute deterministic shuffle for MCQ / multi_correct
+    const currentUser = safeParseUser();
+    setOptionShuffle(computeOptionShuffle(activePoll, currentUser?.id));
+  }, [activePoll?.id]);
+
+  // Show hint after 60% of timer has elapsed without answering
+  useEffect(() => {
+    if (!activePoll || hasResponded || hintVisible) return;
+    const limit = activePoll.time_limit || 60;
+    const elapsed = limit - timeLeft;
+    if (elapsed >= limit * 0.6) {
+      const hasHint = !!(activePoll.justification || (() => {
+        try {
+          const m = typeof activePoll.options_metadata === 'string'
+            ? JSON.parse(activePoll.options_metadata) : (activePoll.options_metadata || {});
+          return m.key_points;
+        } catch { return false; }
+      })());
+      if (hasHint) setHintVisible(true);
+    }
+  }, [timeLeft, activePoll, hasResponded, hintVisible]);
 
   const fetchSession = async () => {
     try {
@@ -201,7 +349,7 @@ const EnhancedStudentSession = () => {
           setPollEndTime(data.poll_end_time);
           setTimeLeft(remaining);
           setHasResponded(false);
-          setSelectedOption(null);
+          setAnswerData({});
           setShowResults(false);
           setSubmissionResult(null);
           setPendingReveal(null);
@@ -306,7 +454,8 @@ const EnhancedStudentSession = () => {
     };
 
     websocket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
+      let data;
+      try { data = JSON.parse(event.data); } catch { return; }
 
       switch (data.type) {
         case 'poll-activated':
@@ -314,8 +463,9 @@ const EnhancedStudentSession = () => {
             if (!data.poll) break;
             window.dispatchEvent(new CustomEvent('saradhi:notification', { detail: { type: 'poll', title: 'New poll — answer now!', body: data.poll.question } }));
             setActivePoll(data.poll);
+            setActiveCluster(data.cluster || null);
             setHasResponded(false);
-            setSelectedOption(null);
+            setAnswerData({});
             setShowResults(false);
             setSubmissionResult(null);
             setPendingReveal(null);
@@ -344,6 +494,7 @@ const EnhancedStudentSession = () => {
           break;
         case 'poll-deactivated':
           setActivePoll(null);
+          setActiveCluster(null);
           setPollEndTime(null);
           setPendingReveal(null);
           pollEndTimeRef.current = null;
@@ -446,6 +597,24 @@ const EnhancedStudentSession = () => {
             }));
           }
           break;
+
+        case 'response-graded': {
+          // Teacher has manually graded this student's essay/short_answer response
+          const currentUser = (() => { try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; } })();
+          if (String(data.studentId) === String(currentUser.id)) {
+            const correct = data.isCorrect;
+            const feedback = data.teacherFeedback;
+            // Update submission result so the result reveal block shows
+            setSubmissionResult(prev => prev ? { ...prev, isCorrect: correct, teacherFeedback: feedback } : { isCorrect: correct, teacherFeedback: feedback });
+            setShowResults(true);
+            const msg = correct ? '✅ Your answer was marked correct!' : '❌ Your answer was marked incorrect.';
+            toast?.[correct ? 'success' : 'error']?.(msg);
+            window.dispatchEvent(new CustomEvent('saradhi:notification', {
+              detail: { type: 'grade', title: 'Answer graded', body: msg }
+            }));
+          }
+          break;
+        }
 
         case 'mcqs-generated':
           if (data.mcqs && Array.isArray(data.mcqs) && data.mcqs.length > 0) {
@@ -558,8 +727,24 @@ const EnhancedStudentSession = () => {
     } catch (_) {}
   };
 
+  const hasPollAnswer = (data, questionType) => {
+    if (!data || Object.keys(data).length === 0) return false;
+    const qt = questionType || 'mcq';
+    if (qt === 'mcq' || qt === 'true_false' || qt === 'assertion_reason') return data.selected_option !== undefined;
+    if (qt === 'numeric') return data.value !== undefined && data.value !== '';
+    if (qt === 'code') return data.selected_option !== undefined || !!(data.text?.trim());
+    if (qt === 'multi_correct') return Array.isArray(data.selected_options) && data.selected_options.length > 0;
+    if (qt === 'ordering') return Array.isArray(data.order) && data.order.length > 0;
+    if (qt === 'match_following') return data.pairs && Object.keys(data.pairs).length > 0;
+    if (qt === 'truth_table') return data.cells && Object.keys(data.cells).length > 0;
+    if (qt === 'code_trace') return data.trace && Object.keys(data.trace).length > 0;
+    if (qt === 'diagram_labeling') return data.labels && Object.keys(data.labels).length > 0;
+    if (qt === 'differentiate') return Array.isArray(data.cells) && data.cells.some(c => c?.trim?.());
+    return !!(data.text?.trim());
+  };
+
   const submitResponse = async () => {
-    if (selectedOption === null || hasResponded || pollLoading) return;
+    if (!hasPollAnswer(answerData, activePoll?.question_type) || hasResponded || pollLoading) return;
     setPollLoading(true);
 
     try {
@@ -573,11 +758,34 @@ const EnhancedStudentSession = () => {
         ? Date.now() - pollActivationTimeRef.current
         : (activePoll.time_limit || 60) * 1000 - timeLeft * 1000;
 
+      // Finalise proctoring counters for this submission
+      const focusedMs = totalFocusedMsRef.current + (Date.now() - focusStartRef.current);
+
+      // Remap shuffled display indices back to original option indices before submitting
+      let submittedAnswerData = answerData;
+      if (optionShuffle) {
+        const qt = activePoll.question_type || 'mcq';
+        if ((qt === 'mcq' || qt === 'true_false' || qt === 'code') &&
+            answerData.selected_option !== undefined && answerData.selected_option !== null) {
+          submittedAnswerData = {
+            ...answerData,
+            selected_option: optionShuffle.shuffledIndices[answerData.selected_option],
+          };
+        } else if (qt === 'multi_correct' && Array.isArray(answerData.selected_options)) {
+          submittedAnswerData = {
+            ...answerData,
+            selected_options: answerData.selected_options.map(i => optionShuffle.shuffledIndices[i]),
+          };
+        }
+      }
+
       const result = await studentAPI.submitPollResponse(
         currentUser.id,
         activePoll.id,
-        selectedOption,
-        responseTimeMs
+        submittedAnswerData,
+        responseTimeMs,
+        tabSwitchCountRef.current,
+        focusedMs
       );
 
       setHasResponded(true);
@@ -596,7 +804,7 @@ const EnhancedStudentSession = () => {
     setTimeout(() => {
       setActivePoll(null);
       setShowResults(false);
-      setSelectedOption(null);
+      setAnswerData({});
       setHasResponded(false);
       setPendingReveal(null);
       pendingRevealRef.current = null;
@@ -627,47 +835,6 @@ const EnhancedStudentSession = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const getOptionColor = (index) => {
-    // When results are revealed, show correctness via color + border-l-4 shape cue
-    if (showResults) {
-      const isCorrect = parseInt(activePoll.correct_answer) === parseInt(index);
-      const isSelected = selectedOption === index;
-
-      if (isCorrect) {
-        return 'bg-green-100 border-green-500 text-green-900 border-l-4 dark:bg-green-900/20 dark:border-green-500 dark:text-green-100';
-      }
-      if (isSelected && !isCorrect) {
-        return 'bg-red-100 border-red-500 text-red-900 border-l-4 dark:bg-red-900/20 dark:border-red-500 dark:text-red-100';
-      }
-      return 'bg-slate-50 border-slate-300 text-slate-600 dark:bg-slate-700/50 dark:border-slate-600 dark:text-slate-400';
-    }
-
-    // Before results are revealed
-    return selectedOption === index
-      ? 'bg-primary-100 border-primary-500 text-primary-900 border-l-4 dark:bg-primary-900/30 dark:border-primary-400 dark:text-primary-100'
-      : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700';
-  };
-
-  // Returns an icon providing a shape-based cue alongside the color cue (colour-blind accessible)
-  const getOptionIcon = (index) => {
-    if (showResults) {
-      const isCorrect = parseInt(activePoll.correct_answer) === parseInt(index);
-      const isSelected = selectedOption === index;
-
-      if (isCorrect) {
-        return <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-green-600 dark:text-green-400" />;
-      }
-      if (isSelected && !isCorrect) {
-        return <XCircle className="w-5 h-5 flex-shrink-0 text-red-600 dark:text-red-400" />;
-      }
-      return null;
-    }
-    // Pre-reveal: filled circle if selected, hollow if not
-    if (selectedOption === index) {
-      return <Circle className="w-4 h-4 flex-shrink-0 fill-blue-500 text-primary-500 dark:fill-blue-400 dark:text-primary-400" />;
-    }
-    return <Circle className="w-4 h-4 flex-shrink-0 text-slate-300 dark:text-slate-600" />;
-  };
 
   if (loading) {
     return <LoadingSpinner text="Joining session..." />;
@@ -868,24 +1035,76 @@ const EnhancedStudentSession = () => {
           {mcqsExpanded && (
             <div className="px-4 sm:px-6 pb-4 space-y-4">
               {liveMcqs.map((mcq, i) => {
-                const options = typeof mcq.options === 'string' ? JSON.parse(mcq.options) : mcq.options;
-                return (
-                  <div key={mcq.id || i} className="border border-slate-200 dark:border-slate-700 rounded-lg p-3">
-                    <p className="text-sm font-medium text-slate-900 dark:text-white mb-2">{mcq.question}</p>
+                const qt = mcq.question_type || 'mcq';
+                const meta = (() => {
+                  try { return typeof mcq.options_metadata === 'string' ? JSON.parse(mcq.options_metadata) : (mcq.options_metadata || {}); }
+                  catch { return {}; }
+                })();
+                const options = (() => {
+                  try { return typeof mcq.options === 'string' ? JSON.parse(mcq.options) : (mcq.options || []); }
+                  catch { return []; }
+                })();
+
+                let answerPreview = null;
+                if (qt === 'mcq') {
+                  const opts = meta.options?.length ? meta.options : options;
+                  answerPreview = (
                     <div className="space-y-1">
-                      {options.map((opt, j) => (
-                        <div
-                          key={j}
-                          className={`text-xs px-2.5 py-1.5 rounded ${
-                            j === mcq.correct_answer
-                              ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 font-medium'
-                              : 'text-slate-600 dark:text-slate-400'
-                          }`}
-                        >
+                      {opts.map((opt, j) => (
+                        <div key={j} className={`text-xs px-2.5 py-1.5 rounded ${j === (meta.correct ?? mcq.correct_answer) ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 font-medium' : 'text-slate-600 dark:text-slate-400'}`}>
                           {String.fromCharCode(65 + j)}. {opt}
                         </div>
                       ))}
                     </div>
+                  );
+                } else if (qt === 'true_false') {
+                  const correct = meta.correct ?? mcq.correct_answer ?? 0;
+                  answerPreview = (
+                    <div className="flex gap-2">
+                      {['True', 'False'].map((label, j) => (
+                        <span key={j} className={`text-xs px-3 py-1 rounded-full border ${j === correct ? 'bg-green-100 dark:bg-green-900/30 border-green-400 text-green-700 dark:text-green-300 font-medium' : 'border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400'}`}>{label}</span>
+                      ))}
+                    </div>
+                  );
+                } else if (qt === 'fill_blank') {
+                  const accepted = meta.accepted_answers || [];
+                  answerPreview = (
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      <span className="font-medium text-green-700 dark:text-green-400">Answer: </span>
+                      {accepted.join(' / ') || '—'}
+                    </p>
+                  );
+                } else if (qt === 'numeric') {
+                  answerPreview = (
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      <span className="font-medium text-green-700 dark:text-green-400">Answer: </span>
+                      {meta.correct_value}{meta.unit ? ` ${meta.unit}` : ''}{meta.tolerance != null ? ` ± ${meta.tolerance}` : ''}
+                    </p>
+                  );
+                } else if (qt === 'assertion_reason') {
+                  const arOptions = ['Both A and R are true, R explains A', 'Both A and R are true, R does not explain A', 'A is true, R is false', 'A is false'];
+                  const correct = meta.correct ?? mcq.correct_answer ?? 0;
+                  answerPreview = (
+                    <div className="space-y-1">
+                      {arOptions.map((label, j) => (
+                        <div key={j} className={`text-xs px-2 py-1 rounded ${j === correct ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 font-medium' : 'text-slate-500 dark:text-slate-400'}`}>
+                          ({String.fromCharCode(65 + j)}) {label}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                }
+
+                const typeColors = { mcq: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400', true_false: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400', fill_blank: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400', numeric: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400', assertion_reason: 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400' };
+                const typeLabel = { mcq: 'MCQ', true_false: 'T/F', fill_blank: 'Fill', numeric: 'Num', assertion_reason: 'A/R' };
+
+                return (
+                  <div key={mcq.id || i} className="border border-slate-200 dark:border-slate-700 rounded-lg p-3">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <p className="text-sm font-medium text-slate-900 dark:text-white flex-1">{mcq.question}</p>
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${typeColors[qt] || typeColors.mcq}`}>{typeLabel[qt] || qt}</span>
+                    </div>
+                    {answerPreview}
                     {mcq.justification && (
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 italic">{mcq.justification}</p>
                     )}
@@ -913,27 +1132,153 @@ const EnhancedStudentSession = () => {
             )}
           </div>
 
+          {/* Cluster sub-question progress indicator */}
+          {clusterInfo && clusterInfo.sub_polls && clusterInfo.sub_polls.length > 1 && (() => {
+            const subPolls = clusterInfo.sub_polls;
+            const currentIdx = subPolls.findIndex(p => p.id === activePoll.id);
+            const current = currentIdx >= 0 ? currentIdx + 1 : 1;
+            const total = subPolls.length;
+            return (
+              <div className="mb-3 flex items-center gap-3">
+                <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">
+                  Sub-question {current} of {total}
+                </span>
+                <div className="flex gap-1 flex-1">
+                  {subPolls.map((_, idx) => (
+                    <div
+                      key={idx}
+                      className={`h-1.5 flex-1 rounded-full transition-colors ${
+                        idx < current
+                          ? 'bg-amber-500 dark:bg-amber-400'
+                          : 'bg-slate-200 dark:bg-slate-700'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {activeCluster && <PassageView cluster={activeCluster} />}
+
           <div className="mb-4 sm:mb-6">
-            <h3 className="text-base sm:text-lg font-medium text-slate-900 dark:text-slate-100 mb-3 sm:mb-4">{activePoll.question}</h3>
-            <div className="space-y-2 sm:space-y-3">
-              {activePoll.options && activePoll.options.map((option, index) => (
-                <button
-                  key={index}
-                  onClick={() => !hasResponded && setSelectedOption(index)}
-                  disabled={hasResponded || timeLeft <= 0}
-                  className={`w-full text-left p-3 sm:p-4 border-2 rounded-lg transition-all duration-200 min-h-[52px] flex items-center gap-3 ${getOptionColor(index)} ${hasResponded || timeLeft <= 0 ? 'cursor-not-allowed opacity-75' : 'cursor-pointer active:scale-[0.98]'}`}
-                >
-                  {getOptionIcon(index)}
-                  <span>
-                    <span className="font-medium">{String.fromCharCode(65 + index)}.</span> {option}
-                  </span>
-                </button>
-              ))}
-            </div>
+            <RichQuestionRenderer
+              poll={optionShuffle
+                ? { ...activePoll, options: optionShuffle.displayOptions }
+                : activePoll}
+              answerData={answerData}
+              onAnswer={setAnswerData}
+              disabled={hasResponded || timeLeft <= 0}
+            />
           </div>
 
+          {/* Rubric / key-points hint for essay + short_answer */}
+          {['essay', 'short_answer'].includes(activePoll.question_type) && !hasResponded && (() => {
+            const meta = activePoll.options_metadata
+              ? (typeof activePoll.options_metadata === 'string'
+                  ? (() => { try { return JSON.parse(activePoll.options_metadata); } catch { return {}; } })()
+                  : activePoll.options_metadata)
+              : {};
+            const kp = meta.key_points;
+            const rubric = meta.rubric;
+            if (!kp && !rubric) return null;
+            return (
+              <div className="mb-4 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 p-3 text-xs">
+                <p className="font-semibold text-indigo-700 dark:text-indigo-300 mb-1.5">📋 Guidance from teacher</p>
+                {kp && (
+                  <div className="mb-2">
+                    <p className="text-indigo-600 dark:text-indigo-400 font-medium mb-1">Key points to cover:</p>
+                    <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">{kp}</p>
+                  </div>
+                )}
+                {rubric && typeof rubric === 'string' && (
+                  <div>
+                    <p className="text-indigo-600 dark:text-indigo-400 font-medium mb-1">Grading rubric:</p>
+                    <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">{rubric}</p>
+                  </div>
+                )}
+                {rubric && Array.isArray(rubric) && (
+                  <div>
+                    <p className="text-indigo-600 dark:text-indigo-400 font-medium mb-1">Grading rubric:</p>
+                    <ul className="space-y-1">
+                      {rubric.map((r, i) => (
+                        <li key={i} className="flex items-start gap-2 text-slate-700 dark:text-slate-300">
+                          <span className="shrink-0 font-medium text-indigo-600 dark:text-indigo-400">{r.points ?? ''}pt</span>
+                          <span>{r.criterion}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Scratch pad for complex question types */}
+          {['numeric', 'code', 'code_trace', 'truth_table', 'essay', 'short_answer'].includes(activePoll.question_type) && !hasResponded && (
+            <div className="mt-3 border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setScratchOpen(o => !o)}
+                className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                <span>✏️ Scratch Pad (rough work)</span>
+                <span>{scratchOpen ? '▲' : '▼'}</span>
+              </button>
+              {scratchOpen && (
+                <textarea
+                  value={scratchText}
+                  onChange={e => setScratchText(e.target.value)}
+                  rows={4}
+                  placeholder="Use this space for rough calculations (not submitted)..."
+                  className="w-full p-3 text-sm font-mono border-0 border-t border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 dark:text-white focus:outline-none resize-y"
+                />
+              )}
+            </div>
+          )}
+
+          {/* Hint reveal — shown after 60% timer elapses, if justification/key_points set */}
+          {hintVisible && !hasResponded && timeLeft > 0 && (() => {
+            const meta = (() => { try { return typeof activePoll.options_metadata === 'string' ? JSON.parse(activePoll.options_metadata) : (activePoll.options_metadata || {}); } catch { return {}; } })();
+            const hintText = meta.key_points || activePoll.justification;
+            if (!hintText) return null;
+            return (
+              <div className="mt-3 rounded-xl border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20 p-3 text-xs animate-fade-in">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span>���</span>
+                  <span className="font-semibold text-yellow-700 dark:text-yellow-400">Hint</span>
+                  <button
+                    type="button"
+                    onClick={() => setHintVisible(false)}
+                    className="ml-auto text-yellow-500 hover:text-yellow-700 dark:text-yellow-500 dark:hover:text-yellow-300"
+                    aria-label="Dismiss hint"
+                  >✕</button>
+                </div>
+                <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">{hintText}</p>
+              </div>
+            );
+          })()}
+
+          {/* Keyboard shortcut hint */}
+          {!hasResponded && timeLeft > 0 && (() => {
+            const qt = activePoll.question_type || 'mcq';
+            if (qt === 'mcq' || qt === 'code') return (
+              <p className="mt-2 text-xs text-center text-slate-400 dark:text-slate-500">Press A–D to select · Enter to submit</p>
+            );
+            if (qt === 'true_false') return (
+              <p className="mt-2 text-xs text-center text-slate-400 dark:text-slate-500">Press T for True · F for False · Enter to submit</p>
+            );
+            if (qt === 'multi_correct') return (
+              <p className="mt-2 text-xs text-center text-slate-400 dark:text-slate-500">Click options to toggle · Select all correct ones · Enter to submit</p>
+            );
+            if (qt === 'assertion_reason') return (
+              <p className="mt-2 text-xs text-center text-slate-400 dark:text-slate-500">Press A–D to select · Enter to submit</p>
+            );
+            return null;
+          })()}
+
           {/* Submit button */}
-          {selectedOption !== null && !hasResponded && timeLeft > 0 && (
+          {hasPollAnswer(answerData, activePoll?.question_type) && !hasResponded && timeLeft > 0 && (
             <div className="mt-4">
               <button
                 onClick={submitResponse}
@@ -954,62 +1299,323 @@ const EnhancedStudentSession = () => {
 
           {/* Submitted — waiting for timer to end */}
           {hasResponded && submissionResult && !showResults && (
-            <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg p-3 sm:p-4 mt-4">
-              <div className="flex items-center justify-center gap-2">
-                <svg className="h-5 w-5 sm:h-6 sm:w-6 text-primary-600 dark:text-primary-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="font-medium text-sm sm:text-base text-primary-800 dark:text-primary-300">
-                  Answer submitted! Results will be revealed when the timer ends.
-                </span>
+            <div className="mt-4 space-y-3">
+              <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg p-3 sm:p-4">
+                <div className="flex items-center justify-center gap-2">
+                  <svg className="h-5 w-5 sm:h-6 sm:w-6 text-primary-600 dark:text-primary-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="font-medium text-sm sm:text-base text-primary-800 dark:text-primary-300">
+                    Answer submitted! Results will be revealed when the timer ends.
+                  </span>
+                </div>
+              </div>
+              {/* Confidence rating */}
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3">
+                <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-2 text-center">How confident are you?</p>
+                <div className="flex justify-center gap-2">
+                  {[
+                    { val: 'low',    emoji: '🔴', label: 'Not sure' },
+                    { val: 'medium', emoji: '🟡', label: 'Somewhat' },
+                    { val: 'high',   emoji: '🟢', label: 'Very sure' },
+                  ].map(c => (
+                    <button
+                      key={c.val}
+                      type="button"
+                      onClick={async () => {
+                        setConfidence(c.val);
+                        // Persist to backend — fire-and-forget
+                        try {
+                          const responseId = submissionResult?.data?.id || submissionResult?.id;
+                          if (responseId && activePoll?.id) {
+                            await apiRequest(
+                              `/polls/${activePoll.id}/responses/${responseId}/confidence`,
+                              { method: 'PATCH', body: JSON.stringify({ confidence: c.val }) }
+                            );
+                          }
+                        } catch { /* non-critical */ }
+                      }}
+                      className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg border-2 text-xs font-medium transition-all ${
+                        confidence === c.val
+                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                          : 'border-slate-200 dark:border-slate-600 text-slate-500 hover:border-slate-400'
+                      }`}
+                    >
+                      <span className="text-base">{c.emoji}</span>
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+                {confidence && (
+                  <p className="text-center text-xs text-slate-400 mt-1.5">Saved ✓</p>
+                )}
               </div>
             </div>
           )}
 
           {/* Results revealed — show correct/wrong + justification */}
-          {hasResponded && submissionResult && showResults && (
-            <div className={`border rounded-lg p-3 sm:p-4 mt-4 ${submissionResult.is_correct ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
-              <div className="flex items-center">
-                <svg className={`h-5 w-5 sm:h-6 sm:w-6 mr-2 flex-shrink-0 ${submissionResult.is_correct ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  {submissionResult.is_correct ? (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  ) : (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  )}
-                </svg>
-                <span className={`font-medium text-sm sm:text-base ${submissionResult.is_correct ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300'}`}>
-                  {submissionResult.is_correct ? 'Correct! Well done!' : 'Incorrect, but good try!'}
-                </span>
-              </div>
-              <div className={`mt-3 text-xs sm:text-sm ${submissionResult.is_correct ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                <strong>Correct Answer:</strong> {String.fromCharCode(65 + activePoll.correct_answer)}. {activePoll.options[activePoll.correct_answer]}
-              </div>
-              {activePoll.justification && (
-                <div className={`mt-3 text-xs sm:text-sm ${submissionResult.is_correct ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                  <strong>Explanation:</strong> {activePoll.justification}
+          {hasResponded && submissionResult && showResults && (() => {
+            // Support both snake_case (from API) and camelCase (from WS grade broadcast)
+            const resolvedCorrect = submissionResult.is_correct ?? submissionResult.isCorrect ?? null;
+            const isManual = resolvedCorrect === null;
+            const isCorrect = resolvedCorrect === true;
+            const teacherFeedback = submissionResult.teacherFeedback || submissionResult.teacher_feedback || null;
+            const colorCls = isManual
+              ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+              : isCorrect
+                ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800';
+            const textCls = isManual
+              ? 'text-blue-800 dark:text-blue-300'
+              : isCorrect ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300';
+            const subTextCls = isManual
+              ? 'text-blue-700 dark:text-blue-400'
+              : isCorrect ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400';
+            const qt = activePoll.question_type || 'mcq';
+            const meta = activePoll.options_metadata
+              ? (typeof activePoll.options_metadata === 'string' ? JSON.parse(activePoll.options_metadata) : activePoll.options_metadata)
+              : {};
+            let correctAnswerBlock = null;
+
+            if (qt === 'mcq' || qt === 'true_false') {
+              const idx = activePoll.correct_answer;
+              const label = qt === 'true_false'
+                ? activePoll.options?.[idx]
+                : `${String.fromCharCode(65 + idx)}. ${activePoll.options?.[idx]}`;
+              correctAnswerBlock = <p><strong>Correct Answer:</strong> {label}</p>;
+            } else if (qt === 'fill_blank' || qt === 'one_word') {
+              correctAnswerBlock = <p><strong>Accepted:</strong> {(meta.accepted_answers || []).join(' / ')}</p>;
+            } else if (qt === 'numeric') {
+              correctAnswerBlock = <p><strong>Correct Value:</strong> {meta.correct_value}{meta.unit ? ` ${meta.unit}` : ''} (±{meta.tolerance ?? 0})</p>;
+            } else if (qt === 'code') {
+              if (meta.code_mode === 'fill_blank') {
+                correctAnswerBlock = <p><strong>Accepted:</strong> {(meta.accepted_answers || []).join(' / ')}</p>;
+              } else {
+                const idx = activePoll.correct_answer;
+                correctAnswerBlock = <p><strong>Correct:</strong> {String.fromCharCode(65 + idx)}. {activePoll.options?.[idx]}</p>;
+              }
+            } else if (qt === 'multi_correct') {
+              const correctOpts = meta.correct_options || [];
+              const opts = activePoll.options || [];
+              correctAnswerBlock = (
+                <div>
+                  <strong>Correct Options:</strong>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {correctOpts.map(i => (
+                      <span key={i} className="text-xs px-2 py-0.5 rounded bg-white/50 dark:bg-black/20 font-medium">
+                        {String.fromCharCode(65 + i)}. {opts[i]}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              )}
-            </div>
-          )}
+              );
+            } else if (qt === 'assertion_reason') {
+              const arOpts = ['A: Both correct, R explains A', "B: Both correct, R doesn't explain", 'C: A correct, R false', 'D: A false'];
+              correctAnswerBlock = <p><strong>Correct:</strong> {arOpts[activePoll.correct_answer ?? 0]}</p>;
+            } else if (qt === 'match_following') {
+              const left = meta.left_items || [];
+              const right = meta.right_items || [];
+              const pairs = meta.correct_pairs || {};
+              const studentPairs = answerData.pairs || {};
+              correctAnswerBlock = (
+                <div>
+                  <strong>Correct Matches:</strong>
+                  <div className="mt-1 space-y-1">
+                    {left.map((item, i) => {
+                      const ri = pairs[String(i)];
+                      const studentRi = studentPairs[String(i)];
+                      const pairCorrect = String(studentRi) === String(ri);
+                      return (
+                        <div key={i} className="flex items-center gap-2 text-xs">
+                          <span>{item}</span>
+                          <span>→</span>
+                          <span className="font-medium">{right[ri]}</span>
+                          {studentRi !== undefined && (
+                            <span className={pairCorrect ? 'text-green-600' : 'text-red-500'}>
+                              {pairCorrect ? '✓' : `✗ (you said: ${right[studentRi]})`}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            } else if (qt === 'ordering') {
+              const items = meta.items || [];
+              const correctOrder = meta.correct_order || items.map((_, i) => i);
+              const studentOrder = answerData.order || [];
+              correctAnswerBlock = (
+                <div>
+                  <strong>Correct Order:</strong>
+                  <ol className="mt-1 space-y-1 list-decimal list-inside">
+                    {correctOrder.map((i, pos) => {
+                      const studentPos = studentOrder.indexOf(i);
+                      const posCorrect = studentPos === pos;
+                      return (
+                        <li key={i} className="text-xs">
+                          {items[i]}
+                          {studentOrder.length > 0 && (
+                            <span className={`ml-2 ${posCorrect ? 'text-green-600' : 'text-red-500'}`}>
+                              {posCorrect ? '✓' : `✗ (you placed at #${studentPos + 1})`}
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </div>
+              );
+            } else if (qt === 'code_trace') {
+              const steps = meta.steps || [];
+              const studentTrace = answerData.trace || {};
+              correctAnswerBlock = (
+                <div>
+                  <strong>Step-by-step answers:</strong>
+                  <div className="mt-1 space-y-1">
+                    {steps.map((step, i) => {
+                      const studentAns = studentTrace[String(i)] || '';
+                      const stepCorrect = step.correct_answer?.toLowerCase().trim() === studentAns.toLowerCase().trim();
+                      return (
+                        <div key={i} className="text-xs flex flex-wrap gap-1 items-center">
+                          <span className="font-medium">Step {i + 1}:</span>
+                          <span>{step.question}</span>
+                          <span className="font-medium">→ {step.correct_answer}</span>
+                          {studentAns && (
+                            <span className={stepCorrect ? 'text-green-600' : 'text-red-500'}>
+                              {stepCorrect ? '✓' : `✗ (yours: ${studentAns})`}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            } else if (qt === 'truth_table') {
+              const rows = meta.rows || [];
+              const hdrs = meta.headers || [];
+              const studentCells = answerData.cells || {};
+              let wrongCount = 0;
+              rows.forEach((row, r) => row.forEach((cell, c) => {
+                if (cell.editable && String(studentCells[`${r}-${c}`]) !== String(cell.value)) wrongCount++;
+              }));
+              correctAnswerBlock = wrongCount === 0
+                ? <p>All cells correct! ✓</p>
+                : <p>{wrongCount} cell{wrongCount !== 1 ? 's' : ''} incorrect — review the correct table above.</p>;
+            }
+
+            return (
+              <div className={`border rounded-lg p-3 sm:p-4 mt-4 ${colorCls}`}>
+                <div className="flex items-center">
+                  <svg className={`h-5 w-5 sm:h-6 sm:w-6 mr-2 flex-shrink-0 ${textCls}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    {isManual
+                      ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      : isCorrect
+                        ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    }
+                  </svg>
+                  <span className={`font-medium text-sm sm:text-base ${textCls}`}>
+                    {isManual ? 'Submitted! Your answer will be reviewed.' : isCorrect ? 'Correct! Well done!' : 'Incorrect, but good try!'}
+                  </span>
+                </div>
+                {/* Teacher feedback for manually graded responses */}
+                {teacherFeedback && (
+                  <div className="mt-3 p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700">
+                    <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 mb-1">Teacher's Feedback</p>
+                    <p className="text-sm text-indigo-800 dark:text-indigo-300">{teacherFeedback}</p>
+                  </div>
+                )}
+                {isManual && !teacherFeedback && (
+                  <p className="mt-2 text-xs text-blue-600 dark:text-blue-400">Your teacher will review and grade this response.</p>
+                )}
+                {correctAnswerBlock && (
+                  <div className={`mt-3 text-xs sm:text-sm ${subTextCls}`}>{correctAnswerBlock}</div>
+                )}
+                {activePoll.justification && (
+                  <div className={`mt-3 text-xs sm:text-sm ${subTextCls}`}>
+                    <strong>Explanation:</strong> {activePoll.justification}
+                  </div>
+                )}
+                {activePoll.solution_steps && activePoll.solution_steps.length > 0 && (
+                  <SolutionStepsViewer steps={activePoll.solution_steps} />
+                )}
+              </div>
+            );
+          })()}
 
           {/* Time's up without answering */}
           {timeLeft === 0 && !hasResponded && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 sm:p-4 text-center text-red-700 dark:text-red-400 mt-4">
               <p className="font-medium text-sm sm:text-base">Time's up! You can no longer respond to this poll.</p>
-              {showResults && (
-                <>
-                  <div className="mt-3 text-xs sm:text-sm text-red-700 dark:text-red-400">
-                    <strong>Correct Answer:</strong>{' '}
-                    {String.fromCharCode(65 + activePoll.correct_answer)}.{' '}
-                    {activePoll.options[activePoll.correct_answer]}
-                  </div>
-                  {activePoll.justification && (
-                    <div className="mt-3 text-xs sm:text-sm text-red-700 dark:text-red-400">
-                      <strong>Explanation:</strong> {activePoll.justification}
+              {showResults && (() => {
+                const qt = activePoll.question_type || 'mcq';
+                const parsedMeta = (() => { try { return typeof activePoll.options_metadata === 'string' ? JSON.parse(activePoll.options_metadata) : (activePoll.options_metadata || {}); } catch { return {}; } })();
+                let correctAnswerLine = null;
+
+                if (qt === 'mcq' || qt === 'true_false') {
+                  const idx = activePoll.correct_answer;
+                  const label = qt === 'true_false'
+                    ? activePoll.options?.[idx]
+                    : `${String.fromCharCode(65 + idx)}. ${activePoll.options?.[idx]}`;
+                  correctAnswerLine = <><strong>Correct Answer:</strong> {label}</>;
+                } else if (qt === 'fill_blank' || qt === 'one_word') {
+                  correctAnswerLine = <><strong>Accepted:</strong> {(parsedMeta.accepted_answers || []).join(' / ')}</>;
+                } else if (qt === 'numeric') {
+                  correctAnswerLine = <><strong>Correct Value:</strong> {parsedMeta.correct_value}{parsedMeta.unit ? ` ${parsedMeta.unit}` : ''} {parsedMeta.tolerance != null ? `(±${parsedMeta.tolerance})` : ''}</>;
+                } else if (qt === 'multi_correct') {
+                  const opts = activePoll.options || [];
+                  const correctIdxs = parsedMeta.correct_options || [];
+                  correctAnswerLine = (
+                    <>
+                      <strong>Correct Options:</strong>{' '}
+                      {correctIdxs.map(i => `${String.fromCharCode(65 + i)}. ${opts[i]}`).join(', ')}
+                    </>
+                  );
+                } else if (qt === 'assertion_reason') {
+                  const arLabels = ['A: Both correct, R explains A', "B: Both correct, R doesn't explain", 'C: A correct, R false', 'D: A false'];
+                  correctAnswerLine = <><strong>Correct:</strong> {arLabels[activePoll.correct_answer ?? 0]}</>;
+                } else if (qt === 'match_following') {
+                  const left = parsedMeta.left_items || [];
+                  const right = parsedMeta.right_items || [];
+                  const pairs = parsedMeta.correct_pairs || {};
+                  correctAnswerLine = (
+                    <div>
+                      <strong>Correct Matches:</strong>
+                      <ul className="mt-1 space-y-0.5">
+                        {left.map((item, i) => (
+                          <li key={i} className="text-xs">{item} → {right[pairs[String(i)]]}</li>
+                        ))}
+                      </ul>
                     </div>
-                  )}
-                </>
-              )}
+                  );
+                } else if (qt === 'ordering') {
+                  const items = parsedMeta.items || [];
+                  const order = parsedMeta.correct_order || [];
+                  correctAnswerLine = (
+                    <div>
+                      <strong>Correct Order:</strong>
+                      <ol className="mt-1 list-decimal list-inside space-y-0.5">
+                        {order.map((i, pos) => <li key={pos} className="text-xs">{items[i]}</li>)}
+                      </ol>
+                    </div>
+                  );
+                }
+
+                return (
+                  <>
+                    {correctAnswerLine && (
+                      <div className="mt-3 text-xs sm:text-sm text-red-700 dark:text-red-400">{correctAnswerLine}</div>
+                    )}
+                    {activePoll.justification && (
+                      <div className="mt-3 text-xs sm:text-sm text-red-700 dark:text-red-400">
+                        <strong>Explanation:</strong> {activePoll.justification}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
 
