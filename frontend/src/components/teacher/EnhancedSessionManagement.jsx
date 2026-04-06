@@ -441,7 +441,6 @@ const EnhancedSessionManagement = () => {
           clearInterval(summaryPollingRef.current);
           summaryPollingRef.current = null;
           setSummaryText(data.summary);
-          setSummaryExpanded(true);
           toast.success('AI session summary ready!');
         } else if (data.status === 'failed') {
           clearInterval(summaryPollingRef.current);
