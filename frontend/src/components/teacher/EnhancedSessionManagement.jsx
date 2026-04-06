@@ -12,6 +12,7 @@ import PollPanel from './PollPanel';
 import ManualGradingPanel from './ManualGradingPanel';
 import AttendancePanel from './AttendancePanel';
 import NotesPanel from './NotesPanel';
+import SummaryPanel from './SummaryPanel';
 import useAudioRecorder from '../../hooks/useAudioRecorder';
 
 // WebSocket URL configuration
@@ -62,7 +63,6 @@ const EnhancedSessionManagement = () => {
   // AI session summary state
   const [summaryStatus, setSummaryStatus] = useState('none'); // 'none'|'generating'|'completed'|'failed'
   const [summaryText, setSummaryText] = useState(null);
-  const [summaryExpanded, setSummaryExpanded] = useState(false);
   const summaryPollingRef = useRef(null);
 
   // Live participant count (from WebSocket)
@@ -775,56 +775,11 @@ const EnhancedSessionManagement = () => {
 
               {/* AI Session Summary */}
               {!session.is_live && (
-                <div className="rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 p-3 sm:p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-semibold text-indigo-900 dark:text-indigo-200 text-sm sm:text-base">AI Session Summary</h3>
-                    {summaryStatus === 'none' && (
-                      <button
-                        onClick={handleGenerateSummary}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium"
-                      >
-                        Generate Summary
-                      </button>
-                    )}
-                    {summaryStatus === 'generating' && (
-                      <span className="text-indigo-600 dark:text-indigo-400 text-sm animate-pulse">Generating…</span>
-                    )}
-                    {summaryStatus === 'completed' && (
-                      <button
-                        onClick={() => setSummaryExpanded(e => !e)}
-                        className="text-indigo-600 dark:text-indigo-400 text-sm font-medium"
-                      >
-                        {summaryExpanded ? 'Collapse ▲' : 'Expand ▼'}
-                      </button>
-                    )}
-                    {summaryStatus === 'failed' && (
-                      <button
-                        onClick={handleGenerateSummary}
-                        className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium"
-                      >
-                        Retry
-                      </button>
-                    )}
-                  </div>
-                  {summaryStatus === 'none' && (
-                    <p className="text-indigo-700 dark:text-indigo-300 text-sm">
-                      Generate an AI summary of topics covered, confusion points, and recommendations for next class.
-                    </p>
-                  )}
-                  {summaryStatus === 'generating' && (
-                    <p className="text-indigo-600 dark:text-indigo-400 text-sm animate-pulse">
-                      Analysing poll data and generating insights…
-                    </p>
-                  )}
-                  {summaryStatus === 'completed' && summaryExpanded && summaryText && (
-                    <div className="mt-2 text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed bg-white dark:bg-slate-800 rounded-lg p-3 border border-indigo-100 dark:border-indigo-900">
-                      {summaryText}
-                    </div>
-                  )}
-                  {summaryStatus === 'failed' && (
-                    <p className="text-red-600 dark:text-red-400 text-sm">Summary generation failed. Try again.</p>
-                  )}
-                </div>
+                <SummaryPanel
+                  status={summaryStatus}
+                  summaryText={summaryText}
+                  onGenerate={handleGenerateSummary}
+                />
               )}
 
               <NotesPanel notesStatus={notesStatus} notesUrl={notesUrl} />
