@@ -17,6 +17,11 @@ function initWebSocket(wss, { pool, redis, redisPub, redisSub, logger }) {
   const attendanceWindows = new Map();
   const dashboardConnections = new Map();
 
+  // Competition room connections: roomCode → Map<userId (string), WebSocket>
+  const competitionConnections = new Map();
+  // In-memory room state: roomCode → { status, currentQuestionIndex, questionStartTime, allQuestions, timePerQuestion, totalQuestions, timerHandles }
+  const competitionRoomState = new Map();
+
   // ── Poll timer state (globally accessible for routes/polls.js) ────────────
   global.pollTimers = global.pollTimers || new Map();
   global.activePollEndTimes = global.activePollEndTimes || new Map();
@@ -178,6 +183,8 @@ function initWebSocket(wss, { pool, redis, redisPub, redisSub, logger }) {
   global.broadcastToDashboardsForSession = broadcastToDashboardsForSession;
   global.broadcastPollToSession = broadcastPollToSession;
   global.sessionConnections = sessionConnections;
+  global.competitionConnections = competitionConnections;
+  global.competitionRoomState = competitionRoomState;
 
   // ── Redis pub/sub fan-out ─────────────────────────────────────────────────
   if (redisSub) {
@@ -607,6 +614,360 @@ function initWebSocket(wss, { pool, redis, redisPub, redisSub, logger }) {
     }
   }
 
+  // ── Competition WebSocket Helpers ─────────────────────────────────────────
+
+  function broadcastToCompetitionRoom(roomCode, message) {
+    const roomMap = competitionConnections.get(roomCode);
+    if (!roomMap) return;
+    const payload = JSON.stringify(message);
+    for (const ws of roomMap.values()) {
+      if (ws.readyState === WebSocket.OPEN) ws.send(payload);
+    }
+  }
+
+  async function handleJoinCompetition(ws, data) {
+    const { roomCode } = data;
+    const role = data.role || 'player';
+    if (!competitionConnections.has(roomCode)) {
+      competitionConnections.set(roomCode, new Map());
+    }
+    competitionConnections.get(roomCode).set(String(ws.userId), ws);
+    ws.competitionRoomCode = roomCode;
+    ws.competitionRole = role;
+
+    const roomResult = await pool.query(
+      'SELECT id FROM competition_rooms WHERE room_code = $1',
+      [roomCode]
+    );
+    if (roomResult.rows.length === 0) return;
+    const participants = await pool.query(
+      `SELECT cp.student_id, u.full_name AS display_name, cp.role, cp.score, cp.correct_count, cp.questions_answered
+       FROM competition_participants cp
+       JOIN users u ON cp.student_id = u.id
+       WHERE cp.room_id = $1
+       ORDER BY cp.score DESC`,
+      [roomResult.rows[0].id]
+    );
+    broadcastToCompetitionRoom(roomCode, {
+      type: 'competition-player-joined',
+      participants: participants.rows
+    });
+  }
+
+  async function handleStartCompetition(ws, data) {
+    const { roomCode } = data;
+
+    const roomResult = await pool.query(
+      'SELECT * FROM competition_rooms WHERE room_code = $1',
+      [roomCode]
+    );
+    if (roomResult.rows.length === 0) {
+      ws.send(JSON.stringify({ type: 'error', message: 'Room not found' }));
+      return;
+    }
+    const room = roomResult.rows[0];
+    if (String(room.created_by) !== String(ws.userId)) {
+      ws.send(JSON.stringify({ type: 'error', message: 'Only the room creator can start the competition' }));
+      return;
+    }
+    if (room.status !== 'waiting') {
+      ws.send(JSON.stringify({ type: 'error', message: 'Competition already started or finished' }));
+      return;
+    }
+
+    // Fetch teacher polls — use specific IDs if stored, else fall back to count limit
+    let pollsResult;
+    const storedPollIds = Array.isArray(room.teacher_poll_ids) && room.teacher_poll_ids.length > 0
+      ? room.teacher_poll_ids : null;
+    if (storedPollIds) {
+      pollsResult = await pool.query(
+        `SELECT p.id, p.question, p.options, p.correct_answer, p.justification
+         FROM polls p
+         JOIN sessions s ON p.session_id = s.id
+         WHERE s.session_id = $1 AND p.correct_answer IS NOT NULL AND p.id = ANY($2)
+         ORDER BY p.created_at ASC`,
+        [room.session_id, storedPollIds]
+      );
+    } else if (room.teacher_question_count > 0) {
+      pollsResult = await pool.query(
+        `SELECT p.id, p.question, p.options, p.correct_answer, p.justification
+         FROM polls p
+         JOIN sessions s ON p.session_id = s.id
+         WHERE s.session_id = $1 AND p.correct_answer IS NOT NULL
+         ORDER BY p.created_at ASC
+         LIMIT $2`,
+        [room.session_id, room.teacher_question_count]
+      );
+    } else {
+      pollsResult = await pool.query(
+        `SELECT p.id, p.question, p.options, p.correct_answer, p.justification
+         FROM polls p
+         JOIN sessions s ON p.session_id = s.id
+         WHERE s.session_id = $1 AND p.correct_answer IS NOT NULL
+         ORDER BY p.created_at ASC`,
+        [room.session_id]
+      );
+    }
+    const normalizedPolls = pollsResult.rows.map(p => ({
+      ...p,
+      options: Array.isArray(p.options) ? p.options : JSON.parse(p.options)
+    }));
+
+    // Fetch AI-generated student questions — filter by selected IDs if provided
+    const selectedIds = Array.isArray(room.student_question_ids) && room.student_question_ids.length > 0
+      ? room.student_question_ids : null;
+    const studentQResult = selectedIds
+      ? await pool.query(
+          `SELECT id, question, options, correct_answer, justification
+           FROM student_questions
+           WHERE session_id = $1 AND id = ANY($2)
+           ORDER BY created_at ASC`,
+          [room.session_id, selectedIds]
+        )
+      : await pool.query(
+          `SELECT id, question, options, correct_answer, justification
+           FROM student_questions
+           WHERE session_id = $1
+           ORDER BY created_at ASC`,
+          [room.session_id]
+        );
+    const studentQs = studentQResult.rows.map(q => ({
+      ...q,
+      options: Array.isArray(q.options) ? q.options : JSON.parse(q.options)
+    }));
+
+    // Cap AI questions to fill remaining slots up to total_questions
+    const teacherLimit = (room.teacher_question_count > 0)
+      ? room.teacher_question_count : normalizedPolls.length;
+    const selectedPolls = normalizedPolls.slice(0, teacherLimit);
+    const totalCap = room.total_questions > 0 ? room.total_questions : selectedPolls.length + studentQs.length;
+    const aiSlots = Math.max(0, totalCap - selectedPolls.length);
+    const allQuestions = [...selectedPolls, ...studentQs.slice(0, aiSlots)];
+
+    competitionRoomState.set(roomCode, {
+      status: 'active',
+      currentQuestionIndex: -1,
+      questionStartTime: null,
+      allQuestions,
+      timePerQuestion: room.time_per_question,
+      totalQuestions: allQuestions.length,
+      timerHandles: []
+    });
+
+    await pool.query(
+      `UPDATE competition_rooms
+       SET status = 'active', total_questions = $1, started_at = NOW()
+       WHERE room_code = $2`,
+      [allQuestions.length, roomCode]
+    );
+
+    broadcastToCompetitionRoom(roomCode, {
+      type: 'competition-started',
+      totalQuestions: allQuestions.length
+    });
+
+    await revealNextCompetitionQuestion(roomCode);
+  }
+
+  async function handleCompetitionAnswer(ws, data) {
+    const { roomCode, answerIndex, questionIndex } = data;
+    const state = competitionRoomState.get(roomCode);
+    if (!state || state.status !== 'active') return;
+
+    const responseTimeMs = Math.min(
+      Date.now() - (state.questionStartTime || Date.now()),
+      state.timePerQuestion * 1000
+    );
+
+    const q = state.allQuestions[questionIndex];
+    if (!q) return;
+
+    const isCorrect = answerIndex === q.correct_answer;
+    let pointsEarned = 0;
+    if (isCorrect) {
+      const basePoints = 100;
+      const speedBonus = Math.floor(
+        Math.max(0, (state.timePerQuestion * 1000 - responseTimeMs) / (state.timePerQuestion * 1000)) * 50
+      );
+      pointsEarned = basePoints + speedBonus;
+    }
+
+    const roomResult = await pool.query(
+      'SELECT id FROM competition_rooms WHERE room_code = $1',
+      [roomCode]
+    );
+    if (roomResult.rows.length === 0) return;
+    const roomId = roomResult.rows[0].id;
+
+    await pool.query(
+      `WITH inserted AS (
+         INSERT INTO competition_answers
+           (room_id, student_id, poll_id, question_index, answer_index, is_correct, response_time_ms, points_earned)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (room_id, student_id, question_index) DO NOTHING
+         RETURNING id
+       )
+       UPDATE competition_participants
+       SET score              = score + $8,
+           correct_count      = correct_count + $9,
+           questions_answered = questions_answered + 1
+       WHERE room_id = $1 AND student_id = $2
+         AND EXISTS (SELECT 1 FROM inserted)`,
+      [
+        roomId,
+        ws.userId,
+        q.id || null,
+        questionIndex,
+        answerIndex,
+        isCorrect,
+        responseTimeMs,
+        pointsEarned,
+        isCorrect ? 1 : 0
+      ]
+    );
+
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM competition_answers WHERE room_id = $1 AND question_index = $2`,
+      [roomId, questionIndex]
+    );
+    const playerCount = await pool.query(
+      `SELECT COUNT(*) FROM competition_participants WHERE room_id = $1 AND role = 'player'`,
+      [roomId]
+    );
+
+    broadcastToCompetitionRoom(roomCode, {
+      type: 'competition-answer-received',
+      answeredCount: parseInt(countResult.rows[0].count),
+      totalPlayers: parseInt(playerCount.rows[0].count)
+    });
+  }
+
+  function handleLeaveCompetition(ws, data) {
+    const roomCode = (data && data.roomCode) || ws.competitionRoomCode;
+    if (!roomCode) return;
+    const roomMap = competitionConnections.get(roomCode);
+    if (roomMap) roomMap.delete(String(ws.userId));
+  }
+
+  async function revealNextCompetitionQuestion(roomCode) {
+    const state = competitionRoomState.get(roomCode);
+    if (!state) return;
+
+    state.currentQuestionIndex++;
+
+    if (state.currentQuestionIndex >= state.totalQuestions) {
+      await endCompetition(roomCode);
+      return;
+    }
+
+    const q = state.allQuestions[state.currentQuestionIndex];
+    state.questionStartTime = Date.now();
+    const questionIndex = state.currentQuestionIndex;
+
+    await pool.query(
+      `UPDATE competition_rooms
+       SET current_question_index = $1, question_start_time = $2
+       WHERE room_code = $3`,
+      [questionIndex, state.questionStartTime, roomCode]
+    );
+
+    broadcastToCompetitionRoom(roomCode, {
+      type: 'competition-question',
+      questionIndex,
+      totalQuestions: state.totalQuestions,
+      question_text: q.question,
+      options: q.options,
+      timePerQuestion: state.timePerQuestion,
+      questionStartTime: state.questionStartTime,
+      endTime: state.questionStartTime + state.timePerQuestion * 1000
+    });
+
+    const revealHandle = setTimeout(async () => {
+      try {
+        const revealRoomResult = await pool.query(
+          'SELECT id FROM competition_rooms WHERE room_code = $1',
+          [roomCode]
+        );
+        let revealScores = [];
+        if (revealRoomResult.rows.length > 0) {
+          const scoresResult = await pool.query(
+            `SELECT cp.student_id, u.full_name AS display_name, cp.score,
+                    cp.correct_count, cp.questions_answered,
+                    RANK() OVER (ORDER BY cp.score DESC) AS rank
+             FROM competition_participants cp
+             JOIN users u ON cp.student_id = u.id
+             WHERE cp.room_id = $1 AND cp.role = 'player'
+             ORDER BY cp.score DESC`,
+            [revealRoomResult.rows[0].id]
+          );
+          revealScores = scoresResult.rows;
+        }
+
+        broadcastToCompetitionRoom(roomCode, {
+          type: 'competition-answer-reveal',
+          questionIndex,
+          question_text: q.question,
+          options: q.options,
+          correct_index: q.correct_answer,
+          explanation: q.justification || '',
+          scores: revealScores
+        });
+
+        const nextHandle = setTimeout(() => {
+          revealNextCompetitionQuestion(roomCode).catch(err =>
+            logger.error('revealNextCompetitionQuestion error', { error: err.message })
+          );
+        }, 3000);
+        const s2 = competitionRoomState.get(roomCode);
+        if (s2) s2.timerHandles.push(nextHandle);
+      } catch (err) {
+        logger.error('Error in competition reveal timeout', { error: err.message });
+      }
+    }, state.timePerQuestion * 1000);
+
+    state.timerHandles.push(revealHandle);
+  }
+
+  async function endCompetition(roomCode) {
+    const state = competitionRoomState.get(roomCode);
+    if (state) {
+      for (const handle of state.timerHandles) clearTimeout(handle);
+      state.timerHandles = [];
+    }
+
+    await pool.query(
+      `UPDATE competition_rooms SET status = 'finished', ended_at = NOW() WHERE room_code = $1`,
+      [roomCode]
+    );
+
+    const leaderboardResult = await pool.query(
+      `SELECT cp.student_id, u.full_name, cp.score, cp.correct_count, cp.questions_answered,
+       CASE WHEN cp.questions_answered > 0
+            THEN ROUND((cp.correct_count::DECIMAL / cp.questions_answered) * 100, 1)
+            ELSE 0
+       END AS accuracy,
+       RANK() OVER (ORDER BY cp.score DESC) AS rank
+       FROM competition_participants cp
+       JOIN users u ON cp.student_id = u.id
+       WHERE cp.room_id = (SELECT id FROM competition_rooms WHERE room_code = $1)
+         AND cp.role = 'player'
+       ORDER BY cp.score DESC`,
+      [roomCode]
+    );
+
+    broadcastToCompetitionRoom(roomCode, {
+      type: 'competition-finished',
+      leaderboard: leaderboardResult.rows.map(r => ({ ...r, display_name: r.full_name }))
+    });
+
+    competitionRoomState.delete(roomCode);
+    logger.info('Competition ended', { roomCode });
+
+    setTimeout(() => {
+      competitionConnections.delete(roomCode);
+    }, 60 * 1000);
+  }
+
   // ── WebSocket connection handler ──────────────────────────────────────────
   const jwt = require('jsonwebtoken');
 
@@ -716,6 +1077,21 @@ function initWebSocket(wss, { pool, redis, redisPub, redisSub, logger }) {
               });
             }
             break;
+          case 'join-competition':
+            handleJoinCompetition(ws, data)
+              .catch(err => logger.error('join-competition error', { error: err.message }));
+            break;
+          case 'start-competition':
+            handleStartCompetition(ws, data)
+              .catch(err => logger.error('start-competition error', { error: err.message }));
+            break;
+          case 'competition-answer':
+            handleCompetitionAnswer(ws, data)
+              .catch(err => logger.error('competition-answer error', { error: err.message }));
+            break;
+          case 'leave-competition':
+            handleLeaveCompetition(ws, data);
+            break;
           default:
             logger.debug('Unknown WebSocket message type', { type: data.type });
             break;
@@ -750,6 +1126,12 @@ function initWebSocket(wss, { pool, redis, redisPub, redisSub, logger }) {
           conns.delete(ws);
           if (conns.size === 0) dashboardConnections.delete(dashKey);
         }
+      }
+
+      // Clean up competition connection
+      if (ws.competitionRoomCode) {
+        const roomMap = competitionConnections.get(ws.competitionRoomCode);
+        if (roomMap) roomMap.delete(String(ws.userId));
       }
 
       for (const [sessionId, connections] of sessionConnections.entries()) {

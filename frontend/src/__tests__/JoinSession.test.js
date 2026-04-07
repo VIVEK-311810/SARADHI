@@ -78,7 +78,7 @@ describe('JoinSession', () => {
     global.fetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: async () => ({
+      text: async () => JSON.stringify({
         session: {
           session_id: 'ABC123',
           title: 'Test Session',
@@ -116,7 +116,7 @@ describe('JoinSession', () => {
     fireEvent.submit(screen.getByText('Join Session').closest('form'));
 
     await waitFor(() => {
-      expect(screen.getByText(/failed to join session/i)).toBeInTheDocument();
+      expect(screen.getByText(/session not found/i)).toBeInTheDocument();
     });
   });
 

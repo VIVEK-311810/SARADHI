@@ -120,6 +120,7 @@ const aiAssistantRouter = require('./routes/ai-assistant');
 const knowledgeCardsRouter = require('./routes/knowledge-cards');
 const salesAgentRouter = require('./routes/sales-agent');
 const healthRouter = require('./routes/health');
+const competitionRouter = require('./routes/competition');
 const { startWorkers, stopWorkers } = require('./workers/aiWorker');
 const { setupBullBoard } = require('./workers/setup');
 
@@ -145,6 +146,7 @@ app.use('/api/knowledge-cards', knowledgeCardsRouter);
 // Public sales agent — no auth required, own rate limiter
 app.use('/api/sales-agent', salesAgentLimiter, salesAgentRouter);
 app.use('/health', healthRouter);
+app.use('/api/competition', competitionRouter);
 setupBullBoard(app);
 
 // Attendance REST endpoint — get attendance list and counts for a session

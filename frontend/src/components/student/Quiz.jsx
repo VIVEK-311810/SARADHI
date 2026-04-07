@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiRequest } from '../../utils/api';
+import Leaderboard from './Leaderboard';
 
 const Quiz = () => {
   const { sessionId } = useParams();
@@ -250,6 +251,28 @@ const Quiz = () => {
                 )}
               </div>
             ))}
+          </div>
+
+          {/* Session Leaderboard */}
+          <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-3 mt-8">
+            How You Stack Up — Session Leaderboard
+          </h2>
+          <Leaderboard sessionId={sessionId} embedded={true} />
+
+          {/* Post-quiz navigation */}
+          <div className="flex flex-col sm:flex-row gap-3 mt-6">
+            <button
+              onClick={handleRetry}
+              className="flex-1 py-2.5 px-6 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 active:bg-primary-800 transition-colors text-sm sm:text-base"
+            >
+              Retake Quiz
+            </button>
+            <button
+              onClick={() => navigate('/student/dashboard')}
+              className="flex-1 py-2.5 px-6 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-sm sm:text-base"
+            >
+              Back to Dashboard
+            </button>
           </div>
         </div>
       </div>

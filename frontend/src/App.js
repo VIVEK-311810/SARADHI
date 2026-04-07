@@ -44,6 +44,9 @@ const VisitSession             = lazy(() => import('./components/student/VisitSe
 const AIResourceSearch         = lazy(() => import('./components/student/AIResourceSearch'));
 const Leaderboard              = lazy(() => import('./components/student/Leaderboard'));
 const Quiz                     = lazy(() => import('./components/student/Quiz'));
+const CompetitionLobby         = lazy(() => import('./components/student/CompetitionLobby'));
+const CompetitionRoom          = lazy(() => import('./components/student/CompetitionRoom'));
+const FacultyCompetitionLobby  = lazy(() => import('./components/teacher/FacultyCompetitionLobby'));
 
 // Community Components
 const CommunityBoard = lazy(() => import('./components/community/CommunityBoard'));
@@ -91,6 +94,8 @@ function TeacherRoutes() {
           <Route path="/teacher/session/:sessionId"         element={<EnhancedSessionManagement />} />
           <Route path="/teacher/session/:sessionId/upload"  element={<ResourceUpload />} />
           <Route path="/teacher/analytics"                  element={<TeacherAnalytics />} />
+          <Route path="/teacher/competition"               element={<FacultyCompetitionLobby />} />
+          <Route path="/teacher/competition/room/:roomCode" element={<CompetitionRoom isTeacherSpectator />} />
           <Route path="/community"                          element={<CommunityBoard />} />
           <Route path="/community/session/:sessionId"       element={<CommunityBoard />} />
           <Route path="/community/tickets/:ticketId"        element={<TicketDetail />} />
@@ -120,6 +125,8 @@ function StudentRoutes() {
           <Route path="/student/session/:sessionId/quiz"       element={<Quiz />} />
           <Route path="/student/leaderboard"                   element={<Leaderboard />} />
           <Route path="/student/leaderboard/:sessionId"        element={<Leaderboard />} />
+          <Route path="/student/competition"                   element={<CompetitionLobby />} />
+          <Route path="/student/competition/room/:roomCode"    element={<CompetitionRoom />} />
           <Route path="/community"                             element={<CommunityBoard />} />
           <Route path="/community/session/:sessionId"          element={<CommunityBoard />} />
           <Route path="/community/tickets/:ticketId"           element={<TicketDetail />} />

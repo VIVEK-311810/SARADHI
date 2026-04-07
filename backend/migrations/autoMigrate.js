@@ -267,6 +267,75 @@ async function runAutoMigrations() {
   // Migration: add difficulty column to generated_mcqs (1=easy, 2=medium, 3=hard)
   await run(`ALTER TABLE generated_mcqs ADD COLUMN IF NOT EXISTS difficulty SMALLINT DEFAULT 1`, 'generated_mcqs.difficulty');
 
+  // Migration 016 – competition schema
+  await run(`
+    CREATE TABLE IF NOT EXISTS competition_rooms (
+      id                     SERIAL PRIMARY KEY,
+      room_code              VARCHAR(8) UNIQUE NOT NULL,
+      session_id             VARCHAR(20) REFERENCES sessions(session_id) ON DELETE CASCADE,
+      created_by             VARCHAR REFERENCES users(id),
+      status                 VARCHAR(20) DEFAULT 'waiting',
+      current_question_index INTEGER DEFAULT -1,
+      question_start_time    BIGINT,
+      time_per_question      INTEGER DEFAULT 20,
+      teacher_question_count INTEGER DEFAULT 0,
+      total_questions        INTEGER DEFAULT 0,
+      started_at             TIMESTAMP,
+      ended_at               TIMESTAMP,
+      created_at             TIMESTAMP DEFAULT NOW()
+    )
+  `, 'competition_rooms');
+  await run(`
+    CREATE TABLE IF NOT EXISTS competition_participants (
+      id                 SERIAL PRIMARY KEY,
+      room_id            INTEGER REFERENCES competition_rooms(id) ON DELETE CASCADE,
+      student_id         VARCHAR REFERENCES users(id),
+      role               VARCHAR(10) DEFAULT 'player',
+      score              INTEGER DEFAULT 0,
+      correct_count      INTEGER DEFAULT 0,
+      questions_answered INTEGER DEFAULT 0,
+      joined_at          TIMESTAMP DEFAULT NOW(),
+      UNIQUE(room_id, student_id)
+    )
+  `, 'competition_participants');
+  await run(`
+    CREATE TABLE IF NOT EXISTS competition_answers (
+      id               SERIAL PRIMARY KEY,
+      room_id          INTEGER REFERENCES competition_rooms(id) ON DELETE CASCADE,
+      student_id       VARCHAR REFERENCES users(id),
+      poll_id          INTEGER,
+      question_index   INTEGER,
+      answer_index     INTEGER,
+      is_correct       BOOLEAN,
+      response_time_ms INTEGER,
+      points_earned    INTEGER DEFAULT 0,
+      answered_at      TIMESTAMP DEFAULT NOW(),
+      UNIQUE(room_id, student_id, question_index)
+    )
+  `, 'competition_answers');
+  await run(`
+    CREATE TABLE IF NOT EXISTS student_questions (
+      id             SERIAL PRIMARY KEY,
+      session_id     VARCHAR(20) REFERENCES sessions(session_id) ON DELETE CASCADE,
+      created_by     VARCHAR REFERENCES users(id),
+      question       TEXT NOT NULL,
+      options        JSONB NOT NULL,
+      correct_answer INTEGER NOT NULL,
+      justification  TEXT,
+      source         VARCHAR(10) DEFAULT 'ai',
+      created_at     TIMESTAMP DEFAULT NOW()
+    )
+  `, 'student_questions');
+  await run(`CREATE INDEX IF NOT EXISTS idx_competition_rooms_status ON competition_rooms(status)`, 'idx_competition_rooms_status');
+  await run(`CREATE INDEX IF NOT EXISTS idx_competition_rooms_session ON competition_rooms(session_id)`, 'idx_competition_rooms_session');
+  await run(`CREATE INDEX IF NOT EXISTS idx_competition_participants_room ON competition_participants(room_id)`, 'idx_competition_participants_room');
+  await run(`CREATE INDEX IF NOT EXISTS idx_competition_answers_room ON competition_answers(room_id)`, 'idx_competition_answers_room');
+  await run(`CREATE INDEX IF NOT EXISTS idx_student_questions_session ON student_questions(session_id)`, 'idx_student_questions_session');
+  await run(`CREATE INDEX IF NOT EXISTS idx_student_questions_creator ON student_questions(created_by)`, 'idx_student_questions_creator');
+  // Columns added in uncommitted competition improvements
+  await run(`ALTER TABLE competition_rooms ADD COLUMN IF NOT EXISTS student_question_ids INTEGER[]`, 'competition_rooms.student_question_ids');
+  await run(`ALTER TABLE competition_rooms ADD COLUMN IF NOT EXISTS teacher_poll_ids INTEGER[]`, 'competition_rooms.teacher_poll_ids');
+
   // Initialize cache service
   const cacheService = require('../services/cacheService');
   await cacheService.init().catch(err => logger.warn('Cache service init failed (non-fatal)', { error: err.message }));

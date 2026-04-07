@@ -72,14 +72,15 @@ class VectorStore {
   /**
    * Search for similar vectors — returns enriched results with denormalized metadata
    */
-  async searchSimilar(queryEmbedding, sessionId, topK = 5) {
+  async searchSimilar(queryEmbedding, sessionId, topK = 5, resourceIds = null) {
     try {
+      const filter = resourceIds && resourceIds.length > 0
+        ? { session_id: { $eq: sessionId }, resource_id: { $in: resourceIds.map(String) } }
+        : { session_id: { $eq: sessionId } };
       const response = await index.query({
         vector: queryEmbedding,
         topK,
-        filter: {
-          session_id: { $eq: sessionId }
-        },
+        filter,
         includeMetadata: true
       });
 

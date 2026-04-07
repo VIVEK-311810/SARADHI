@@ -8,6 +8,7 @@ import {
   BarChart2,
   MessageSquare,
   Trophy,
+  Swords,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -23,6 +24,7 @@ const TEACHER_NAV = [
   { label: 'Sessions',       href: '/teacher/session',        icon: FolderOpen,     matchPrefix: true },
   { label: 'Create Session', href: '/teacher/create-session', icon: PlusSquare },
   { label: 'Analytics',      href: '/teacher/analytics',      icon: BarChart2 },
+  { label: 'Competitions',   href: '/teacher/competition',    icon: Swords,         matchPrefix: true },
   { label: 'Community',      href: '/community',              icon: MessageSquare },
 ];
 

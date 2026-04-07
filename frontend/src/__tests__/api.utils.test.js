@@ -6,7 +6,7 @@ describe('API Utilities', () => {
       global.fetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: async () => ({ data: 'test' }),
+        text: async () => JSON.stringify({ data: 'test' }),
       });
 
       const result = await apiRequest('/test-endpoint');
