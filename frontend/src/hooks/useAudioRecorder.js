@@ -286,7 +286,7 @@ const useAudioRecorder = (initialSessionId = '') => {
 
   const sendManualNotes = async () => {
     if (!sessionId || !notes.trim()) {
-      alert('Please enter notes to send');
+      alert('Please write your comment before sending.');
       return;
     }
     try {

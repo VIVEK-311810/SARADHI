@@ -302,42 +302,6 @@ const EnhancedStudentDashboard = () => {
       </Card>
 
 
-      {/* Question Type Accuracy */}
-      {typeAccuracy.length > 0 && (
-        <Card variant="glass">
-          <CardHeader className="border-b border-slate-200/60 dark:border-slate-700/60">
-            <CardTitle>Accuracy by Question Type</CardTitle>
-            <CardDescription>How well you perform across different types</CardDescription>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-5">
-            <div className="space-y-3">
-              {typeAccuracy.map((row) => {
-                const TYPE_LABELS = { mcq: 'MCQ', true_false: 'True / False', fill_blank: 'Fill in Blank', numeric: 'Numeric', short_answer: 'Short Answer', essay: 'Essay', match_following: 'Match Following', ordering: 'Ordering', assertion_reason: 'Assertion / Reason', code: 'Code', code_trace: 'Code Trace', truth_table: 'Truth Table', multi_correct: 'Multi-Correct' };
-                const TYPE_COLORS = { mcq: 'bg-blue-500', true_false: 'bg-purple-500', fill_blank: 'bg-teal-500', numeric: 'bg-orange-500', short_answer: 'bg-cyan-500', essay: 'bg-lime-500', match_following: 'bg-pink-500', ordering: 'bg-yellow-500', assertion_reason: 'bg-rose-500', code: 'bg-indigo-500', code_trace: 'bg-sky-500', truth_table: 'bg-violet-500', multi_correct: 'bg-emerald-500' };
-                const label = TYPE_LABELS[row.question_type] || row.question_type;
-                const color = TYPE_COLORS[row.question_type] || 'bg-slate-500';
-                const acc = parseFloat(row.accuracy) || 0;
-                const accColor = acc >= 70 ? 'text-green-600 dark:text-green-400' : acc >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-red-500 dark:text-red-400';
-                return (
-                  <div key={row.question_type}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm text-slate-700 dark:text-slate-300 font-medium">{label}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-slate-400">{row.correct}/{row.answered}</span>
-                        <span className={`text-sm font-bold ${accColor}`}>{acc}%</span>
-                      </div>
-                    </div>
-                    <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${acc}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Sessions */}
       <Card variant="glass">
         <CardHeader className="border-b border-slate-200/60 dark:border-slate-700/60">

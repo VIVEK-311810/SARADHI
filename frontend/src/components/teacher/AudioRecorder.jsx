@@ -22,7 +22,6 @@ const AudioRecorder = ({ audioRecorder, sessionId: propSessionId }) => {
     pauseRecording,
     resumeRecording,
     stopRecording,
-    generateNotes,
     sendManualNotes
   } = audioRecorder;
 
@@ -120,7 +119,7 @@ const AudioRecorder = ({ audioRecorder, sessionId: propSessionId }) => {
       </div>
 
       {/* Control Buttons */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <button
           onClick={startRecording}
           disabled={status !== 'idle' || !sessionId.trim() || isProcessing}
@@ -143,14 +142,6 @@ const AudioRecorder = ({ audioRecorder, sessionId: propSessionId }) => {
           className="px-4 sm:px-6 py-2.5 sm:py-3 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 active:bg-red-800 disabled:bg-slate-300 dark:disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors text-sm sm:text-base"
         >
           Stop
-        </button>
-
-        <button
-          onClick={generateNotes}
-          disabled={!fullTranscript || isProcessing}
-          className="px-4 sm:px-6 py-2.5 sm:py-3 bg-primary-600 text-white rounded-lg font-bold hover:bg-primary-700 active:bg-primary-800 disabled:bg-slate-300 dark:disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors text-sm sm:text-base"
-        >
-          📝 Notes
         </button>
       </div>
 
@@ -179,13 +170,13 @@ const AudioRecorder = ({ audioRecorder, sessionId: propSessionId }) => {
         )}
       </div>
 
-      {/* Manual Notes Section */}
+      {/* Comments Section */}
       <div>
-        <h3 className="text-base sm:text-lg font-semibold text-slate-800 dark:text-white mb-2">Manual Notes</h3>
+        <h3 className="text-base sm:text-lg font-semibold text-slate-800 dark:text-white mb-2">Comments</h3>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Write additional notes here..."
+          placeholder="Write your Comment"
           disabled={isProcessing}
           rows={3}
           className="w-full px-3 sm:px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed resize-none text-sm sm:text-base dark:bg-slate-700 dark:text-white"
@@ -195,19 +186,8 @@ const AudioRecorder = ({ audioRecorder, sessionId: propSessionId }) => {
           disabled={!notes.trim() || isProcessing}
           className="mt-2 w-full sm:w-auto px-6 py-2 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 active:bg-primary-800 disabled:bg-slate-300 dark:disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors text-sm sm:text-base"
         >
-          Send Notes
+          Comment
         </button>
-      </div>
-
-      {/* Info Box */}
-      <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg p-3 sm:p-4">
-        <h4 className="font-semibold text-primary-900 dark:text-primary-300 mb-2 text-sm sm:text-base">ℹ️ How it works:</h4>
-        <ul className="text-xs sm:text-sm text-primary-800 dark:text-primary-300 space-y-1">
-          <li>• Audio captured as compressed WebM every 15 seconds</li>
-          <li>• Transcribed by Whisper (GPU or Groq fallback)</li>
-          <li>• "Notes" sends complete transcript anytime</li>
-          <li>• Manual notes sent immediately</li>
-        </ul>
       </div>
     </div>
   );
