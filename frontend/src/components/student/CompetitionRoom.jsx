@@ -44,7 +44,7 @@ function LiveLeaderboardPanel({ scores, currentUserId }) {
   const maxScore = sorted[0]?.score || 1;
 
   return (
-    <div className="rounded-2xl border border-slate-200/60 dark:border-slate-700/60 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm shadow-card flex flex-col h-fit">
+    <div className="rounded-2xl border border-slate-200/60 dark:border-slate-700/60 bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl shadow-glass flex flex-col h-fit">
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-200/60 dark:border-slate-700/60">
         <span className="text-base">🏆</span>
@@ -131,7 +131,7 @@ function WaitingPhase({ roomInfo, participants, currentUser, onStart, starting }
       </div>
 
       {/* Room code */}
-      <div className="rounded-2xl border border-slate-200/60 dark:border-slate-700/60 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm p-6 text-center shadow-card">
+      <div className="rounded-2xl border border-slate-200/60 dark:border-slate-700/60 bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl p-6 text-center shadow-glass">
         <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Room Code</p>
         <p className="text-5xl font-mono font-black text-primary-600 dark:text-primary-400 tracking-widest">{roomInfo?.room_code}</p>
         <p className="text-xs text-slate-400 mt-2">Share this code with classmates</p>
@@ -140,7 +140,7 @@ function WaitingPhase({ roomInfo, participants, currentUser, onStart, starting }
       {/* Participants */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Players */}
-        <div className="rounded-2xl border border-slate-200/60 dark:border-slate-700/60 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm p-4 shadow-card">
+        <div className="rounded-2xl border border-slate-200/60 dark:border-slate-700/60 bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl p-4 shadow-glass">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-lg">⚔</span>
             <h3 className="font-semibold text-slate-900 dark:text-white">Players</h3>
@@ -168,7 +168,7 @@ function WaitingPhase({ roomInfo, participants, currentUser, onStart, starting }
         </div>
 
         {/* Spectators */}
-        <div className="rounded-2xl border border-slate-200/60 dark:border-slate-700/60 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm p-4 shadow-card">
+        <div className="rounded-2xl border border-slate-200/60 dark:border-slate-700/60 bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl p-4 shadow-glass">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-lg">👁</span>
             <h3 className="font-semibold text-slate-900 dark:text-white">Spectators</h3>
@@ -331,7 +331,7 @@ function ActivePhase({ question, timeLeft, totalTime, myRole, selectedOption, ha
         {isSpectator ? (
           <LiveLeaderboardPanel scores={scores} currentUserId={currentUserId} />
         ) : (
-          <div className="rounded-2xl border border-slate-200/60 dark:border-slate-700/60 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm p-5 shadow-card h-fit space-y-4">
+          <div className="rounded-2xl border border-slate-200/60 dark:border-slate-700/60 bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl p-5 shadow-glass h-fit space-y-4">
             <div className="text-center">
               <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Answered</p>
               <p className="text-4xl font-black text-primary-600 dark:text-primary-400">
@@ -439,7 +439,7 @@ function FinishedPhase({ leaderboard, currentUser, roomInfo, onPlayAgain, myRole
 
       {/* Podium (top 3) */}
       {top3.length > 0 && (
-        <div className="rounded-2xl border border-slate-200/60 dark:border-slate-700/60 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm p-5 shadow-card">
+        <div className="rounded-2xl border border-slate-200/60 dark:border-slate-700/60 bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl p-5 shadow-glass">
           <h2 className="font-bold text-slate-900 dark:text-white mb-4 text-center text-lg">Podium</h2>
           <div className="flex items-end justify-center gap-4">
             {/* Silver (2nd) */}
@@ -483,7 +483,7 @@ function FinishedPhase({ leaderboard, currentUser, roomInfo, onPlayAgain, myRole
       )}
 
       {/* Full leaderboard table */}
-      <div className="rounded-2xl border border-slate-200/60 dark:border-slate-700/60 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm overflow-hidden shadow-card">
+      <div className="rounded-2xl border border-slate-200/60 dark:border-slate-700/60 bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl overflow-hidden shadow-glass">
         <div className="px-5 py-3 border-b border-slate-200/60 dark:border-slate-700/60">
           <h3 className="font-semibold text-slate-900 dark:text-white">Final Standings</h3>
         </div>

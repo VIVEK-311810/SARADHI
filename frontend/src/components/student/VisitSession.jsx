@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { sessionAPI,apiRequest } from "../../utils/api";
+import { sessionAPI, apiRequest } from "../../utils/api";
+import ProjectSuggestionsView from "./ProjectSuggestionsView";
 
 export default function VisitSession() {
   const { sessionId } = useParams();
@@ -12,6 +13,8 @@ export default function VisitSession() {
   const [polls, setPolls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState('polls'); // 'polls' | 'projects'
+  const [projectsBadge, setProjectsBadge] = useState(0);
 
   // fetch session details
   const fetchSession = async () => {
@@ -51,6 +54,7 @@ export default function VisitSession() {
     }
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -60,6 +64,20 @@ export default function VisitSession() {
     };
     loadData();
   }, [sessionId]);
+
+  // Listen for project notifications dispatched from WS or NotificationContext
+  useEffect(() => {
+    const handler = (e) => {
+      const d = e.detail;
+      if (d?.type === 'project-notification' || d?.type === 'project-suggestions-ready') {
+        // Forward to ProjectSuggestionsView and show badge if not on the tab
+        window.dispatchEvent(new CustomEvent('saradhi:project-event', { detail: d }));
+        setProjectsBadge(c => c + 1);
+      }
+    };
+    window.addEventListener('saradhi:notification', handler);
+    return () => window.removeEventListener('saradhi:notification', handler);
+  }, []);
 
     const formatTimeAgo = (dateString) => {
         if (!dateString) return "N/A";
@@ -133,8 +151,45 @@ export default function VisitSession() {
         </div>
       )}
 
-      {/* Polls Section */}
-      <div>
+      {/* Tab Navigation */}
+      <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass mb-4 sm:mb-6">
+        <div className="border-b border-slate-200 dark:border-slate-700">
+          <nav className="flex space-x-1 px-4 overflow-x-auto scrollbar-hide">
+            {[
+              { id: 'polls', name: 'Session Polls', icon: '📝' },
+              { id: 'projects', name: 'Projects', icon: '💡', badge: projectsBadge > 0 ? projectsBadge : null },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                className={`relative py-3 px-3 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition-colors ${
+                  activeTab === tab.id
+                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                    : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-200'
+                }`}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  if (tab.id === 'projects') setProjectsBadge(0);
+                }}
+              >
+                <span className="mr-1">{tab.icon}</span>
+                {tab.name}
+                {tab.badge && (
+                  <span className="ml-1.5 bg-indigo-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        <div className="p-4 sm:p-6">
+          {activeTab === 'projects' && (
+            <ProjectSuggestionsView sessionId={sessionId} />
+          )}
+
+          {activeTab === 'polls' && (
+            <div>
         <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-slate-900 dark:text-white">Session Polls</h3>
         {polls.length === 0 ? (
             <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-6 sm:p-8 text-center">
@@ -228,8 +283,11 @@ export default function VisitSession() {
                 </div>
             ))}
             </div>
-        )}
+          )}
+          </div>
+          )}
         </div>
+      </div>
 
     </div>
   );

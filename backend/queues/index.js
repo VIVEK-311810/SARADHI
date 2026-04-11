@@ -25,13 +25,15 @@ const connection = parseRedisUrl(REDIS_URL);
 
 let vectorizeQueue = null;
 let aiSearchQueue = null;
+let projectSuggestionsQueue = null;
 
 if (connection) {
   vectorizeQueue = new Queue('vectorize', { connection });
   aiSearchQueue = new Queue('ai-search', { connection });
-  logger.info('BullMQ queues initialised (vectorize, ai-search)');
+  projectSuggestionsQueue = new Queue('project-suggestions', { connection });
+  logger.info('BullMQ queues initialised (vectorize, ai-search, project-suggestions)');
 } else {
   logger.warn('REDIS_URL not set — BullMQ queues disabled, falling back to in-process execution');
 }
 
-module.exports = { vectorizeQueue, aiSearchQueue, connection };
+module.exports = { vectorizeQueue, aiSearchQueue, projectSuggestionsQueue, connection };

@@ -659,6 +659,19 @@ const EnhancedStudentSession = () => {
           setConnectionStatus('reconnecting');
           break;
 
+        case 'project-notification':
+        case 'project-suggestions-ready':
+          // Forward to ProjectSuggestionsView (Projects tab) and show an in-app notification
+          window.dispatchEvent(new CustomEvent('saradhi:notification', {
+            detail: {
+              type: data.type,
+              title: data.title || (data.type === 'project-suggestions-ready' ? 'Project ideas shared' : 'New assignment posted'),
+              body: data.body || 'Check the Projects tab.',
+            },
+          }));
+          window.dispatchEvent(new CustomEvent('saradhi:project-event', { detail: data }));
+          break;
+
         default:
           break;
       }

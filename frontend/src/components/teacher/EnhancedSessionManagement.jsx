@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { apiRequest, sessionAPI, pollAPI, safeParseUser } from '../../utils/api';
+import { apiRequest, sessionAPI, pollAPI, resourceAPI, safeParseUser } from '../../utils/api';
 import { Badge } from '../ui/badge';
 import LoadingSpinner from '../shared/LoadingSpinner';
 import GeneratedMCQs from './GeneratedMCQs';
@@ -13,6 +13,7 @@ import ManualGradingPanel from './ManualGradingPanel';
 import AttendancePanel from './AttendancePanel';
 import NotesPanel from './NotesPanel';
 import SummaryPanel from './SummaryPanel';
+import ProjectSuggestionsPanel from './ProjectSuggestionsPanel';
 import useAudioRecorder from '../../hooks/useAudioRecorder';
 
 // WebSocket URL configuration
@@ -42,6 +43,9 @@ const EnhancedSessionManagement = () => {
   const [pollPanelInitialData, setPollPanelInitialData] = useState(null);
   const [gradingPoll, setGradingPoll] = useState(null); // poll to manually grade
 
+  // AI Project Lab badge (new suggestions or assignment notifications)
+  const [newProjectsBadge, setNewProjectsBadge] = useState(0);
+
   // Activity tracking state
   const [lastSegmentTime, setLastSegmentTime] = useState(null);
   const [segmentCount, setSegmentCount] = useState(0);
@@ -52,9 +56,15 @@ const EnhancedSessionManagement = () => {
   const [isGoingLive, setIsGoingLive] = useState(false);
 
   // Notes generation state
-  const [notesStatus, setNotesStatus] = useState('none'); // 'none'|'generating'|'ready'|'failed'
+  const [notesStatus, setNotesStatus] = useState('none'); // 'none'|'generating'|'ready'|'failed'|'timeout'
   const [notesUrl, setNotesUrl] = useState(null);
+  const [notesElapsed, setNotesElapsed] = useState(0); // seconds elapsed since generating started
   const notesPollingRef = useRef(null);
+  const notesElapsedRef = useRef(null);
+
+  // Session resources for notes generation selection
+  const [sessionResources, setSessionResources] = useState([]);
+  const [selectedResourceIds, setSelectedResourceIds] = useState(new Set());
 
   // Session lock state
   const [isLocked, setIsLocked] = useState(false);
@@ -64,6 +74,11 @@ const EnhancedSessionManagement = () => {
   const [summaryStatus, setSummaryStatus] = useState('none'); // 'none'|'generating'|'completed'|'failed'
   const [summaryText, setSummaryText] = useState(null);
   const summaryPollingRef = useRef(null);
+
+  // Track previous online count to only notify on actual joins (not every heartbeat update)
+  const prevOnlineCountRef = useRef(0);
+  // Skip notification on first count update (existing students when teacher opens the page)
+  const isInitialCountRef = useRef(true);
 
   // Live participant count (from WebSocket)
   const [onlineCount, setOnlineCount] = useState(0);
@@ -86,6 +101,7 @@ const EnhancedSessionManagement = () => {
   // Initialize audio recorder hook
   const audioRecorder = useAudioRecorder(sessionId);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const currentUser = safeParseUser();
     if (!currentUser || currentUser.role !== 'teacher') {
@@ -97,6 +113,7 @@ const EnhancedSessionManagement = () => {
     fetchParticipants();
     fetchPolls();
     fetchGeneratedMCQs();
+    fetchSessionResources();
     setupWebSocketConnection();
 
 
@@ -106,6 +123,9 @@ const EnhancedSessionManagement = () => {
       }
       if (notesPollingRef.current) {
         clearInterval(notesPollingRef.current);
+      }
+      if (notesElapsedRef.current) {
+        clearInterval(notesElapsedRef.current);
       }
       if (summaryPollingRef.current) {
         clearInterval(summaryPollingRef.current);
@@ -160,13 +180,19 @@ const EnhancedSessionManagement = () => {
         const data = JSON.parse(event.data);
 
         switch (data.type) {
-          case 'participant-count-updated':
+          case 'participant-count-updated': {
             fetchParticipants();
-            if ((data.count || 0) > 0) {
-              window.dispatchEvent(new CustomEvent('saradhi:notification', { detail: { type: 'student', title: 'Student joined', body: `${data.count} student${data.count !== 1 ? 's' : ''} online` } }));
+            const newCount = data.count || 0;
+            if (isInitialCountRef.current) {
+              // First update after teacher opens the page — just sync the count silently
+              isInitialCountRef.current = false;
+            } else if (newCount > prevOnlineCountRef.current) {
+              window.dispatchEvent(new CustomEvent('saradhi:notification', { detail: { type: 'student', title: 'Student joined', body: `${newCount} student${newCount !== 1 ? 's' : ''} online` } }));
             }
-            setOnlineCount(data.count || 0);
+            prevOnlineCountRef.current = newCount;
+            setOnlineCount(newCount);
             break;
+          }
           case 'stuck-update':
             if ((data.count || 0) > 0) {
               window.dispatchEvent(new CustomEvent('saradhi:notification', { detail: { type: 'stuck', title: `${data.count} student${data.count !== 1 ? 's' : ''} confused`, body: 'Check in with your class.' } }));
@@ -241,9 +267,16 @@ const EnhancedSessionManagement = () => {
               window.dispatchEvent(new CustomEvent('saradhi:notification', { detail: { type: 'notes', title: 'Session notes ready', body: 'Students can now view the notes.' } }));
               setNotesStatus('ready');
               setNotesUrl(data.notesUrl);
-              if (notesPollingRef.current) clearInterval(notesPollingRef.current);
+              stopNotesPolling();
               toast.success('Class notes are ready for students!');
             }
+            break;
+          case 'project-suggestions-ready':
+            window.dispatchEvent(new CustomEvent('saradhi:project-event', { detail: data }));
+            setNewProjectsBadge(c => c + 1);
+            break;
+          case 'project-notification':
+            // Teacher sent it — no-op for their own view
             break;
           case 'server-restarting':
             wsReconnectAttemptsRef.current = 0;
@@ -302,6 +335,18 @@ const EnhancedSessionManagement = () => {
       console.error('Error fetching session:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSessionResources = async () => {
+    try {
+      const data = await resourceAPI.getSessionResources(sessionId);
+      const resources = (data?.resources || []).filter(r => r.resource_type !== 'auto_notes');
+      setSessionResources(resources);
+      // Default: select all resources
+      setSelectedResourceIds(new Set(resources.map(r => r.id)));
+    } catch (error) {
+      console.error('Error fetching session resources:', error);
     }
   };
 
@@ -389,8 +434,6 @@ const EnhancedSessionManagement = () => {
         body: JSON.stringify({ live: false })
       });
       setSession(prev => ({ ...prev, is_live: false }));
-      setNotesStatus('generating');
-      startNotesPolling();
       // Auto-kick off AI summary after class ends
       handleGenerateSummary();
     } catch (error) {
@@ -453,18 +496,69 @@ const EnhancedSessionManagement = () => {
     }, 3000);
   };
 
-  const startNotesPolling = () => {
+  const handleGenerateNotes = async () => {
+    try {
+      const body = selectedResourceIds.size > 0
+        ? JSON.stringify({ selectedResourceIds: Array.from(selectedResourceIds) })
+        : JSON.stringify({});
+      await apiRequest(`/sessions/${sessionId}/generate-notes`, {
+        method: 'POST',
+        body,
+      });
+      setNotesStatus('generating');
+      startNotesPolling();
+    } catch (error) {
+      if (error.message?.includes('already in progress')) {
+        setNotesStatus('generating');
+        startNotesPolling();
+      } else {
+        console.error('Error starting notes generation:', error);
+        toast.error(`Notes generation failed: ${error.message}`);
+      }
+    }
+  };
+
+  const handleStopNotes = async () => {
+    try {
+      await apiRequest(`/sessions/${sessionId}/cancel-notes`, { method: 'POST' });
+    } catch (error) {
+      console.error('Error stopping notes generation:', error);
+    } finally {
+      stopNotesPolling();
+      setNotesStatus('none');
+    }
+  };
+
+  const stopNotesPolling = () => {
     if (notesPollingRef.current) clearInterval(notesPollingRef.current);
+    if (notesElapsedRef.current) clearInterval(notesElapsedRef.current);
+  };
+
+  const startNotesPolling = () => {
+    stopNotesPolling();
+    setNotesElapsed(0);
+    const MAX_POLLS = 36; // 36 × 10s = 6 minutes max
+    let pollCount = 0;
+
+    // Tick elapsed seconds every second
+    notesElapsedRef.current = setInterval(() => {
+      setNotesElapsed(s => s + 1);
+    }, 1000);
+
     notesPollingRef.current = setInterval(async () => {
+      pollCount++;
       try {
         const data = await apiRequest(`/sessions/${sessionId}/notes`);
         setNotesStatus(data.status);
         if (data.status === 'ready') {
           setNotesUrl(data.url);
-          clearInterval(notesPollingRef.current);
+          stopNotesPolling();
         } else if (data.status === 'failed') {
-          clearInterval(notesPollingRef.current);
+          stopNotesPolling();
           toast.error('Notes generation failed. Students can contact their teacher for notes.');
+        } else if (pollCount >= MAX_POLLS) {
+          stopNotesPolling();
+          setNotesStatus('timeout');
         }
       } catch (_) {}
     }, 10000);
@@ -673,7 +767,8 @@ const EnhancedSessionManagement = () => {
               { id: 'existing-polls', name: 'Past Polls', icon: '📑' },
               { id: 'ai-doubts', name: 'AI Doubts', icon: '❓' },
               { id: 'knowledge-cards', name: 'Cards', icon: '🃏' },
-              { id: 'gamification', name: 'Gamify', icon: '🏆' }
+              { id: 'gamification', name: 'Gamify', icon: '🏆' },
+              { id: 'projects', name: 'Projects', icon: '💡', badge: newProjectsBadge > 0 ? newProjectsBadge : null, badgeColor: 'bg-indigo-500' }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -685,6 +780,7 @@ const EnhancedSessionManagement = () => {
                 onClick={() => {
                   setActiveTab(tab.id);
                   if (tab.id === 'generated-mcqs') setNewMCQsCount(0);
+                  if (tab.id === 'projects') setNewProjectsBadge(0);
                 }}
               >
                 <span className="mr-1">{tab.icon}</span>
@@ -782,7 +878,23 @@ const EnhancedSessionManagement = () => {
                 />
               )}
 
-              <NotesPanel notesStatus={notesStatus} notesUrl={notesUrl} />
+              <NotesPanel
+                notesStatus={notesStatus}
+                notesUrl={notesUrl}
+                elapsedSeconds={notesElapsed}
+                isLive={session?.is_live}
+                onGenerate={handleGenerateNotes}
+                onStop={handleStopNotes}
+                sessionResources={sessionResources}
+                selectedResourceIds={selectedResourceIds}
+                onResourceToggle={(id) => setSelectedResourceIds(prev => {
+                  const next = new Set(prev);
+                  next.has(id) ? next.delete(id) : next.add(id);
+                  return next;
+                })}
+                onSelectAll={() => setSelectedResourceIds(new Set(sessionResources.map(r => r.id)))}
+                onSelectNone={() => setSelectedResourceIds(new Set())}
+              />
 
               <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3 sm:p-4">
                 <h3 className="font-semibold text-slate-900 dark:text-white mb-2 text-sm sm:text-base">Quick Actions</h3>
@@ -939,9 +1051,14 @@ const EnhancedSessionManagement = () => {
           {/* Gamification Recap Tab */}
           {activeTab === 'gamification' && (
             <GamificationRecap
-              sessionId={session?.id || sessionId}
+              sessionId={session?.session_id || sessionId}
               wsRef={wsRef}
             />
+          )}
+
+          {/* AI Project Lab Tab */}
+          {activeTab === 'projects' && (
+            <ProjectSuggestionsPanel sessionId={sessionId} />
           )}
         </div>
       </div>
@@ -1185,20 +1302,46 @@ function PastPollsList({ polls, pollStats, setGradingPoll, setPollPanelInitialDa
 const GamificationRecap = ({ sessionId, wsRef }) => {
   const [recap, setRecap] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [leaderboardVisible, setLeaderboardVisible] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
+  const [finalizeMsg, setFinalizeMsg] = useState(null);
 
-  useEffect(() => {
+  const fetchRecap = (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
     apiRequest(`/gamification/teacher/session/${sessionId}/recap`)
       .then(data => { if (data.success) setRecap(data.data); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [sessionId]);
+      .catch(() => { if (isRefresh) toast.error('Failed to refresh gamification data. Please try again.'); })
+      .finally(() => { setLoading(false); setRefreshing(false); });
+  };
+
+  useEffect(() => { fetchRecap(); }, [sessionId]); // eslint-disable-line
 
   const toggleLeaderboard = () => {
     const newVisible = !leaderboardVisible;
     setLeaderboardVisible(newVisible);
     if (wsRef?.current && wsRef.current.readyState === 1) {
-      wsRef.current.send(JSON.stringify({ type: 'toggle-leaderboard', visible: newVisible }));
+      // Include sessionId so the backend can identify which session to broadcast to
+      wsRef.current.send(JSON.stringify({ type: 'toggle-leaderboard', visible: newVisible, sessionId }));
+    }
+  };
+
+  const finalizeSession = async () => {
+    setFinalizing(true);
+    setFinalizeMsg(null);
+    try {
+      const data = await apiRequest(`/gamification/session/${sessionId}/finalize`, { method: 'POST' });
+      if (data.success) {
+        setFinalizeMsg({ type: 'success', text: 'Session finalized! Completion bonuses & XP awarded.' });
+        fetchRecap(true);
+      } else {
+        setFinalizeMsg({ type: 'error', text: data.error || 'Failed to finalize session.' });
+      }
+    } catch (err) {
+      setFinalizeMsg({ type: 'error', text: 'Failed to finalize session.' });
+    } finally {
+      setFinalizing(false);
     }
   };
 
@@ -1207,67 +1350,188 @@ const GamificationRecap = ({ sessionId, wsRef }) => {
   }
 
   if (!recap) {
-    return <div className="py-8 text-center text-slate-400 text-sm">No gamification data yet. Create polls to start tracking.</div>;
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Controls */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">&#127942; Session Gamification</h3>
+    return (
+      <div className="py-8 text-center space-y-3">
+        <p className="text-slate-400 text-sm">No gamification data yet. Create and activate polls to start tracking points.</p>
         <button
-          onClick={toggleLeaderboard}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors
-            ${leaderboardVisible
-              ? 'bg-primary-600 text-white border-primary-600'
-              : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600'}`}
+          onClick={() => fetchRecap(true)}
+          disabled={refreshing}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors disabled:opacity-50"
         >
-          {leaderboardVisible ? '&#128065; Leaderboard Visible' : '&#128100; Show Leaderboard to Students'}
+          <svg className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          {refreshing ? 'Refreshing...' : 'Refresh'}
         </button>
       </div>
+    );
+  }
+
+  const rankIcon = (rank) => {
+    if (rank === 1) return '🥇';
+    if (rank === 2) return '🥈';
+    if (rank === 3) return '🥉';
+    return `#${rank}`;
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Header Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">🏆 Session Leaderboard</h3>
+        <div className="flex items-center gap-2 flex-wrap">
+
+          {/* Refresh */}
+          <button
+            onClick={() => fetchRecap(true)}
+            disabled={refreshing}
+            className="p-1.5 rounded-lg border bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 hover:text-slate-700 dark:hover:text-slate-200 transition-colors disabled:opacity-40"
+            title="Refresh leaderboard data"
+          >
+            <svg
+              className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+
+          {/* Finalize Session */}
+          <button
+            onClick={finalizeSession}
+            disabled={finalizing}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border bg-teal-50 text-teal-700 border-teal-300 hover:bg-teal-100 dark:bg-teal-900/20 dark:text-teal-400 dark:border-teal-700 dark:hover:bg-teal-900/40 transition-colors disabled:opacity-50"
+            title="Award session-completion bonuses: attendance (+5 pts), all-polls-answered (+10 pts), top-3 XP, weekly consistency XP"
+          >
+            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+            </svg>
+            <span>{finalizing ? 'Awarding...' : 'Finalize & Award Bonuses'}</span>
+          </button>
+
+          {/* Show/Hide Leaderboard to Students */}
+          <button
+            onClick={toggleLeaderboard}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors
+              ${leaderboardVisible
+                ? 'bg-primary-600 text-white border-primary-600 hover:bg-primary-700'
+                : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600'}`}
+            title={leaderboardVisible
+              ? 'Students can see the live leaderboard overlay. Click to hide it.'
+              : 'Broadcast live rankings to all students currently in this session.'}
+          >
+            {leaderboardVisible ? (
+              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            )}
+            <span>{leaderboardVisible ? 'Leaderboard Live (Hide)' : 'Show Leaderboard to Students'}</span>
+          </button>
+
+        </div>
+      </div>
+
+      {/* Finalize feedback */}
+      {finalizeMsg && (
+        <div className={`px-3 py-2 rounded-lg text-xs font-medium ${
+          finalizeMsg.type === 'success'
+            ? 'bg-teal-50 text-teal-700 border border-teal-200 dark:bg-teal-900/20 dark:text-teal-400 dark:border-teal-700'
+            : 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-700'
+        }`}>
+          {finalizeMsg.text}
+        </div>
+      )}
+
+      {/* Leaderboard visibility indicator */}
+      {leaderboardVisible && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-700 rounded-lg">
+          <svg className="w-4 h-4 text-primary-500 dark:text-primary-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+          <p className="text-xs text-primary-700 dark:text-primary-400 font-medium">
+            Live leaderboard is visible to all students in this session. They see a rankings overlay in real time.
+          </p>
+        </div>
+      )}
 
       {/* Class Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Participants', value: recap.totalParticipants, color: 'bg-primary-50 text-primary-700' },
-          { label: 'Avg Accuracy', value: `${recap.classAvgAccuracy}%`, color: 'bg-green-50 text-green-700' },
-          { label: 'Engagement', value: `${recap.engagementRate}%`, color: 'bg-primary-50 text-primary-700' },
-          { label: 'Total Polls', value: recap.totalPolls, color: 'bg-orange-50 text-orange-700' }
+          { label: 'Participants', value: recap.totalParticipants, color: 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-400' },
+          { label: 'Avg Accuracy', value: `${recap.classAvgAccuracy}%`, color: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' },
+          { label: 'Engagement', value: `${recap.engagementRate}%`, color: 'bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-400' },
+          { label: 'Total Polls', value: recap.totalPolls, color: 'bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400' }
         ].map(s => (
-          <div key={s.label} className={`rounded-xl p-3 text-center ${s.color} dark:bg-opacity-20`}>
+          <div key={s.label} className={`rounded-xl p-3 text-center ${s.color}`}>
             <p className="text-xl font-bold">{s.value}</p>
             <p className="text-xs font-medium mt-0.5">{s.label}</p>
           </div>
         ))}
       </div>
 
-      {/* Top 5 */}
-      {recap.top5 && recap.top5.length > 0 && (
+      {/* Top 5 Leaderboard */}
+      {recap.top5 && recap.top5.length > 0 ? (
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+          <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
             <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Top Students</h4>
+            <span className="text-xs text-slate-400 dark:text-slate-500">Points earned this session</span>
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-700">
             {recap.top5.map(s => (
-              <div key={s.studentId} className="flex items-center px-4 py-2.5 gap-3">
-                <span className="w-6 text-center font-bold text-slate-400 text-sm">#{s.rank}</span>
-                <span className="flex-1 text-sm font-medium text-slate-800 dark:text-slate-200">{s.studentName}</span>
-                <span className="text-xs text-slate-500">{s.correctAnswers}/{s.totalAnswers} correct</span>
-                <span className="text-sm font-bold text-primary-600 dark:text-primary-400">{s.points} pts</span>
+              <div key={s.studentId} className="flex items-center px-4 py-3 gap-3">
+                <span className="w-8 text-center text-base flex-shrink-0">{rankIcon(s.rank)}</span>
+                <span className="flex-1 text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{s.studentName}</span>
+                <span className="text-xs text-slate-400 dark:text-slate-500 hidden sm:block">{s.correctAnswers}/{s.totalAnswers} correct</span>
+                <span className="text-sm font-bold text-primary-600 dark:text-primary-400 flex-shrink-0">
+                  {s.points > 0 ? `${s.points} pts` : <span className="text-slate-400 font-normal text-xs">0 pts</span>}
+                </span>
               </div>
             ))}
           </div>
+          {recap.top5.every(s => s.points === 0) && (
+            <div className="px-4 py-3 bg-amber-50 dark:bg-amber-900/10 border-t border-amber-100 dark:border-amber-800">
+              <div className="flex items-start gap-2">
+                <svg className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  Points are awarded automatically when students answer polls. If all scores show 0, ensure polls are active and students are submitting answers. Click "Finalize &amp; Award Bonuses" after the session to add completion rewards.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 text-center">
+          <p className="text-slate-400 text-sm">No students ranked yet. Points appear as students answer polls.</p>
         </div>
       )}
 
       {/* Needs Attention */}
       {recap.needsAttention && recap.needsAttention.length > 0 && (
         <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl p-4">
-          <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2">&#9888; Needs Attention</h4>
+          <div className="flex items-center gap-1.5 mb-2">
+            <svg className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-300">Needs Attention</h4>
+          </div>
           <div className="space-y-1">
             {recap.needsAttention.map(s => (
               <div key={s.studentId} className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
-                <span>&#8226;</span>
+                <span className="w-1 h-1 rounded-full bg-amber-500 flex-shrink-0" />
                 <span className="font-medium">{s.studentName}</span>
                 <span>— {s.accuracy}% accuracy, {s.answered} polls answered</span>
               </div>

@@ -33,7 +33,7 @@ function RoleSelectionModal({ room, onClose, onJoin, joining }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-card border border-slate-200/80 dark:border-slate-700/80 max-w-md w-full p-6">
+      <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass max-w-md w-full p-6">
         {/* Room summary */}
         <div className="mb-4">
           <h2 className="text-lg font-bold font-display text-slate-900 dark:text-white">{room.session_title}</h2>
@@ -686,7 +686,7 @@ const CompetitionLobby = () => {
   if (demo) {
     return (
       <div className="max-w-7xl mx-auto space-y-6 px-4 sm:px-6 pb-8">
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-card border border-slate-200/80 dark:border-slate-700/80 p-6 text-center">
+        <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass p-6 text-center">
           <p className="text-slate-700 dark:text-slate-300 mb-4">Competition mode requires a real account.</p>
           <Button onClick={() => navigate('/auth')}>Sign in</Button>
         </div>
@@ -698,7 +698,7 @@ const CompetitionLobby = () => {
     <div className="max-w-7xl mx-auto space-y-6 px-4 sm:px-6 pb-8">
 
       {/* ── Section 1: Active Competitions ─────────────────────────────────── */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-card border border-slate-200/80 dark:border-slate-700/80">
+      <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass">
         <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700">
           <h2 className="text-lg sm:text-xl font-bold font-display text-slate-900 dark:text-white">
             Active Competitions
@@ -763,7 +763,7 @@ const CompetitionLobby = () => {
       </div>
 
       {/* ── Section 2: Start a Competition ─────────────────────────────────── */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-card border border-slate-200/80 dark:border-slate-700/80">
+      <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass">
         <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700">
           <h2 className="text-lg sm:text-xl font-bold font-display text-slate-900 dark:text-white">
             Start a Competition

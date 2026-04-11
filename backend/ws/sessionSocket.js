@@ -383,9 +383,10 @@ function initWebSocket(wss, { pool, redis, redisPub, redisSub, logger }) {
       message: 'Successfully joined session'
     }));
 
+    const studentCount = sessionConnections.get(normalizedSessionId).filter(c => c.userRole === 'student').length;
     broadcastToSession(normalizedSessionId, {
       type: 'participant-count-updated',
-      count: sessionConnections.get(normalizedSessionId).length
+      count: studentCount
     });
 
     const activePollData = global.activePollEndTimes.get(normalizedSessionId);
@@ -1064,17 +1065,32 @@ function initWebSocket(wss, { pool, redis, redisPub, redisSub, logger }) {
             break;
           }
           case 'toggle-leaderboard':
-            if (ws.userRole === 'teacher' && data.sessionId) {
-              const normalizedSid = String(data.sessionId).toUpperCase();
-              const visible = !!data.visible;
-              pool.query(
-                'UPDATE sessions SET leaderboard_visible = $1 WHERE session_id = $2',
-                [visible, normalizedSid]
-              ).catch(err => logger.error('toggle-leaderboard DB error', { error: err.message }));
-              broadcastToSession(normalizedSid, {
-                type: 'leaderboard-visibility',
-                visible
-              });
+            if (ws.userRole === 'teacher') {
+              const normalizedSid = (data.sessionId ? String(data.sessionId) : String(ws.sessionId || '')).toUpperCase();
+              if (normalizedSid) {
+                const visible = !!data.visible;
+                pool.query(
+                  'UPDATE sessions SET leaderboard_visible = $1 WHERE session_id = $2',
+                  [visible, normalizedSid]
+                ).catch(err => logger.error('toggle-leaderboard DB error', { error: err.message }));
+                broadcastToSession(normalizedSid, {
+                  type: 'leaderboard-visibility',
+                  visible
+                });
+                // When making visible, also push current leaderboard data so the
+                // student overlay has something to render immediately
+                if (visible) {
+                  const { getSessionLeaderboard } = require('../routes/gamification');
+                  pool.query('SELECT id FROM sessions WHERE session_id = $1', [normalizedSid])
+                    .then(async sessionRes => {
+                      if (sessionRes.rows.length > 0) {
+                        const leaderboard = await getSessionLeaderboard(sessionRes.rows[0].id, 50);
+                        broadcastToSession(normalizedSid, { type: 'leaderboard-update', leaderboard });
+                      }
+                    })
+                    .catch(err => logger.error('toggle-leaderboard fetch error', { error: err.message }));
+                }
+              }
             }
             break;
           case 'join-competition':

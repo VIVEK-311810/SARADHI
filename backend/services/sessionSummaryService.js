@@ -5,10 +5,10 @@ const logger = require('../logger');
 let mistralClient;
 try {
   const client = require('./mistralClient');
-  if (client && typeof client.chat === 'function') {
+  if (client && typeof client.chatComplete === 'function') {
     mistralClient = client;
   } else {
-    logger.warn('mistralClient loaded but missing .chat method — falling back to rule-based summary');
+    logger.warn('mistralClient loaded but missing .chatComplete method — falling back to rule-based summary');
   }
 } catch (err) {
   logger.warn('mistralClient unavailable — falling back to rule-based summary', { error: err.message });
@@ -21,23 +21,45 @@ try {
  */
 async function generateSessionSummary(sessionId) {
   // 1. Fetch all polls with per-poll response stats
-  const pollsRes = await pool.query(`
-    SELECT
-      p.question,
-      p.question_type,
-      p.topic,
-      p.blooms_level,
-      p.subject_tag,
-      COUNT(pr.id)::int AS response_count,
-      ROUND(
-        AVG(CASE WHEN pr.is_correct = TRUE THEN 1.0 ELSE 0.0 END) * 100
-      )::int AS accuracy_pct
-    FROM polls p
-    LEFT JOIN poll_responses pr ON pr.poll_id = p.id
-    WHERE p.session_id = $1
-    GROUP BY p.id
-    ORDER BY p.id
-  `, [sessionId]);
+  let pollsRes;
+  try {
+    pollsRes = await pool.query(`
+      SELECT
+        p.question,
+        p.question_type,
+        p.topic,
+        p.blooms_level,
+        p.subject_tag,
+        COUNT(pr.id)::int AS response_count,
+        ROUND(
+          AVG(CASE WHEN pr.is_correct = TRUE THEN 1.0 ELSE 0.0 END) * 100
+        )::int AS accuracy_pct
+      FROM polls p
+      LEFT JOIN poll_responses pr ON pr.poll_id = p.id
+      WHERE p.session_id = $1
+      GROUP BY p.id
+      ORDER BY p.id
+    `, [sessionId]);
+  } catch (queryErr) {
+    // Fallback for schemas without migration 011 columns
+    pollsRes = await pool.query(`
+      SELECT
+        p.question,
+        NULL::text AS question_type,
+        NULL::text AS topic,
+        NULL::text AS blooms_level,
+        NULL::text AS subject_tag,
+        COUNT(pr.id)::int AS response_count,
+        ROUND(
+          AVG(CASE WHEN pr.is_correct = TRUE THEN 1.0 ELSE 0.0 END) * 100
+        )::int AS accuracy_pct
+      FROM polls p
+      LEFT JOIN poll_responses pr ON pr.poll_id = p.id
+      WHERE p.session_id = $1
+      GROUP BY p.id
+      ORDER BY p.id
+    `, [sessionId]);
+  }
 
   const polls = pollsRes.rows;
 
@@ -95,13 +117,12 @@ Write a concise post-class summary (under 220 words) with exactly these sections
   let summaryText;
   try {
     if (!mistralClient) throw new Error('Mistral client unavailable');
-    const response = await mistralClient.chat({
-      model: process.env.MISTRAL_MODEL_SMALL || 'mistral-small-latest',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 512,
-      temperature: 0.4,
-    });
-    summaryText = response?.choices?.[0]?.message?.content?.trim() || '';
+    const response = await mistralClient.chatComplete(
+      process.env.MISTRAL_MODEL_SMALL || 'mistral-small-latest',
+      [{ role: 'user', content: prompt }],
+      { maxTokens: 512, temperature: 0.4 }
+    );
+    summaryText = response?.content?.trim() || '';
   } catch (err) {
     logger.error('Mistral session summary failed, using fallback', { error: err.message });
     // Graceful fallback: build a rule-based summary

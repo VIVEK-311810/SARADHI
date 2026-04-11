@@ -336,6 +336,75 @@ async function runAutoMigrations() {
   await run(`ALTER TABLE competition_rooms ADD COLUMN IF NOT EXISTS student_question_ids INTEGER[]`, 'competition_rooms.student_question_ids');
   await run(`ALTER TABLE competition_rooms ADD COLUMN IF NOT EXISTS teacher_poll_ids INTEGER[]`, 'competition_rooms.teacher_poll_ids');
 
+  // Migration 017 – AI Project Lab: project suggestions, assignments, submissions, notifications
+  await run(`
+    CREATE TABLE IF NOT EXISTS session_projects (
+      id                  SERIAL PRIMARY KEY,
+      session_id          INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+      generated_by        VARCHAR REFERENCES users(id),
+      generation_status   VARCHAR(20) NOT NULL DEFAULT 'none'
+                          CHECK (generation_status IN ('none','generating','completed','failed')),
+      suggestions         JSONB NOT NULL DEFAULT '[]',
+      is_published        BOOLEAN NOT NULL DEFAULT FALSE,
+      generation_error    TEXT,
+      generated_at        TIMESTAMP,
+      updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `, 'session_projects');
+  await run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_session_projects_session ON session_projects(session_id)`, 'idx_session_projects_session');
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS project_assignments (
+      id          SERIAL PRIMARY KEY,
+      session_id  INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+      project_id  INTEGER REFERENCES session_projects(id) ON DELETE SET NULL,
+      created_by  VARCHAR NOT NULL REFERENCES users(id),
+      title       VARCHAR(255) NOT NULL,
+      description TEXT NOT NULL,
+      difficulty  VARCHAR(20) CHECK (difficulty IN ('beginner','intermediate','advanced')),
+      due_date    TIMESTAMP,
+      is_active   BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `, 'project_assignments');
+  await run(`CREATE INDEX IF NOT EXISTS idx_project_assignments_session ON project_assignments(session_id)`, 'idx_project_assignments_session');
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS assignment_submissions (
+      id              SERIAL PRIMARY KEY,
+      assignment_id   INTEGER NOT NULL REFERENCES project_assignments(id) ON DELETE CASCADE,
+      student_id      VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      submission_type VARCHAR(10) NOT NULL CHECK (submission_type IN ('text','file')),
+      content         TEXT,
+      file_url        TEXT,
+      file_name       VARCHAR(255),
+      file_type       VARCHAR(50),
+      status          VARCHAR(20) NOT NULL DEFAULT 'submitted'
+                      CHECK (status IN ('submitted','reviewed')),
+      submitted_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(assignment_id, student_id)
+    )
+  `, 'assignment_submissions');
+  await run(`CREATE INDEX IF NOT EXISTS idx_submissions_assignment ON assignment_submissions(assignment_id)`, 'idx_submissions_assignment');
+  await run(`CREATE INDEX IF NOT EXISTS idx_submissions_student ON assignment_submissions(student_id)`, 'idx_submissions_student');
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS session_notifications (
+      id           SERIAL PRIMARY KEY,
+      session_id   INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+      sender_id    VARCHAR NOT NULL REFERENCES users(id),
+      type         VARCHAR(30) NOT NULL
+                   CHECK (type IN ('project_suggestion','assignment')),
+      reference_id INTEGER,
+      title        VARCHAR(255) NOT NULL,
+      body         TEXT,
+      created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `, 'session_notifications');
+  await run(`CREATE INDEX IF NOT EXISTS idx_session_notifs_session ON session_notifications(session_id, created_at DESC)`, 'idx_session_notifs_session');
+
   // Initialize cache service
   const cacheService = require('../services/cacheService');
   await cacheService.init().catch(err => logger.warn('Cache service init failed (non-fatal)', { error: err.message }));

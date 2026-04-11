@@ -24,14 +24,18 @@ router.post('/', authenticate, authorize('teacher'), async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const VALID_SUBJECTS = ['math','physics','chemistry','biology','cs','ece','mechanical','civil','english','history','economics','art','business'];
-    const validatedSubject = subject && VALID_SUBJECTS.includes(subject.toLowerCase())
-      ? subject.toLowerCase()
-      : null;
+    // Generate a unique 6-character alphanumeric session code (retry on collision)
+    const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let sessionCode;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      sessionCode = Array.from({ length: 6 }, () => CHARS[Math.floor(Math.random() * CHARS.length)]).join('');
+      const existing = await pool.query('SELECT 1 FROM sessions WHERE session_id = $1', [sessionCode]);
+      if (existing.rows.length === 0) break;
+    }
 
     const result = await pool.query(
-      'INSERT INTO sessions (title, course_name, teacher_id, is_active, subject) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [title, course_name, teacher_id, true, validatedSubject]
+      'INSERT INTO sessions (session_id, title, course_name, teacher_id, is_active) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [sessionCode, title, course_name, teacher_id, true]
     );
 
     res.status(201).json(result.rows[0]);
@@ -305,8 +309,7 @@ router.patch('/:sessionId/live', authenticate, authorize('teacher'), async (req,
       `UPDATE sessions
        SET is_live         = $1,
            live_started_at = CASE WHEN $1 = TRUE  THEN CURRENT_TIMESTAMP ELSE live_started_at END,
-           live_ended_at   = CASE WHEN $1 = FALSE THEN CURRENT_TIMESTAMP ELSE live_ended_at   END,
-           notes_status    = CASE WHEN $1 = FALSE THEN 'generating'      ELSE notes_status    END
+           live_ended_at   = CASE WHEN $1 = FALSE THEN CURRENT_TIMESTAMP ELSE live_ended_at   END
        WHERE session_id = $2 AND teacher_id = $3
        RETURNING *`,
       [live, sessionId.toUpperCase(), req.user.id]
@@ -323,14 +326,6 @@ router.patch('/:sessionId/live', authenticate, authorize('teacher'), async (req,
     }
     if (global.broadcastToDashboardsForSession) {
       global.broadcastToDashboardsForSession(sessionId.toUpperCase(), wsMessage);
-    }
-
-    // Auto-generate class notes when session ends
-    if (!live && result.rows[0]) {
-      const notesGenerator = require('../services/notesGeneratorService');
-      notesGenerator.generateNotesAsync(result.rows[0]).catch(err =>
-        logger.error('Auto notes generation failed (non-fatal)', { error: err.message, sessionId: sessionId.toUpperCase() })
-      );
     }
 
     logger.info(`Class ${live ? 'started' : 'ended'}`, { sessionId: sessionId.toUpperCase(), teacherId: req.user.id });
@@ -356,6 +351,62 @@ router.get('/:sessionId/notes', authenticate, async (req, res) => {
     res.json({ status: notes_status || 'none', url: notes_url, generatedAt: notes_generated_at, error: notes_error });
   } catch (error) {
     logger.error('Error fetching notes status', { error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /:sessionId/generate-notes — Teacher manually triggers class notes generation
+router.post('/:sessionId/generate-notes', authenticate, authorize('teacher'), async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { selectedResourceIds } = req.body || {};
+
+    const numericId = await getNumericSessionId(sessionId);
+    if (numericId === null) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const sessionRes = await pool.query(
+      `SELECT id, session_id, title, course_name, teacher_id, live_started_at, live_ended_at, notes_status
+       FROM sessions WHERE id = $1`,
+      [numericId]
+    );
+    const session = sessionRes.rows[0];
+
+    if (session.notes_status === 'generating') {
+      return res.status(409).json({ error: 'Notes generation already in progress' });
+    }
+
+    // Set status to generating (notes_error reset separately to handle missing column gracefully)
+    await pool.query(`UPDATE sessions SET notes_status = 'generating' WHERE id = $1`, [numericId]);
+    await pool.query(`UPDATE sessions SET notes_error = NULL WHERE id = $1`, [numericId]).catch(() => {});
+
+    const notesGenerator = require('../services/notesGeneratorService');
+    const options = Array.isArray(selectedResourceIds) && selectedResourceIds.length > 0
+      ? { selectedResourceIds }
+      : {};
+    notesGenerator.generateNotesAsync(session, options).catch(err =>
+      logger.error('Manual notes generation failed', { error: err.message, sessionId: sessionId.toUpperCase() })
+    );
+
+    res.json({ success: true, status: 'generating' });
+  } catch (error) {
+    logger.error('Error starting notes generation', { error: error.message });
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
+// POST /:sessionId/cancel-notes — Teacher cancels / resets notes generation
+router.post('/:sessionId/cancel-notes', authenticate, authorize('teacher'), async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    await pool.query(
+      `UPDATE sessions SET notes_status = 'none', notes_error = NULL WHERE session_id = $1 AND teacher_id = $2`,
+      [sessionId.toUpperCase(), req.user.id]
+    );
+    res.json({ success: true, status: 'none' });
+  } catch (error) {
+    logger.error('Error cancelling notes generation', { error: error.message });
     res.status(500).json({ error: 'Internal server error' });
   }
 });

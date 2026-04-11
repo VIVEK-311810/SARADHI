@@ -296,20 +296,48 @@ const TeacherAnalytics = () => {
             {pollPerformance.length > 0 ? (
               <>
                 <div className="hidden sm:block">
-                  <ResponsiveContainer width="100%" height={400}>
-                    <BarChart data={pollPerformance.slice(0, 10)} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" domain={[0, 100]} />
+                  <ResponsiveContainer width="100%" height={Math.max(300, pollPerformance.slice(0, 10).length * 44)}>
+                    <BarChart
+                      data={pollPerformance.slice(0, 10).map((p, i) => ({ ...p, label: `Q${i + 1}` }))}
+                      layout="vertical"
+                      margin={{ top: 4, right: 24, left: 8, bottom: 4 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                      <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
                       <YAxis
                         type="category"
-                        dataKey="question"
-                        width={120}
-                        tick={{ fontSize: 11 }}
+                        dataKey="label"
+                        width={32}
+                        tick={{ fontSize: 12, fontWeight: 600 }}
                       />
-                      <Tooltip formatter={(value) => [`${value}%`, 'Accuracy']} />
-                      <Bar dataKey="accuracyRate" name="Accuracy Rate" fill="#4F46E5" radius={[0, 4, 4, 0]} />
+                      <Tooltip
+                        formatter={(value) => [`${value}%`, 'Accuracy']}
+                        labelFormatter={(label, payload) => payload?.[0]?.payload?.question || label}
+                        wrapperStyle={{ maxWidth: 320 }}
+                        itemStyle={{ whiteSpace: 'normal', wordBreak: 'break-word' }}
+                      />
+                      <Bar dataKey="accuracyRate" name="Accuracy" radius={[0, 6, 6, 0]}>
+                        {pollPerformance.slice(0, 10).map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={entry.accuracyRate >= 70 ? '#10B981' : entry.accuracyRate >= 40 ? '#F59E0B' : '#EF4444'}
+                          />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
+                  {/* Legend */}
+                  <div className="mt-3 space-y-1">
+                    {pollPerformance.slice(0, 10).map((p, i) => (
+                      <div key={p.pollId} className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-400">
+                        <span className="font-bold text-slate-800 dark:text-slate-200 flex-shrink-0 w-6">Q{i + 1}</span>
+                        <span className="truncate">{p.question}</span>
+                        <span className={`ml-auto flex-shrink-0 font-semibold px-1.5 py-0.5 rounded text-white text-[11px] ${
+                          p.accuracyRate >= 70 ? 'bg-emerald-500' : p.accuracyRate >= 40 ? 'bg-amber-500' : 'bg-red-500'
+                        }`}>{p.accuracyRate}%</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Mobile: Cards view */}

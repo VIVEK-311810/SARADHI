@@ -167,7 +167,7 @@ router.get('/:studentId/type-accuracy', authenticate, async (req, res) => {
 
     const result = await pool.query(`
       SELECT
-        COALESCE(p.question_type, 'mcq') AS question_type,
+        'mcq' AS question_type,
         COUNT(*) AS answered,
         SUM(CASE WHEN pr.is_correct = true THEN 1 ELSE 0 END) AS correct,
         ROUND(
@@ -178,8 +178,6 @@ router.get('/:studentId/type-accuracy', authenticate, async (req, res) => {
       JOIN polls p ON pr.poll_id = p.id
       WHERE pr.student_id = $1
         AND pr.is_correct IS NOT NULL
-      GROUP BY COALESCE(p.question_type, 'mcq')
-      ORDER BY answered DESC
     `, [studentId]);
 
     res.json({ success: true, data: result.rows });

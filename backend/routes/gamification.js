@@ -112,29 +112,38 @@ async function awardBadge(studentId, badgeType, sessionId = null, tier = 'bronze
   try {
     await pool.query(`
       INSERT INTO student_badges (student_id, badge_type, badge_name, badge_description, session_id, badge_tier, badge_category)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      ON CONFLICT DO NOTHING
+      SELECT $1, $2, $3, $4, $5, $6, $7
+      WHERE NOT EXISTS (
+        SELECT 1 FROM student_badges WHERE student_id = $1 AND badge_type = $2
+      )
     `, [studentId, badgeType, badgeName, badgeDescription, sessionId, tier, category]);
   } catch (error) {
     logger.error('Error awarding badge', { error: error.message, studentId, badgeType });
   }
 }
 
-// ─── Helper: Award points (idempotent) ──────────────────────────────────────
+// ─── Helper: Award points (idempotent, no named constraint required) ─────────
 async function awardPoints(studentId, sessionId, pollId, points, pointType) {
   try {
     if (pollId !== null) {
+      // Use WHERE NOT EXISTS so no named unique constraint is required
       await pool.query(`
         INSERT INTO student_points (student_id, session_id, poll_id, points, point_type)
-        VALUES ($1, $2, $3, $4, $5)
-        ON CONFLICT (student_id, poll_id, point_type) DO NOTHING
+        SELECT $1, $2, $3, $4, $5
+        WHERE NOT EXISTS (
+          SELECT 1 FROM student_points
+          WHERE student_id = $1 AND poll_id = $3 AND point_type = $5
+        )
       `, [studentId, sessionId, pollId, points, pointType]);
     } else {
-      // Session-level award (poll_id IS NULL) — uses the partial unique index
+      // Session-level award (poll_id IS NULL)
       await pool.query(`
         INSERT INTO student_points (student_id, session_id, poll_id, points, point_type)
-        VALUES ($1, $2, NULL, $3, $4)
-        ON CONFLICT ON CONSTRAINT unique_session_level_points DO NOTHING
+        SELECT $1, $2, NULL, $3, $4
+        WHERE NOT EXISTS (
+          SELECT 1 FROM student_points
+          WHERE student_id = $1 AND session_id = $2 AND point_type = $4 AND poll_id IS NULL
+        )
       `, [studentId, sessionId, points, pointType]);
     }
   } catch (error) {
@@ -147,8 +156,11 @@ async function awardXP(studentId, sessionId, xpType, xpAmount) {
   try {
     await pool.query(`
       INSERT INTO student_xp (student_id, session_id, xp_type, xp_amount)
-      VALUES ($1, $2, $3, $4)
-      ON CONFLICT (student_id, session_id, xp_type) DO NOTHING
+      SELECT $1, $2, $3, $4
+      WHERE NOT EXISTS (
+        SELECT 1 FROM student_xp
+        WHERE student_id = $1 AND session_id = $2 AND xp_type = $3
+      )
     `, [studentId, sessionId, xpType, xpAmount]);
   } catch (error) {
     logger.error('Error awarding XP', { error: error.message, studentId, xpType });
@@ -167,11 +179,11 @@ async function getSessionLeaderboard(dbSessionId, limit = 100) {
       COALESCE(sstr.current_streak, 0) as current_streak,
       COALESCE(sstr.max_streak, 0) as max_streak
     FROM session_participants spart
-    JOIN users u ON spart.student_id = u.id
-    LEFT JOIN student_points sp ON u.id = sp.student_id AND sp.session_id = $1
-    LEFT JOIN poll_responses pr ON u.id = pr.student_id
+    JOIN users u ON CAST(spart.student_id AS TEXT) = CAST(u.id AS TEXT)
+    LEFT JOIN student_points sp ON CAST(u.id AS TEXT) = CAST(sp.student_id AS TEXT) AND sp.session_id = $1
+    LEFT JOIN poll_responses pr ON CAST(u.id AS TEXT) = CAST(pr.student_id AS TEXT)
       AND pr.poll_id IN (SELECT id FROM polls WHERE session_id = $1)
-    LEFT JOIN session_streaks sstr ON u.id = sstr.student_id AND sstr.session_id = $1
+    LEFT JOIN session_streaks sstr ON CAST(u.id AS TEXT) = CAST(sstr.student_id AS TEXT) AND sstr.session_id = $1
     WHERE spart.session_id = $1
     GROUP BY u.id, u.full_name, sstr.current_streak, sstr.max_streak
     ORDER BY total_points DESC, correct_answers DESC
@@ -546,14 +558,14 @@ router.post('/session/:sessionId/finalize', authenticate, async (req, res) => {
     const { sessionId } = req.params;
 
     const sessionResult = await pool.query(
-      'SELECT id FROM sessions WHERE id = $1 AND teacher_id = $2',
-      [sessionId, req.user.id]
+      'SELECT id FROM sessions WHERE session_id = $1 AND teacher_id = $2',
+      [sessionId.toUpperCase(), req.user.id]
     );
     if (sessionResult.rows.length === 0) {
       return res.status(404).json({ error: 'Session not found or not yours.' });
     }
 
-    const dbSessionId = parseInt(sessionId);
+    const dbSessionId = sessionResult.rows[0].id;
     await awardSessionCompletionPoints(dbSessionId);
     await processSessionEndXP(dbSessionId);
     await generateSessionSummaries(dbSessionId);
@@ -613,17 +625,19 @@ router.get('/teacher/session/:sessionId/recap', authenticate, async (req, res) =
     const { sessionId } = req.params;
 
     const sessionCheck = await pool.query(
-      'SELECT id FROM sessions WHERE id = $1 AND teacher_id = $2',
-      [sessionId, req.user.id]
+      'SELECT id FROM sessions WHERE session_id = $1 AND teacher_id = $2',
+      [sessionId.toUpperCase(), req.user.id]
     );
     if (sessionCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Session not found.' });
     }
 
+    const dbSessionId = sessionCheck.rows[0].id;
+
     const [leaderboard, pollsResult, participantsResult] = await Promise.all([
-      getSessionLeaderboard(parseInt(sessionId), 5),
-      pool.query('SELECT id FROM polls WHERE session_id = $1', [sessionId]),
-      pool.query('SELECT COUNT(*) as cnt FROM session_participants WHERE session_id = $1', [sessionId])
+      getSessionLeaderboard(dbSessionId, 5),
+      pool.query('SELECT id FROM polls WHERE session_id = $1', [dbSessionId]),
+      pool.query('SELECT COUNT(*) as cnt FROM session_participants WHERE session_id = $1', [dbSessionId])
     ]);
 
     const pollIds = pollsResult.rows.map(p => p.id);
@@ -642,11 +656,11 @@ router.get('/teacher/session/:sessionId/recap', authenticate, async (req, res) =
           COUNT(pr.id) as answered,
           SUM(CASE WHEN pr.is_correct THEN 1 ELSE 0 END) as correct
         FROM session_participants sp
-        JOIN users u ON sp.student_id = u.id
-        LEFT JOIN poll_responses pr ON u.id = pr.student_id AND pr.poll_id = ANY($1)
+        JOIN users u ON CAST(sp.student_id AS TEXT) = CAST(u.id AS TEXT)
+        LEFT JOIN poll_responses pr ON CAST(u.id AS TEXT) = CAST(pr.student_id AS TEXT) AND pr.poll_id = ANY($1)
         WHERE sp.session_id = $2
         GROUP BY u.id, u.full_name
-      `, [pollIds, sessionId]);
+      `, [pollIds, dbSessionId]);
 
       const allStats = statsResult.rows;
       const totalAnswered = allStats.reduce((sum, s) => sum + parseInt(s.answered || 0), 0);
@@ -726,9 +740,9 @@ router.get('/leaderboard/all-time', authenticate, async (req, res) => {
         COUNT(DISTINCT pr.id) as total_answers,
         COALESCE(MAX(sstr.max_streak), 0) as best_streak
       FROM users u
-      LEFT JOIN student_xp xp ON u.id = xp.student_id
-      LEFT JOIN poll_responses pr ON u.id = pr.student_id
-      LEFT JOIN session_streaks sstr ON u.id = sstr.student_id
+      LEFT JOIN student_xp xp ON CAST(u.id AS TEXT) = CAST(xp.student_id AS TEXT)
+      LEFT JOIN poll_responses pr ON CAST(u.id AS TEXT) = CAST(pr.student_id AS TEXT)
+      LEFT JOIN session_streaks sstr ON CAST(u.id AS TEXT) = CAST(sstr.student_id AS TEXT)
       WHERE u.role = 'student'
       GROUP BY u.id, u.full_name
       HAVING COALESCE(SUM(xp.xp_amount), 0) > 0
@@ -795,7 +809,7 @@ router.get('/student/:studentId/stats', authenticate, async (req, res) => {
       ) as higher_ranked
     `, [totalXP]);
     const totalStudentsResult = await pool.query(
-      'SELECT COUNT(DISTINCT student_id) as total FROM student_xp'
+      "SELECT COUNT(*) as total FROM users WHERE role = 'student'"
     );
 
     res.json({

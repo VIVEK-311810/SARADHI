@@ -133,9 +133,6 @@ router.get('/teacher/:teacherId/poll-performance', authenticate, authorize('teac
         SUBSTRING(p.question, 1, 50) as question,
         s.title as session_title,
         s.session_id,
-        p.question_type,
-        p.blooms_level,
-        p.subject_tag,
         COUNT(pr.id) as total_responses,
         COUNT(CASE WHEN pr.is_correct THEN 1 END) as correct_responses,
         COALESCE(ROUND((COUNT(CASE WHEN pr.is_correct THEN 1 END)::DECIMAL / NULLIF(COUNT(pr.id), 0)) * 100, 1), 0) as accuracy_rate,
@@ -145,7 +142,7 @@ router.get('/teacher/:teacherId/poll-performance', authenticate, authorize('teac
       JOIN sessions s ON p.session_id = s.id
       LEFT JOIN poll_responses pr ON p.id = pr.poll_id
       WHERE s.teacher_id = $1
-      GROUP BY p.id, p.question, s.title, s.session_id, p.question_type, p.blooms_level, p.subject_tag, p.created_at
+      GROUP BY p.id, p.question, s.title, s.session_id, p.created_at
       ORDER BY p.created_at DESC
       LIMIT $2
     `, [teacherId, limit]);
@@ -157,9 +154,9 @@ router.get('/teacher/:teacherId/poll-performance', authenticate, authorize('teac
         question: row.question + (row.question.length >= 50 ? '...' : ''),
         sessionTitle: row.session_title,
         sessionId: row.session_id,
-        question_type: row.question_type,
-        blooms_level: row.blooms_level,
-        subject_tag: row.subject_tag,
+        question_type: null,
+        blooms_level: null,
+        subject_tag: null,
         totalResponses: parseInt(row.total_responses) || 0,
         correctResponses: parseInt(row.correct_responses) || 0,
         accuracyRate: parseFloat(row.accuracy_rate) || 0,
@@ -194,7 +191,7 @@ router.get('/teacher/:teacherId/engagement-trends', authenticate, authorize('tea
       LEFT JOIN polls p ON s.id = p.session_id
       LEFT JOIN poll_responses pr ON p.id = pr.poll_id
       WHERE s.teacher_id = $1
-        AND s.created_at >= NOW() - ($2 * INTERVAL '1 day')
+        AND s.created_at >= NOW() - ($2::int * INTERVAL '1 day')
       GROUP BY DATE(s.created_at)
       ORDER BY date ASC
     `, [teacherId, days]);
@@ -270,8 +267,8 @@ router.get('/session/:sessionId/detailed', authenticate, authorize('teacher'), a
         COALESCE(ROUND(AVG(CASE WHEN pr.is_correct THEN 100 ELSE 0 END), 1), 0) as accuracy,
         COALESCE(ROUND(AVG(pr.response_time)::DECIMAL / 1000, 1), 0) as avg_response_time
       FROM session_participants sp
-      JOIN users u ON sp.student_id = u.id
-      LEFT JOIN poll_responses pr ON u.id = pr.student_id
+      JOIN users u ON CAST(sp.student_id AS TEXT) = CAST(u.id AS TEXT)
+      LEFT JOIN poll_responses pr ON CAST(u.id AS TEXT) = CAST(pr.student_id AS TEXT)
         AND pr.poll_id IN (SELECT id FROM polls WHERE session_id = $1)
       WHERE sp.session_id = $1
       GROUP BY u.id, u.full_name, u.email

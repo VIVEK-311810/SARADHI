@@ -12,6 +12,7 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from '../ui/alert-dialog';
+import { SummaryContent } from './SummaryPanel';
 
 const SESSIONS_PER_PAGE = 20;
 
@@ -152,8 +153,8 @@ const EnhancedTeacherDashboard = () => {
               </div>
               <button onClick={() => setSummaryModal(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl leading-none px-1">✕</button>
             </div>
-            <div className="overflow-y-auto px-5 py-4 text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
-              {summaryModal.text}
+            <div className="overflow-y-auto px-5 py-4">
+              <SummaryContent summaryText={summaryModal.text} />
             </div>
           </div>
         </div>

@@ -1033,11 +1033,14 @@ export const handleDemoRequest = (endpoint, options = {}) => {
     return Promise.resolve({
       success: true,
       data: {
-        classStats: { avgAccuracy: 72, participationRate: 85, totalStudents: 12, activeStudents: 10 },
-        topStudents: DEMO_SESSION_LEADERBOARD.slice(0, 5),
+        top5: DEMO_SESSION_LEADERBOARD.slice(0, 5),
+        classAvgAccuracy: 72,
+        engagementRate: 85,
+        totalParticipants: 12,
+        totalPolls: 6,
         needsAttention: [
-          { studentId: 1005, studentName: 'Vijay Anand', avgAccuracy: 33, pollsAnswered: 3 },
-          { studentId: 1006, studentName: 'Sowmya Nair', avgAccuracy: 40, pollsAnswered: 2 },
+          { studentId: 1005, studentName: 'Vijay Anand', accuracy: 33, answered: 3 },
+          { studentId: 1006, studentName: 'Sowmya Nair', accuracy: 40, answered: 2 },
         ],
       },
     });
@@ -1227,6 +1230,71 @@ export const handleDemoRequest = (endpoint, options = {}) => {
 
     return Promise.resolve({ success: true });
   }
+
+  // ── AI Project Lab ───────────────────────────────────────────────
+  // GET  /sessions/:id/projects
+  if (ep.includes('/PROJECTS') && !ep.includes('/GENERATE') && !ep.includes('/PUBLISH') && !ep.includes('/ASSIGNMENTS') && method === 'GET') {
+    return Promise.resolve({
+      id: 1,
+      status: 'completed',
+      isPublished: true,
+      generatedAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+      updatedAt: new Date(Date.now() - 4 * 60 * 1000).toISOString(),
+      suggestions: [
+        { title: 'Stack-based Expression Evaluator', description: 'Build a calculator that uses a stack to evaluate infix expressions. Handle operator precedence and parentheses correctly.', difficulty: 'beginner', real_world_use_cases: ['Compiler design', 'Scientific calculators'], tech_stack_hints: ['Python', 'JavaScript'], estimated_duration: '1–2 days', learning_outcomes: ['Stack operations', 'Algorithm design'] },
+        { title: 'Binary Search Visualiser', description: 'Create an interactive web page that animates the binary search algorithm on a sorted array. Allow users to set the target and step through each comparison.', difficulty: 'beginner', real_world_use_cases: ['Teaching tools', 'Algorithm demos'], tech_stack_hints: ['HTML/CSS/JS', 'React'], estimated_duration: '1 day', learning_outcomes: ['Binary search mechanics', 'DOM manipulation'] },
+        { title: 'Mini File System Simulator', description: 'Implement a simplified in-memory file system that supports directories and files using a tree data structure. Support basic commands: mkdir, ls, cd, touch.', difficulty: 'intermediate', real_world_use_cases: ['OS internals education', 'Cloud storage concepts'], tech_stack_hints: ['Python', 'Node.js'], estimated_duration: '3–4 days', learning_outcomes: ['Tree traversal', 'Recursive data structures'] },
+        { title: 'LRU Cache Implementation', description: 'Design and implement an LRU (Least Recently Used) cache using a doubly linked list and a hash map. Benchmark it against a naive array-based cache.', difficulty: 'intermediate', real_world_use_cases: ['Database query caching', 'CDN edge caches'], tech_stack_hints: ['Python', 'Java', 'C++'], estimated_duration: '2–3 days', learning_outcomes: ['Linked list mastery', 'Time complexity analysis'] },
+        { title: 'Pathfinding Visualiser', description: 'Build a grid-based visualiser for BFS, DFS, and A* pathfinding algorithms. Allow users to place walls and see the search frontier expand in real time.', difficulty: 'advanced', real_world_use_cases: ['GPS navigation', 'Game AI', 'Robotics'], tech_stack_hints: ['React', 'Canvas API', 'TypeScript'], estimated_duration: '5–7 days', learning_outcomes: ['Graph algorithms', 'Real-time UI updates', 'Algorithm comparison'] },
+        { title: 'Distributed Key-Value Store', description: 'Implement a simplified distributed key-value store with consistent hashing for sharding and eventual consistency. Deploy two nodes that replicate writes to each other.', difficulty: 'advanced', real_world_use_cases: ['Redis-like systems', 'Distributed databases', 'Cloud infrastructure'], tech_stack_hints: ['Node.js', 'TCP sockets', 'Docker'], estimated_duration: '1–2 weeks', learning_outcomes: ['Distributed systems fundamentals', 'Consistency models', 'Network programming'] },
+      ],
+    });
+  }
+
+  // POST /sessions/:id/projects/generate
+  if (ep.includes('/PROJECTS/GENERATE') && method === 'POST')
+    return Promise.resolve({ status: 'generating', message: 'Project suggestions are being generated' });
+
+  // PATCH /sessions/:id/projects/:projectId
+  if (ep.match(/\/SESSIONS\/[^/]+\/PROJECTS\/\d+$/) && method === 'PATCH')
+    return Promise.resolve({ success: true, updatedAt: new Date().toISOString() });
+
+  // POST /sessions/:id/projects/:projectId/publish
+  if (ep.includes('/PROJECTS/') && ep.includes('/PUBLISH') && method === 'POST')
+    return Promise.resolve({ success: true, notification: { id: 1, title: 'New AI Project Suggestions', body: 'Check the Projects tab!', createdAt: new Date().toISOString() } });
+
+  // GET /sessions/:id/assignments
+  if (ep.includes('/ASSIGNMENTS') && !ep.includes('/SUBMISSIONS') && !ep.includes('/SUBMIT') && method === 'GET') {
+    return Promise.resolve({
+      assignments: [
+        {
+          id: 1, title: 'Mini File System Simulator', description: 'Build a simplified in-memory file system that supports directories and files using a tree data structure.',
+          difficulty: 'intermediate', due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          is_active: true, submission_count: 3, submission_status: null, created_at: new Date().toISOString(),
+        },
+      ],
+    });
+  }
+
+  // POST /sessions/:id/assignments
+  if (ep.includes('/ASSIGNMENTS') && method === 'POST')
+    return Promise.resolve({ success: true, assignment: { id: Date.now(), title: 'Demo Assignment', difficulty: 'intermediate', is_active: true, created_at: new Date().toISOString() } });
+
+  // DELETE /sessions/:id/assignments/:id
+  if (ep.includes('/ASSIGNMENTS') && method === 'DELETE')
+    return Promise.resolve({ success: true });
+
+  // GET /sessions/:id/assignments/:id/submissions
+  if (ep.includes('/SUBMISSIONS') && method === 'GET')
+    return Promise.resolve({ submissions: [], total: 0, page: 1, limit: 20 });
+
+  // POST /sessions/:id/assignments/:id/submit
+  if (ep.includes('/SUBMIT') && method === 'POST')
+    return Promise.resolve({ success: true, submission: { id: Date.now(), status: 'submitted', submitted_at: new Date().toISOString() } });
+
+  // GET /sessions/:id/notifications
+  if (ep.includes('/NOTIFICATIONS') && method === 'GET')
+    return Promise.resolve({ notifications: [] });
 
   // Fallback
   return Promise.resolve({ success: true, data: [] });
