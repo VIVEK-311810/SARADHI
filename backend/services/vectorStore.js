@@ -48,6 +48,7 @@ class VectorStore {
         token_count: chunk.tokenCount,
         page_number: chunk.pageNumber || null,
         section_title: chunk.sectionTitle || null,
+        content_type: chunk.contentType || 'text',
         pinecone_vector_id: `${resourceId}_chunk_${i}`
       }));
 
