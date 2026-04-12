@@ -1,7 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
 const AudioRecorder = ({ audioRecorder, sessionId: propSessionId }) => {
   const transcriptEndRef = useRef(null);
+  const [contextUploadState, setContextUploadState] = useState('idle'); // idle | uploading | done | error
+  const [contextFilename, setContextFilename] = useState('');
 
   // Destructure props from audioRecorder hook
   const {
@@ -14,6 +18,9 @@ const AudioRecorder = ({ audioRecorder, sessionId: propSessionId }) => {
     setMcqTypes,
     mcqCount,
     setMcqCount,
+    sessionResources,
+    selectedResourceId,
+    setSelectedResourceId,
     status,
     transcripts,
     fullTranscript,
@@ -44,6 +51,31 @@ const AudioRecorder = ({ audioRecorder, sessionId: propSessionId }) => {
     setMcqTypes(prev =>
       prev.includes(value) ? prev.filter(t => t !== value) : [...prev, value]
     );
+  };
+
+  const handleContextUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.type !== 'application/pdf') { alert('Only PDF files supported'); return; }
+    setContextUploadState('uploading');
+    setContextFilename(file.name);
+    try {
+      const token = localStorage.getItem('authToken');
+      const fd = new FormData();
+      fd.append('pdf', file);
+      fd.append('session_id', sessionId);
+      const res = await fetch(`${API_URL}/transcription/upload-context`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Upload failed');
+      setContextUploadState('done');
+    } catch (err) {
+      console.error('[AudioRecorder] Context upload failed:', err);
+      setContextUploadState('error');
+    }
+    e.target.value = '';
   };
 
   // Auto-scroll transcript display
@@ -136,6 +168,29 @@ const AudioRecorder = ({ audioRecorder, sessionId: propSessionId }) => {
         </div>
       </div>
 
+      {/* Reference Resource */}
+      <div>
+        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+          Reference Resource <span className="font-normal text-slate-400">(optional — for MCQ context)</span>
+        </label>
+        <select
+          value={selectedResourceId}
+          onChange={(e) => setSelectedResourceId(e.target.value)}
+          disabled={status !== 'idle'}
+          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed text-sm dark:bg-slate-700 dark:text-white"
+        >
+          <option value="">Transcript only (no resource)</option>
+          {sessionResources
+            .filter(r => r.vectorization_status === 'completed')
+            .map(r => (
+              <option key={r.id} value={r.id}>{r.title}</option>
+            ))}
+        </select>
+        {sessionResources.length > 0 && sessionResources.filter(r => r.vectorization_status === 'completed').length === 0 && (
+          <p className="text-xs text-slate-400 mt-1">No AI-ready resources yet — upload and vectorize first.</p>
+        )}
+      </div>
+
       {/* MCQ Preferences */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Question Types to Generate</h3>
@@ -201,6 +256,26 @@ const AudioRecorder = ({ audioRecorder, sessionId: propSessionId }) => {
           Stop
         </button>
       </div>
+
+      {/* Upload PDF mid-session for context (only during active recording) */}
+      {status !== 'idle' && (
+        <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <span className="text-sm text-blue-700 dark:text-blue-300 font-medium whitespace-nowrap">PDF context:</span>
+          {contextUploadState === 'done' ? (
+            <span className="text-xs text-green-600 dark:text-green-400 truncate">✓ {contextFilename}</span>
+          ) : contextUploadState === 'uploading' ? (
+            <span className="text-xs text-blue-500 animate-pulse">Indexing {contextFilename}…</span>
+          ) : contextUploadState === 'error' ? (
+            <span className="text-xs text-red-500">Failed — try again</span>
+          ) : (
+            <span className="text-xs text-slate-500 dark:text-slate-400">None uploaded</span>
+          )}
+          <label className="ml-auto cursor-pointer text-xs px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-800/50 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-700/50 transition-colors font-medium whitespace-nowrap">
+            {contextUploadState === 'done' ? 'Replace' : 'Upload PDF'}
+            <input type="file" accept="application/pdf" className="hidden" onChange={handleContextUpload} />
+          </label>
+        </div>
+      )}
 
       {/* Real-time Transcript Display */}
       <div>

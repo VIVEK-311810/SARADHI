@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const fetch = require('node-fetch');
 const audioProcessor = require('../services/audioProcessor');
+const sessionContextStore = require('../services/sessionContextStore');
 const pool = require('../db');
 const logger = require('../logger');
 const { authenticate, authorize } = require('../middleware/auth');
@@ -50,6 +51,7 @@ router.post('/start', authenticate, authorize('teacher'), upload.single('pdf'), 
 
     let mcqTypes = ['mcq', 'true_false', 'fill_blank', 'numeric', 'assertion_reason'];
     let mcqCount = 3;
+    let resourceId = req.body.resource_id || null;
     if (req.body.mcq_types) {
       try { mcqTypes = JSON.parse(req.body.mcq_types); } catch (_) {}
     }
@@ -58,7 +60,7 @@ router.post('/start', authenticate, authorize('teacher'), upload.single('pdf'), 
       if (!isNaN(parsed) && parsed >= 1 && parsed <= 10) mcqCount = parsed;
     }
 
-    const session = await audioProcessor.createSession(session_id, intervalMinutes, pdfUploaded, pdfFilename, mcqTypes, mcqCount);
+    const session = await audioProcessor.createSession(session_id, intervalMinutes, pdfUploaded, pdfFilename, mcqTypes, mcqCount, resourceId);
     audioProcessor.startSegmentTimer(session_id, intervalMinutes);
 
     res.json({ success: true, session_id, session, message: 'Session started successfully' });
@@ -385,6 +387,27 @@ router.post('/trigger-segment', authenticate, authorize('teacher'), async (req, 
   } catch (error) {
     logger.error('Error triggering segment webhook', { error: error.message });
     res.status(500).json({ error: 'Failed to trigger webhook', details: error.message });
+  }
+});
+
+// POST /api/transcription/upload-context — Upload a PDF during recording for in-session context (teacher only)
+// File is parsed + embedded in memory only — never saved to DB or Supabase storage.
+router.post('/upload-context', authenticate, authorize('teacher'), upload.single('pdf'), async (req, res) => {
+  try {
+    const { session_id } = req.body;
+    if (!session_id) return res.status(400).json({ error: 'session_id is required' });
+    if (!req.file) return res.status(400).json({ error: 'No PDF provided' });
+    if (req.file.mimetype !== 'application/pdf') return res.status(400).json({ error: 'Only PDF files are supported' });
+    if (!(await verifySessionOwnership(session_id, req.user.id))) {
+      return res.status(403).json({ error: 'Session not found or access denied' });
+    }
+
+    const chunkCount = await sessionContextStore.indexPDF(session_id, req.file.buffer, req.file.originalname);
+    logger.info('In-session PDF indexed in memory', { session_id, filename: req.file.originalname, chunkCount });
+    res.json({ success: true, session_id, filename: req.file.originalname, chunkCount });
+  } catch (error) {
+    logger.error('Error indexing in-session PDF', { error: error.message });
+    res.status(500).json({ error: 'Failed to index PDF', details: error.message });
   }
 });
 

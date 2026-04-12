@@ -5,6 +5,7 @@ const pool = require('../db');
 const { runMCQAgent } = require('./mcqAgent');
 const { runKeyPointsAgent } = require('./keyPointsAgent');
 const { runNotesAgent } = require('./notesAgent');
+const sessionContextStore = require('./sessionContextStore');
 
 // Configuration
 const GPU_TRANSCRIPTION_URL = process.env.GPU_TRANSCRIPTION_URL || 'http://localhost:5000';
@@ -203,6 +204,7 @@ async function sendTranscriptSegment(sessionId) {
     let dbId = sessionData?.dbId;
     const mcqTypes = sessionData?.mcqTypes || null;
     const mcqCount = sessionData?.mcqCount || 3;
+    const resourceId = sessionData?.resourceId || null;
     console.log(`[AudioProcessor]   activeSessions lookup '${sessionId}' → dbId=${dbId}`);
     if (!dbId) {
       const sessionQuery = `
@@ -261,7 +263,7 @@ async function sendTranscriptSegment(sessionId) {
     console.log(`[AudioProcessor] ✓ Transcripts marked sent for session: ${sessionId} (${result.rows.length} segments)`);
 
     // Trigger MCQ generation via LangGraph agent (fire-and-forget — non-blocking)
-    runMCQAgent(transcriptSegment, sessionId, { types: mcqTypes, count: mcqCount })
+    runMCQAgent(transcriptSegment, sessionId, { types: mcqTypes, count: mcqCount, resourceId })
       .then(mcqs => console.log(`[AudioProcessor] MCQ agent completed: ${mcqs?.length || 0} MCQs for session: ${sessionId}`))
       .catch(err => console.error(`[AudioProcessor] MCQ agent error (non-fatal): ${err.message}`));
 
@@ -341,7 +343,7 @@ function getDebugState() {
  * @param {string} pdfFilename - PDF filename if uploaded
  * @returns {Promise<Object>} Created session record
  */
-async function createSession(sessionId, segmentInterval, pdfUploaded = false, pdfFilename = null, mcqTypes = null, mcqCount = 3) {
+async function createSession(sessionId, segmentInterval, pdfUploaded = false, pdfFilename = null, mcqTypes = null, mcqCount = 3, resourceId = null) {
   try {
     const query = `
       INSERT INTO transcription_sessions (session_id, segment_interval, pdf_uploaded, pdf_filename, status)
@@ -353,7 +355,7 @@ async function createSession(sessionId, segmentInterval, pdfUploaded = false, pd
     const session = result.rows[0];
 
     // Store session data in memory for quick transcript saves and MCQ preferences
-    activeSessions.set(sessionId, { dbId: session.id, mcqTypes, mcqCount });
+    activeSessions.set(sessionId, { dbId: session.id, mcqTypes, mcqCount, resourceId });
 
     console.log(`[AudioProcessor] Session created: ${sessionId} (db_id: ${session.id}) at ${session.start_time}`);
 
@@ -439,8 +441,9 @@ async function endSession(sessionId) {
       }
     }
 
-    // Remove from active sessions
+    // Remove from active sessions and clear in-memory PDF context
     activeSessions.delete(sessionId);
+    sessionContextStore.clearSession(sessionId);
 
     if (!dbId) {
       console.log(`[AudioProcessor] No database session found to end for: ${sessionId}`);

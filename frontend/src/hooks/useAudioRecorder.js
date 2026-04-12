@@ -17,6 +17,8 @@ const useAudioRecorder = (initialSessionId = '') => {
   const [segmentInterval, setSegmentInterval] = useState(10);
   const [mcqTypes, setMcqTypes] = useState(['mcq', 'true_false', 'fill_blank', 'numeric', 'assertion_reason']);
   const [mcqCount, setMcqCount] = useState(3);
+  const [sessionResources, setSessionResources] = useState([]);
+  const [selectedResourceId, setSelectedResourceId] = useState('');
   const [status, setStatus] = useState('idle'); // idle, recording, paused
   const [transcripts, setTranscripts] = useState([]);
   const [notes, setNotes] = useState('');
@@ -35,6 +37,19 @@ const useAudioRecorder = (initialSessionId = '') => {
       setSessionId(initialSessionId);
     }
   }, [initialSessionId]);
+
+  // Fetch uploaded resources for this session (for reference dropdown)
+  useEffect(() => {
+    const sid = initialSessionId || sessionId;
+    if (!sid) return;
+    const token = localStorage.getItem('authToken');
+    fetch(`${API_URL}/resources/session/${sid}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(r => r.json())
+      .then(data => setSessionResources(data.resources || []))
+      .catch(() => {});
+  }, [initialSessionId, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // WebSocket connection — opened once on mount, not per-sessionId change
   useEffect(() => {
@@ -153,6 +168,7 @@ const useAudioRecorder = (initialSessionId = '') => {
       formData.append('segment_interval', segmentInterval);
       formData.append('mcq_types', JSON.stringify(mcqTypes));
       formData.append('mcq_count', mcqCount);
+      if (selectedResourceId) formData.append('resource_id', selectedResourceId);
       if (pdfFile) formData.append('pdf', pdfFile);
 
       const token = localStorage.getItem('authToken');
@@ -323,6 +339,8 @@ const useAudioRecorder = (initialSessionId = '') => {
     segmentInterval, setSegmentInterval,
     mcqTypes, setMcqTypes,
     mcqCount, setMcqCount,
+    sessionResources,
+    selectedResourceId, setSelectedResourceId,
     status,
     transcripts, fullTranscript,
     notes, setNotes,

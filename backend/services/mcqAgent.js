@@ -7,17 +7,19 @@ const { PineconeStore } = require('@langchain/pinecone');
 const { ChatPromptTemplate } = require('@langchain/core/prompts');
 const { StringOutputParser } = require('@langchain/core/output_parsers');
 const { index: pineconeIndex } = require('../config/pinecone');
+const sessionContextStore = require('./sessionContextStore');
 const pool = require('../db');
 
 // ── State Definition ──────────────────────────────────────────────────────────
 const StateAnnotation = Annotation.Root({
-  transcript: Annotation,
-  sessionId:  Annotation,
-  mcqTypes:   Annotation,
-  mcqCount:   Annotation,
-  context:    Annotation,
-  mcqText:    Annotation,
-  mcqs:       Annotation,
+  transcript:  Annotation,
+  sessionId:   Annotation,
+  resourceId:  Annotation,
+  mcqTypes:    Annotation,
+  mcqCount:    Annotation,
+  context:     Annotation,
+  mcqText:     Annotation,
+  mcqs:        Annotation,
 });
 
 // ── Shared model instances ────────────────────────────────────────────────────
@@ -34,22 +36,58 @@ const llm = new ChatMistralAI({
 });
 
 // ── Node 1: Retrieve course-material context from Pinecone ────────────────────
+// Only runs if teacher explicitly selected a resource. Skipped when resourceId is null.
 async function retrieveContext(state) {
+  // Priority 1: in-session PDF uploaded during recording (in-memory, no DB)
+  if (sessionContextStore.hasContext(state.sessionId)) {
+    try {
+      const results = await sessionContextStore.search(state.sessionId, state.transcript.substring(0, 300), 5);
+      if (results.length && results[0].score >= 0.3) {
+        const context = results.map((r, i) => `[${i + 1}] ${r.text}`).join('\n\n').slice(0, 3000);
+        console.log(`[MCQAgent] Using in-session PDF context (top score: ${results[0].score.toFixed(2)}) for session: ${state.sessionId}`);
+        return { context };
+      }
+      console.log(`[MCQAgent] In-session PDF not relevant to transcript — skipping`);
+    } catch (err) {
+      console.warn(`[MCQAgent] In-session context search failed: ${err.message}`);
+    }
+    return { context: '' };
+  }
+
+  // Priority 2: pre-uploaded resource selected by teacher
+  if (!state.resourceId) {
+    console.log(`[MCQAgent] No resource selected — skipping context retrieval for session: ${state.sessionId}`);
+    return { context: '' };
+  }
+
   try {
     const queryText = state.transcript.substring(0, 300);
     const vectorStore = await PineconeStore.fromExistingIndex(embeddings, {
       pineconeIndex,
-      filter: { session_id: state.sessionId },
+      filter: { session_id: state.sessionId, resource_id: state.resourceId },
     });
     const docs = await vectorStore.similaritySearch(queryText, 5);
+
+    if (!docs.length) {
+      console.log(`[MCQAgent] No matching chunks found for resource: ${state.resourceId}`);
+      return { context: '' };
+    }
+
+    // Relevance check: if top result score is very low the resource is off-topic — skip it.
+    // PineconeStore.similaritySearchWithScore returns [doc, score] pairs.
+    const docsWithScore = await vectorStore.similaritySearchWithScore(queryText, 1);
+    if (docsWithScore.length && docsWithScore[0][1] < 0.3) {
+      console.log(`[MCQAgent] Resource context not relevant to transcript (score: ${docsWithScore[0][1].toFixed(2)}) — ignoring for session: ${state.sessionId}`);
+      return { context: '' };
+    }
+
     const context = docs
       .map((doc, i) => `[${i + 1}] ${doc.pageContent}`)
       .join('\n\n')
       .slice(0, 3000);
-    console.log(`[MCQAgent] Retrieved ${docs.length} context chunks for session: ${state.sessionId}`);
+    console.log(`[MCQAgent] Retrieved ${docs.length} context chunks for resource: ${state.resourceId}`);
     return { context };
   } catch (err) {
-    // Context retrieval is best-effort — MCQs can still be generated from transcript alone
     console.warn(`[MCQAgent] Context retrieval failed (continuing without): ${err.message}`);
     return { context: '' };
   }
@@ -71,7 +109,9 @@ function buildMCQSystemPrompt(types, count) {
     .map(t => TYPE_DESCRIPTIONS[t])
     .join('\n');
 
-  return `You are an AI question generator for university lectures. Generate exactly ${count} question${count !== 1 ? 's' : ''} using ONLY the following allowed types. Use the transcript and course materials as content.
+  return `You are an AI question generator for university lectures. Generate exactly ${count} question${count !== 1 ? 's' : ''} using ONLY the allowed types below.
+
+PRIORITY RULE: Base questions PRIMARILY on the transcript. Use course material context ONLY to add depth or clarify — never shift focus away from what was actually said in the transcript.
 
 ALLOWED TYPES:
 ${typeLines}
@@ -87,7 +127,7 @@ const MCQ_HUMAN = `Transcript Segment:
 Course Materials Context:
 {context}
 
-Generate 3-4 mixed-type questions based on BOTH the transcript AND the course materials context above. Output ONLY the JSON array.`;
+Generate exactly the required number of questions. Focus on what was SAID IN THE TRANSCRIPT. Use course material context only if it directly relates to the transcript content. Output ONLY the JSON array.`;
 
 async function generateMCQs(state) {
   const systemPrompt = buildMCQSystemPrompt(state.mcqTypes, state.mcqCount);
@@ -218,11 +258,12 @@ const graph = new StateGraph(StateAnnotation)
   .compile();
 
 // ── Public API ────────────────────────────────────────────────────────────────
-async function runMCQAgent(transcript, sessionId, { types = null, count = 3 } = {}) {
-  console.log(`[MCQAgent] Starting for session: ${sessionId} (${transcript.length} chars, types: ${(types || ['all']).join(',')}, count: ${count})`);
+async function runMCQAgent(transcript, sessionId, { types = null, count = 3, resourceId = null } = {}) {
+  console.log(`[MCQAgent] Starting for session: ${sessionId} (${transcript.length} chars, types: ${(types || ['all']).join(',')}, count: ${count}, resource: ${resourceId || 'none'})`);
   const result = await graph.invoke({
     transcript,
     sessionId,
+    resourceId,
     mcqTypes: types,
     mcqCount: count,
     context:  '',
