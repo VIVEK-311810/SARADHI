@@ -23,6 +23,34 @@ const MIME_TO_EXTENSIONS = {
   'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['pptx'],
 };
 
+// Magic byte signatures — verify actual file content matches declared type
+// Prevents polyglot files that lie about their content type.
+function validateMagicBytes(buffer, mimetype) {
+  if (!buffer || buffer.length < 8) return false;
+
+  switch (mimetype) {
+    case 'application/pdf':
+      // PDF: %PDF
+      return buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46;
+
+    case 'application/msword':
+      // Legacy DOC: OLE2 compound document (D0 CF 11 E0)
+      return buffer[0] === 0xD0 && buffer[1] === 0xCF && buffer[2] === 0x11 && buffer[3] === 0xE0;
+
+    case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+    case 'application/vnd.openxmlformats-officedocument.presentationml.presentation':
+    case 'application/vnd.ms-powerpoint':
+      // OOXML (DOCX/PPTX) and legacy PPT are both ZIP-based (PK\x03\x04) or OLE2
+      return (
+        (buffer[0] === 0x50 && buffer[1] === 0x4B && buffer[2] === 0x03 && buffer[3] === 0x04) || // ZIP/OOXML
+        (buffer[0] === 0xD0 && buffer[1] === 0xCF && buffer[2] === 0x11 && buffer[3] === 0xE0)    // OLE2
+      );
+
+    default:
+      return false;
+  }
+}
+
 // Configure multer for memory storage
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -51,6 +79,14 @@ router.post('/upload', authenticate, authorize('teacher'), upload.single('file')
 
     if (!file) {
       return res.status(400).json({ error: 'No file provided' });
+    }
+
+    // Magic byte check — reject files whose content doesn't match the declared MIME type
+    if (!validateMagicBytes(file.buffer, file.mimetype)) {
+      logger.warn('Upload rejected: magic bytes do not match declared MIME type', {
+        mimetype: file.mimetype, filename: file.originalname, teacherId: req.user.id
+      });
+      return res.status(400).json({ error: 'File content does not match the declared file type.' });
     }
 
     if (!session_id || !title) {
@@ -219,15 +255,16 @@ router.post('/upload-complete', authenticate, authorize('teacher'), async (req, 
       return res.status(400).json({ error: 'resourceId and filePath are required' });
     }
 
-    // Verify ownership
+    // Verify ownership and fetch the server-side path — never trust client-supplied filePath
     const { data: resource, error: fetchError } = await supabase
-      .from('resources').select('id, session_id, teacher_id').eq('id', resourceId).single();
+      .from('resources').select('id, session_id, teacher_id, file_path').eq('id', resourceId).single();
 
     if (fetchError || !resource) return res.status(404).json({ error: 'Resource not found' });
     if (resource.teacher_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
 
-    // Get public URL now that the file is actually in storage
-    const { data: urlData } = supabase.storage.from('session-resources').getPublicUrl(filePath);
+    // Use the server-side registered path — prevents path traversal / cross-teacher file access
+    const serverFilePath = resource.file_path;
+    const { data: urlData } = supabase.storage.from('session-resources').getPublicUrl(serverFilePath);
 
     await supabase.from('resources').update({
       file_url: urlData.publicUrl,

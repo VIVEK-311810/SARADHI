@@ -1,8 +1,10 @@
 require('dotenv').config();
 
-// Crash immediately if critical env vars are missing
+// Crash immediately if critical env vars are missing or too weak
 if (!process.env.JWT_SECRET) throw new Error('FATAL: JWT_SECRET environment variable is not set');
+if (process.env.JWT_SECRET.length < 32) throw new Error('FATAL: JWT_SECRET must be at least 32 characters (256-bit minimum)');
 if (!process.env.SESSION_SECRET) throw new Error('FATAL: SESSION_SECRET environment variable is not set');
+if (process.env.SESSION_SECRET.length < 32) throw new Error('FATAL: SESSION_SECRET must be at least 32 characters');
 
 const express = require('express');
 const cors = require('cors');
@@ -90,6 +92,7 @@ app.use(session({
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
+    sameSite: 'strict',
     maxAge: 24 * 60 * 60 * 1000
   }
 }));

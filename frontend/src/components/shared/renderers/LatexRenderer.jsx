@@ -1,6 +1,23 @@
 import React from 'react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
+import DOMPurify from 'dompurify';
+
+// KaTeX produces safe SVG/HTML — allow its elements but strip anything extraneous
+const KATEX_CONFIG = {
+  ALLOWED_TAGS: [
+    'span', 'svg', 'path', 'line', 'rect', 'circle', 'g', 'use', 'defs',
+    'mrow', 'mo', 'mi', 'mn', 'msup', 'msub', 'mfrac', 'msqrt', 'mtext',
+    'annotation', 'semantics', 'math',
+  ],
+  ALLOWED_ATTR: [
+    'class', 'style', 'aria-hidden', 'focusable', 'role',
+    'xmlns', 'viewBox', 'width', 'height', 'd', 'x', 'y',
+    'x1', 'y1', 'x2', 'y2', 'rx', 'ry', 'fill', 'stroke',
+    'stroke-width', 'transform', 'href', 'xlink:href',
+  ],
+  FORCE_BODY: false,
+};
 
 /**
  * Renders mixed text containing LaTeX math expressions.
@@ -73,7 +90,8 @@ export default function LatexRenderer({ text, className = '' }) {
         }
         if (part.type === 'inline') {
           try {
-            const html = katex.renderToString(part.content, { throwOnError: false, displayMode: false });
+            const raw = katex.renderToString(part.content, { throwOnError: false, displayMode: false });
+            const html = DOMPurify.sanitize(raw, KATEX_CONFIG);
             return <span key={i} dangerouslySetInnerHTML={{ __html: html }} />;
           } catch {
             return <span key={i}>${part.content}$</span>;
@@ -81,7 +99,8 @@ export default function LatexRenderer({ text, className = '' }) {
         }
         if (part.type === 'block') {
           try {
-            const html = katex.renderToString(part.content, { throwOnError: false, displayMode: true });
+            const raw = katex.renderToString(part.content, { throwOnError: false, displayMode: true });
+            const html = DOMPurify.sanitize(raw, KATEX_CONFIG);
             return (
               <span
                 key={i}

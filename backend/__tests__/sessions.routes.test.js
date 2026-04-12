@@ -36,7 +36,7 @@ const { generateToken, mockTeacher, mockStudent, mockSession } = require('./help
 const request = require('supertest');
 
 // Create test app with only the sessions router
-const sessionsRouter = require('../routes/sessions');
+const sessionsRouter = require('../routes/session/sessions');
 const app = createTestApp({ path: '/api/sessions', router: sessionsRouter });
 
 describe('Sessions Routes - /api/sessions', () => {
@@ -61,6 +61,7 @@ describe('Sessions Routes - /api/sessions', () => {
       const sessionData = { title: 'Test Session', course_name: 'CS101' };
       const createdSession = mockSession({ ...sessionData, teacher_id: teacher.id });
 
+      mockQuery.mockResolvedValueOnce({ rows: [] });               // SELECT 1 collision check (no collision)
       mockQuery.mockResolvedValueOnce({ rows: [createdSession] }); // INSERT
 
       const res = await request(app)

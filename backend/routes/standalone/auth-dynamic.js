@@ -3,6 +3,13 @@ const { passport, generateOAuthState, verifyOAuthState } = require('../../config
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const pool = require('../../db');
+
+// Redact email for logs — keeps domain visible for debugging, hides local part
+const redactEmail = (email) => {
+  if (!email || !email.includes('@')) return '[redacted]';
+  const [local, domain] = email.split('@');
+  return `${local.slice(0, 2)}***@${domain}`;
+};
 const logger = require('../../logger');
 const { redis } = require('../../redis');
 
@@ -73,13 +80,13 @@ router.get('/google/callback/edu',
 
       // Enforce correct role for this callback
       if (user.role !== 'teacher') {
-        logger.warn('Wrong portal: non-teacher hit teacher callback', { email: user.email, role: user.role });
+        logger.warn('Wrong portal: non-teacher hit teacher callback', { email: redactEmail(user.email), role: user.role });
         return res.redirect('/auth?error=wrong_portal');
       }
 
       // Validate email domain for role
       if (!validateSastraEmail(user.email, user.role)) {
-        logger.warn('Invalid domain for teacher', { email: user.email });
+        logger.warn('Invalid domain for teacher', { email: redactEmail(user.email) });
         return res.redirect('/auth?error=invalid_domain');
       }
 
@@ -124,13 +131,13 @@ router.get('/google/callback/acin',
 
       // Enforce correct role for this callback
       if (user.role !== 'student') {
-        logger.warn('Wrong portal: non-student hit student callback', { email: user.email, role: user.role });
+        logger.warn('Wrong portal: non-student hit student callback', { email: redactEmail(user.email), role: user.role });
         return res.redirect('/auth?error=wrong_portal');
       }
 
       // Validate email domain for role
       if (!validateSastraEmail(user.email, user.role)) {
-        logger.warn('Invalid domain for student', { email: user.email });
+        logger.warn('Invalid domain for student', { email: redactEmail(user.email) });
         return res.redirect('/auth?error=invalid_domain');
       }
 
@@ -174,7 +181,7 @@ router.get('/google/callback',
       const user = req.user;
 
       if (!user || !user.role || (user.role !== 'teacher' && user.role !== 'student')) {
-        logger.warn('SSO: invalid domain or no role', { email: user?.email });
+        logger.warn('SSO: invalid domain or no role', { email: redactEmail(user?.email) });
         return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth?error=invalid_domain`);
       }
 

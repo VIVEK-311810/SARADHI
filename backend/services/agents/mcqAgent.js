@@ -9,6 +9,7 @@ const { StringOutputParser } = require('@langchain/core/output_parsers');
 const { index: pineconeIndex } = require('../../config/pinecone');
 const sessionContextStore = require('../infra/sessionContextStore');
 const pool = require('../../db');
+const logger = require('../../logger');
 
 // ── State Definition ──────────────────────────────────────────────────────────
 const StateAnnotation = Annotation.Root({
@@ -44,19 +45,19 @@ async function retrieveContext(state) {
       const results = await sessionContextStore.search(state.sessionId, state.transcript.substring(0, 300), 5);
       if (results.length && results[0].score >= 0.3) {
         const context = results.map((r, i) => `[${i + 1}] ${r.text}`).join('\n\n').slice(0, 3000);
-        console.log(`[MCQAgent] Using in-session PDF context (top score: ${results[0].score.toFixed(2)}) for session: ${state.sessionId}`);
+        logger.info(`[MCQAgent] Using in-session PDF context (top score: ${results[0].score.toFixed(2)}) for session: ${state.sessionId}`);
         return { context };
       }
-      console.log(`[MCQAgent] In-session PDF not relevant to transcript — skipping`);
+      logger.info(`[MCQAgent] In-session PDF not relevant to transcript — skipping`);
     } catch (err) {
-      console.warn(`[MCQAgent] In-session context search failed: ${err.message}`);
+      logger.warn(`[MCQAgent] In-session context search failed: ${err.message}`);
     }
     return { context: '' };
   }
 
   // Priority 2: pre-uploaded resource selected by teacher
   if (!state.resourceId) {
-    console.log(`[MCQAgent] No resource selected — skipping context retrieval for session: ${state.sessionId}`);
+    logger.info(`[MCQAgent] No resource selected — skipping context retrieval for session: ${state.sessionId}`);
     return { context: '' };
   }
 
@@ -69,7 +70,7 @@ async function retrieveContext(state) {
     const docs = await vectorStore.similaritySearch(queryText, 5);
 
     if (!docs.length) {
-      console.log(`[MCQAgent] No matching chunks found for resource: ${state.resourceId}`);
+      logger.info(`[MCQAgent] No matching chunks found for resource: ${state.resourceId}`);
       return { context: '' };
     }
 
@@ -77,7 +78,7 @@ async function retrieveContext(state) {
     // PineconeStore.similaritySearchWithScore returns [doc, score] pairs.
     const docsWithScore = await vectorStore.similaritySearchWithScore(queryText, 1);
     if (docsWithScore.length && docsWithScore[0][1] < 0.3) {
-      console.log(`[MCQAgent] Resource context not relevant to transcript (score: ${docsWithScore[0][1].toFixed(2)}) — ignoring for session: ${state.sessionId}`);
+      logger.info(`[MCQAgent] Resource context not relevant to transcript (score: ${docsWithScore[0][1].toFixed(2)}) — ignoring for session: ${state.sessionId}`);
       return { context: '' };
     }
 
@@ -85,10 +86,10 @@ async function retrieveContext(state) {
       .map((doc, i) => `[${i + 1}] ${doc.pageContent}`)
       .join('\n\n')
       .slice(0, 3000);
-    console.log(`[MCQAgent] Retrieved ${docs.length} context chunks for resource: ${state.resourceId}`);
+    logger.info(`[MCQAgent] Retrieved ${docs.length} context chunks for resource: ${state.resourceId}`);
     return { context };
   } catch (err) {
-    console.warn(`[MCQAgent] Context retrieval failed (continuing without): ${err.message}`);
+    logger.warn(`[MCQAgent] Context retrieval failed (continuing without): ${err.message}`);
     return { context: '' };
   }
 }
@@ -144,7 +145,7 @@ async function generateMCQs(state) {
     transcript: state.transcript,
     context: state.context || 'No additional context available.',
   });
-  console.log(`[MCQAgent] Generated MCQ text (${mcqText.length} chars) for session: ${state.sessionId}`);
+  logger.info(`[MCQAgent] Generated MCQ text (${mcqText.length} chars) for session: ${state.sessionId}`);
   return { mcqText };
 }
 
@@ -194,7 +195,7 @@ function parseAIOutput(text) {
 async function parseAndStore(state) {
   const questions = parseAIOutput(state.mcqText);
   if (!questions.length) {
-    console.warn(`[MCQAgent] No questions parsed for session: ${state.sessionId}`);
+    logger.warn(`[MCQAgent] No questions parsed for session: ${state.sessionId}`);
     return { mcqs: [] };
   }
 
@@ -204,7 +205,7 @@ async function parseAndStore(state) {
     [state.sessionId.toUpperCase()]
   );
   if (!sessionResult.rows.length) {
-    console.warn(`[MCQAgent] Session not found: ${state.sessionId}`);
+    logger.warn(`[MCQAgent] Session not found: ${state.sessionId}`);
     return { mcqs: [] };
   }
   const numericSessionId = sessionResult.rows[0].id;
@@ -219,7 +220,7 @@ async function parseAndStore(state) {
   for (const q of questions) {
     // Skip questions with no question text — would violate NOT NULL constraint
     if (!q.question || typeof q.question !== 'string' || !q.question.trim()) {
-      console.warn(`[MCQAgent] Skipping question with no text (type: ${q.type})`);
+      logger.warn(`[MCQAgent] Skipping question with no text (type: ${q.type})`);
       continue;
     }
 
@@ -262,11 +263,11 @@ async function parseAndStore(state) {
       );
       insertedMCQs.push(res.rows[0]);
     } catch (insertErr) {
-      console.warn(`[MCQAgent] Failed to insert question "${q.question.substring(0, 50)}": ${insertErr.message}`);
+      logger.warn(`[MCQAgent] Failed to insert question "${q.question.substring(0, 50)}": ${insertErr.message}`);
     }
   }
 
-  console.log(`[MCQAgent] ✓ Stored ${insertedMCQs.length} questions for session: ${state.sessionId}`);
+  logger.info(`[MCQAgent] ✓ Stored ${insertedMCQs.length} questions for session: ${state.sessionId}`);
 
   if (global.broadcastToSession) {
     global.broadcastToSession(state.sessionId.toUpperCase(), {
@@ -293,7 +294,7 @@ const graph = new StateGraph(StateAnnotation)
 
 // ── Public API ────────────────────────────────────────────────────────────────
 async function runMCQAgent(transcript, sessionId, { types = null, count = 3, resourceId = null } = {}) {
-  console.log(`[MCQAgent] Starting for session: ${sessionId} (${transcript.length} chars, types: ${(types || ['all']).join(',')}, count: ${count}, resource: ${resourceId || 'none'})`);
+  logger.info(`[MCQAgent] Starting for session: ${sessionId} (${transcript.length} chars, types: ${(types || ['all']).join(',')}, count: ${count}, resource: ${resourceId || 'none'})`);
   const result = await graph.invoke({
     transcript,
     sessionId,

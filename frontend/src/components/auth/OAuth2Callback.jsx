@@ -63,8 +63,8 @@ const OAuth2Callback = () => {
           return;
         }
 
-        // Validate SASTRA domain (allow exact @sastra.edu and dept subdomains)
-        const isValidTeacher = user.role === 'teacher' && (user.email.endsWith('@sastra.edu') || user.email.endsWith('.sastra.edu'));
+        // Validate SASTRA domain — exact domain match only (no subdomain bypass)
+        const isValidTeacher = user.role === 'teacher' && user.email.endsWith('@sastra.edu');
         const isValidStudent = user.role === 'student' && /^\d+@sastra\.ac\.in$/.test(user.email);
         
         if (!isValidTeacher && !isValidStudent) {
@@ -76,6 +76,9 @@ const OAuth2Callback = () => {
         // Store authentication data
         localStorage.setItem('authToken', token);
         localStorage.setItem('currentUser', JSON.stringify(user));
+
+        // Remove token from URL — prevents it leaking into browser history or server logs
+        window.history.replaceState({}, document.title, window.location.pathname);
 
         setStatus('success');
 

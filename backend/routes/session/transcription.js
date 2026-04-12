@@ -59,7 +59,7 @@ router.post('/start', authenticate, authorize('teacher'), upload.single('pdf'), 
     res.json({ success: true, session_id, session, message: 'Session started successfully' });
   } catch (error) {
     logger.error('Error starting transcription session', { error: error.message });
-    res.status(500).json({ error: 'Failed to start session', details: error.message });
+    res.status(500).json({ error: 'Failed to start session'});
   }
 });
 
@@ -116,7 +116,7 @@ router.post('/audio-chunk', authenticate, authorize('teacher'), upload.single('a
     res.json({ success: true, transcript, detected_language: detectedLanguage, session_id });
   } catch (error) {
     logger.error('Error processing audio chunk', { error: error.message });
-    res.status(500).json({ error: 'Failed to process audio chunk', details: error.message });
+    res.status(500).json({ error: 'Failed to process audio chunk'});
   }
 });
 
@@ -210,7 +210,7 @@ router.post('/audio-stream', authenticate, authorize('teacher'), async (req, res
     res.json({ success: true, transcript, detected_language: detectedLanguage, session_id });
   } catch (error) {
     logger.error('Error processing audio stream', { error: error.message });
-    res.status(500).json({ error: 'Failed to process audio stream', details: error.message });
+    res.status(500).json({ error: 'Failed to process audio stream'});
   }
 });
 
@@ -229,7 +229,7 @@ router.post('/pause', authenticate, authorize('teacher'), async (req, res) => {
     res.json({ success: true, session_id, session, message: 'Session paused' });
   } catch (error) {
     logger.error('Error pausing transcription session', { error: error.message });
-    res.status(500).json({ error: 'Failed to pause session', details: error.message });
+    res.status(500).json({ error: 'Failed to pause session'});
   }
 });
 
@@ -256,7 +256,7 @@ router.post('/resume', authenticate, authorize('teacher'), async (req, res) => {
     res.json({ success: true, session_id, session, message: 'Session resumed' });
   } catch (error) {
     logger.error('Error resuming transcription session', { error: error.message });
-    res.status(500).json({ error: 'Failed to resume session', details: error.message });
+    res.status(500).json({ error: 'Failed to resume session'});
   }
 });
 
@@ -273,7 +273,7 @@ router.post('/stop', authenticate, authorize('teacher'), async (req, res) => {
     res.json({ success: true, session_id, session, message: 'Session stopped' });
   } catch (error) {
     logger.error('Error stopping transcription session', { error: error.message });
-    res.status(500).json({ error: 'Failed to stop session', details: error.message });
+    res.status(500).json({ error: 'Failed to stop session'});
   }
 });
 
@@ -294,7 +294,7 @@ async function handleGenerateNotes(req, res) {
     res.json({ success: true, session_id, message: 'Notes generated successfully' });
   } catch (error) {
     logger.error('Error generating notes', { error: error.message });
-    res.status(500).json({ error: 'Failed to generate notes', details: error.message });
+    res.status(500).json({ error: 'Failed to generate notes'});
   }
 }
 
@@ -334,7 +334,7 @@ router.get('/session/:sessionId', authenticate, authorize('teacher'), async (req
     res.json({ success: true, session, statistics: countResult.rows[0] });
   } catch (error) {
     logger.error('Error fetching transcription session', { error: error.message });
-    res.status(500).json({ error: 'Failed to fetch session details', details: error.message });
+    res.status(500).json({ error: 'Failed to fetch session details'});
   }
 });
 
@@ -358,7 +358,7 @@ router.get('/debug', authenticate, authorize('teacher'), async (req, res) => {
     });
   } catch (error) {
     logger.error('Error fetching debug state', { error: error.message });
-    res.status(500).json({ error: 'Failed to fetch debug state', details: error.message });
+    res.status(500).json({ error: 'Failed to fetch debug state'});
   }
 });
 
@@ -379,7 +379,7 @@ router.post('/trigger-segment', authenticate, authorize('teacher'), async (req, 
     });
   } catch (error) {
     logger.error('Error triggering segment webhook', { error: error.message });
-    res.status(500).json({ error: 'Failed to trigger webhook', details: error.message });
+    res.status(500).json({ error: 'Failed to trigger webhook'});
   }
 });
 
@@ -400,7 +400,7 @@ router.post('/upload-context', authenticate, authorize('teacher'), upload.single
     res.json({ success: true, session_id, filename: req.file.originalname, chunkCount });
   } catch (error) {
     logger.error('Error indexing in-session PDF', { error: error.message });
-    res.status(500).json({ error: 'Failed to index PDF', details: error.message });
+    res.status(500).json({ error: 'Failed to index PDF'});
   }
 });
 

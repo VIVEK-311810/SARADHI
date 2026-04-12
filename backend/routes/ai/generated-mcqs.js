@@ -6,7 +6,12 @@ const logger = require('../../logger');
 const { authenticate, authorize } = require('../../middleware/auth');
 
 // Webhook secret validation middleware for n8n callbacks
-// n8n must send: X-Webhook-Secret: <value of N8N_WEBHOOK_SECRET env var>
+// n8n must send:
+//   X-Webhook-Secret: <value of N8N_WEBHOOK_SECRET env var>
+//   X-Webhook-Timestamp: <Unix seconds (integer) at time of request>
+// Requests older than 5 minutes are rejected to prevent replay attacks.
+const WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS = 300; // 5 minutes
+
 const validateWebhookSecret = (req, res, next) => {
   const secret = process.env.N8N_WEBHOOK_SECRET;
   if (!secret) {
@@ -30,6 +35,23 @@ const validateWebhookSecret = (req, res, next) => {
     }
   } catch {
     logger.warn('Webhook secret comparison error', { ip: req.ip });
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  // Replay protection: reject requests with a stale or missing timestamp
+  const tsHeader = req.headers['x-webhook-timestamp'];
+  if (!tsHeader) {
+    logger.warn('Webhook call missing X-Webhook-Timestamp header', { ip: req.ip });
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const tsSeconds = parseInt(tsHeader, 10);
+  if (isNaN(tsSeconds)) {
+    logger.warn('Webhook call has non-numeric X-Webhook-Timestamp', { ip: req.ip });
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const ageSec = Math.floor(Date.now() / 1000) - tsSeconds;
+  if (Math.abs(ageSec) > WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS) {
+    logger.warn('Webhook call timestamp too old or in future (replay?)', { ip: req.ip, ageSec });
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

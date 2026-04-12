@@ -19,6 +19,46 @@ const path = require('path');
 const os = require('os');
 const logger = require('../../logger');
 
+// Zip bomb guard — inspect ZIP local file headers to sum uncompressed sizes.
+// Rejects files where total uncompressed content exceeds MAX_UNCOMPRESSED_BYTES
+// or the compression ratio exceeds MAX_RATIO (protects against decompression explosions).
+const MAX_UNCOMPRESSED_BYTES = 200 * 1024 * 1024; // 200 MB
+const MAX_RATIO = 100; // e.g. 50 KB compressed → reject if expands > 5 MB
+
+function checkZipBomb(buffer) {
+  let offset = 0;
+  let totalUncompressed = 0;
+  let entryCount = 0;
+
+  while (offset + 30 <= buffer.length) {
+    // Local file header signature: PK\x03\x04
+    if (buffer.readUInt32LE(offset) !== 0x04034b50) break;
+
+    const compressedSize = buffer.readUInt32LE(offset + 18);
+    const uncompressedSize = buffer.readUInt32LE(offset + 22);
+    const fileNameLength = buffer.readUInt16LE(offset + 26);
+    const extraFieldLength = buffer.readUInt16LE(offset + 28);
+
+    totalUncompressed += uncompressedSize;
+    entryCount++;
+
+    if (totalUncompressed > MAX_UNCOMPRESSED_BYTES) {
+      return { safe: false, reason: `Total uncompressed size (${Math.round(totalUncompressed / 1024 / 1024)} MB) exceeds ${MAX_UNCOMPRESSED_BYTES / 1024 / 1024} MB limit` };
+    }
+
+    offset += 30 + fileNameLength + extraFieldLength + compressedSize;
+  }
+
+  if (entryCount > 0 && buffer.length > 0) {
+    const ratio = totalUncompressed / buffer.length;
+    if (ratio > MAX_RATIO) {
+      return { safe: false, reason: `Compression ratio ${ratio.toFixed(0)}:1 exceeds limit of ${MAX_RATIO}:1` };
+    }
+  }
+
+  return { safe: true };
+}
+
 class DocumentProcessor {
   async extractText(resourceId, filePath, fileType) {
     try {
@@ -71,6 +111,11 @@ class DocumentProcessor {
   }
 
   async extractFromWord(buffer) {
+    const zipCheck = checkZipBomb(buffer);
+    if (!zipCheck.safe) {
+      logger.warn('Zip bomb detected in Word document', { reason: zipCheck.reason });
+      throw new Error('File rejected: potential zip bomb detected');
+    }
     try {
       const result = await mammoth.extractRawText({ buffer });
       return {
@@ -85,6 +130,11 @@ class DocumentProcessor {
   }
 
   async extractFromPowerPoint(buffer) {
+    const zipCheck = checkZipBomb(buffer);
+    if (!zipCheck.safe) {
+      logger.warn('Zip bomb detected in PowerPoint file', { reason: zipCheck.reason });
+      throw new Error('File rejected: potential zip bomb detected');
+    }
     const tempFilePath = path.join(os.tmpdir(), `temp_ppt_${Date.now()}_${Math.random().toString(36).slice(2)}.pptx`);
 
     try {

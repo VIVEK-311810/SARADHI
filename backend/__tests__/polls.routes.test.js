@@ -35,7 +35,7 @@ const { generateToken, mockTeacher, mockStudent, mockPoll } = require('./helpers
 
 const request = require('supertest');
 
-const pollsRouter = require('../routes/polls');
+const pollsRouter = require('../routes/session/polls');
 const app = createTestApp({ path: '/api/polls', router: pollsRouter });
 
 describe('Polls Routes - /api/polls', () => {
