@@ -19,7 +19,7 @@ const GROQ_TIMEOUT_MS = 30000;
 
 // Store active session timers and metadata
 const sessionTimers = new Map();
-const activeSessions = new Map(); // Store { session_id: database_id }
+const activeSessions = new Map(); // Store { session_id: { dbId, mcqTypes, mcqCount } }
 
 // Log provider config once at startup (visible in Render boot logs)
 console.log('[AudioProcessor] Config — GPU_ENABLED:', GPU_ENABLED, '| GROQ_API_KEY:', GROQ_API_KEY ? 'set' : 'NOT SET');
@@ -134,7 +134,7 @@ async function saveTranscript(sessionId, text, detectedLanguage = null) {
     }
 
     // Get database ID from active sessions in memory
-    let dbId = activeSessions.get(sessionId);
+    let dbId = activeSessions.get(sessionId)?.dbId;
 
     if (!dbId) {
       // Fallback to database query if not in memory - get most recent session
@@ -199,7 +199,10 @@ async function sendTranscriptSegment(sessionId) {
     console.log(`[AudioProcessor] ▶ Timer fired — sending segment for session: ${sessionId}`);
 
     // Get database ID for most recent session
-    let dbId = activeSessions.get(sessionId);
+    const sessionData = activeSessions.get(sessionId);
+    let dbId = sessionData?.dbId;
+    const mcqTypes = sessionData?.mcqTypes || null;
+    const mcqCount = sessionData?.mcqCount || 3;
     console.log(`[AudioProcessor]   activeSessions lookup '${sessionId}' → dbId=${dbId}`);
     if (!dbId) {
       const sessionQuery = `
@@ -258,7 +261,7 @@ async function sendTranscriptSegment(sessionId) {
     console.log(`[AudioProcessor] ✓ Transcripts marked sent for session: ${sessionId} (${result.rows.length} segments)`);
 
     // Trigger MCQ generation via LangGraph agent (fire-and-forget — non-blocking)
-    runMCQAgent(transcriptSegment, sessionId)
+    runMCQAgent(transcriptSegment, sessionId, { types: mcqTypes, count: mcqCount })
       .then(mcqs => console.log(`[AudioProcessor] MCQ agent completed: ${mcqs?.length || 0} MCQs for session: ${sessionId}`))
       .catch(err => console.error(`[AudioProcessor] MCQ agent error (non-fatal): ${err.message}`));
 
@@ -338,7 +341,7 @@ function getDebugState() {
  * @param {string} pdfFilename - PDF filename if uploaded
  * @returns {Promise<Object>} Created session record
  */
-async function createSession(sessionId, segmentInterval, pdfUploaded = false, pdfFilename = null) {
+async function createSession(sessionId, segmentInterval, pdfUploaded = false, pdfFilename = null, mcqTypes = null, mcqCount = 3) {
   try {
     const query = `
       INSERT INTO transcription_sessions (session_id, segment_interval, pdf_uploaded, pdf_filename, status)
@@ -349,8 +352,8 @@ async function createSession(sessionId, segmentInterval, pdfUploaded = false, pd
     const result = await pool.query(query, [sessionId, segmentInterval, pdfUploaded, pdfFilename]);
     const session = result.rows[0];
 
-    // Store database ID in memory for quick transcript saves
-    activeSessions.set(sessionId, session.id);
+    // Store session data in memory for quick transcript saves and MCQ preferences
+    activeSessions.set(sessionId, { dbId: session.id, mcqTypes, mcqCount });
 
     console.log(`[AudioProcessor] Session created: ${sessionId} (db_id: ${session.id}) at ${session.start_time}`);
 
@@ -371,7 +374,7 @@ async function createSession(sessionId, segmentInterval, pdfUploaded = false, pd
 async function updateSessionStatus(sessionId, status, isPaused = null) {
   try {
     // Get database ID for most recent session
-    let dbId = activeSessions.get(sessionId);
+    let dbId = activeSessions.get(sessionId)?.dbId;
     if (!dbId) {
       const sessionQuery = `SELECT id FROM transcription_sessions WHERE session_id = $1 ORDER BY start_time DESC LIMIT 1`;
       const sessionResult = await pool.query(sessionQuery, [sessionId]);
@@ -427,7 +430,7 @@ async function endSession(sessionId) {
     stopSegmentTimer(sessionId);
 
     // Get database ID before removing from memory
-    let dbId = activeSessions.get(sessionId);
+    let dbId = activeSessions.get(sessionId)?.dbId;
     if (!dbId) {
       const sessionQuery = `SELECT id FROM transcription_sessions WHERE session_id = $1 ORDER BY start_time DESC LIMIT 1`;
       const sessionResult = await pool.query(sessionQuery, [sessionId]);

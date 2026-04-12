@@ -13,6 +13,8 @@ const pool = require('../db');
 const StateAnnotation = Annotation.Root({
   transcript: Annotation,
   sessionId:  Annotation,
+  mcqTypes:   Annotation,
+  mcqCount:   Annotation,
   context:    Annotation,
   mcqText:    Annotation,
   mcqs:       Annotation,
@@ -54,58 +56,30 @@ async function retrieveContext(state) {
 }
 
 // ── Node 2: Generate questions via Mistral ────────────────────────────────────
-const MCQ_SYSTEM = `You are an AI question generator for university lectures. Generate 3-4 questions of MIXED types to test different cognitive levels. Use the transcript and course materials as content.
+const TYPE_DESCRIPTIONS = {
+  mcq:              '- mcq: 4-option multiple choice\n  Example: {{ "type": "mcq", "question": "...", "question_latex": null, "options_metadata": {{ "options": ["A","B","C","D"], "correct": 0 }}, "blooms_level": "Remember", "difficulty": 1, "justification": "..." }}',
+  true_false:       '- true_false: statement that is true or false\n  Example: {{ "type": "true_false", "question": "...", "options_metadata": {{ "correct": 0 }}, "blooms_level": "Understand", "difficulty": 1, "justification": "..." }}',
+  fill_blank:       '- fill_blank: short fill-in-the-blank (1-3 word answer, use ___ in the question)\n  Example: {{ "type": "fill_blank", "question": "The ___ law states ...", "options_metadata": {{ "accepted_answers": ["Newton"] }}, "blooms_level": "Remember", "difficulty": 1, "justification": "..." }}',
+  numeric:          '- numeric: numerical answer with tolerance\n  Example: {{ "type": "numeric", "question": "Calculate ...", "options_metadata": {{ "correct_value": 9.81, "tolerance": 0.1, "unit": "m/s2" }}, "blooms_level": "Apply", "difficulty": 2, "justification": "..." }}',
+  assertion_reason: '- assertion_reason: one assertion + one reason, options: A=both correct+reason explains, B=both correct+reason doesn\'t explain, C=assertion correct+reason wrong, D=assertion wrong\n  Example: {{ "type": "assertion_reason", "question": "Assertion: ... Reason: ...", "options_metadata": {{ "correct": 0 }}, "blooms_level": "Analyze", "difficulty": 2, "justification": "..." }}',
+};
 
-SUPPORTED TYPES (pick appropriate ones based on the content):
-- mcq: 4-option multiple choice
-- true_false: statement that is true or false
-- fill_blank: short fill-in-the-blank (1-3 word answer, use ___ in the question)
-- numeric: numerical answer with tolerance
-- assertion_reason: one assertion + one reason, 4 fixed options (A=both correct+reason explains, B=both correct+reason doesn't explain, C=assertion correct+reason wrong, D=assertion wrong)
+function buildMCQSystemPrompt(types, count) {
+  const activeTypes = (types && types.length > 0) ? types : Object.keys(TYPE_DESCRIPTIONS);
+  const typeLines = activeTypes
+    .filter(t => TYPE_DESCRIPTIONS[t])
+    .map(t => TYPE_DESCRIPTIONS[t])
+    .join('\n');
 
-Output ONLY a valid JSON array — no markdown fences, no explanation outside the array.
+  return `You are an AI question generator for university lectures. Generate exactly ${count} question${count !== 1 ? 's' : ''} using ONLY the following allowed types. Use the transcript and course materials as content.
 
-[
-  {{
-    "type": "mcq",
-    "question": "...",
-    "question_latex": null,
-    "options_metadata": {{
-      "options": ["option A", "option B", "option C", "option D"],
-      "correct": 0
-    }},
-    "blooms_level": "Remember",
-    "difficulty": 1,
-    "justification": "..."
-  }},
-  {{
-    "type": "true_false",
-    "question": "...",
-    "options_metadata": {{ "correct": 0 }},
-    "blooms_level": "Understand",
-    "difficulty": 1,
-    "justification": "..."
-  }},
-  {{
-    "type": "fill_blank",
-    "question": "The ___ law states ...",
-    "options_metadata": {{ "accepted_answers": ["Newton", "newton's second"] }},
-    "blooms_level": "Remember",
-    "difficulty": 1,
-    "justification": "..."
-  }},
-  {{
-    "type": "numeric",
-    "question": "Calculate ...",
-    "options_metadata": {{ "correct_value": 9.81, "tolerance": 0.1, "unit": "m/s2" }},
-    "blooms_level": "Apply",
-    "difficulty": 2,
-    "justification": "..."
-  }}
-]
+ALLOWED TYPES:
+${typeLines}
 
+Output ONLY a valid JSON array of exactly ${count} question${count !== 1 ? 's' : ''} — no markdown fences, no explanation outside the array.
 blooms_level must be one of: Remember, Understand, Apply, Analyze, Evaluate, Create
 difficulty: 1=easy, 2=medium, 3=hard`;
+}
 
 const MCQ_HUMAN = `Transcript Segment:
 {transcript}
@@ -116,8 +90,9 @@ Course Materials Context:
 Generate 3-4 mixed-type questions based on BOTH the transcript AND the course materials context above. Output ONLY the JSON array.`;
 
 async function generateMCQs(state) {
+  const systemPrompt = buildMCQSystemPrompt(state.mcqTypes, state.mcqCount);
   const prompt = ChatPromptTemplate.fromMessages([
-    ['system', MCQ_SYSTEM],
+    ['system', systemPrompt],
     ['human', MCQ_HUMAN],
   ]);
   const chain = prompt.pipe(llm).pipe(new StringOutputParser());
@@ -243,11 +218,13 @@ const graph = new StateGraph(StateAnnotation)
   .compile();
 
 // ── Public API ────────────────────────────────────────────────────────────────
-async function runMCQAgent(transcript, sessionId) {
-  console.log(`[MCQAgent] Starting for session: ${sessionId} (${transcript.length} chars)`);
+async function runMCQAgent(transcript, sessionId, { types = null, count = 3 } = {}) {
+  console.log(`[MCQAgent] Starting for session: ${sessionId} (${transcript.length} chars, types: ${(types || ['all']).join(',')}, count: ${count})`);
   const result = await graph.invoke({
     transcript,
     sessionId,
+    mcqTypes: types,
+    mcqCount: count,
     context:  '',
     mcqText:  '',
     mcqs:     [],

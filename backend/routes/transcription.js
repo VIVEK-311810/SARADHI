@@ -48,7 +48,17 @@ router.post('/start', authenticate, authorize('teacher'), upload.single('pdf'), 
     const pdfUploaded = !!req.file;
     const pdfFilename = req.file ? req.file.originalname : null;
 
-    const session = await audioProcessor.createSession(session_id, intervalMinutes, pdfUploaded, pdfFilename);
+    let mcqTypes = ['mcq', 'true_false', 'fill_blank', 'numeric', 'assertion_reason'];
+    let mcqCount = 3;
+    if (req.body.mcq_types) {
+      try { mcqTypes = JSON.parse(req.body.mcq_types); } catch (_) {}
+    }
+    if (req.body.mcq_count) {
+      const parsed = parseInt(req.body.mcq_count);
+      if (!isNaN(parsed) && parsed >= 1 && parsed <= 10) mcqCount = parsed;
+    }
+
+    const session = await audioProcessor.createSession(session_id, intervalMinutes, pdfUploaded, pdfFilename, mcqTypes, mcqCount);
     audioProcessor.startSegmentTimer(session_id, intervalMinutes);
 
     res.json({ success: true, session_id, session, message: 'Session started successfully' });

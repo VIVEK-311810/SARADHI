@@ -10,6 +10,10 @@ const AudioRecorder = ({ audioRecorder, sessionId: propSessionId }) => {
     pdfFile,
     segmentInterval,
     setSegmentInterval,
+    mcqTypes,
+    setMcqTypes,
+    mcqCount,
+    setMcqCount,
     status,
     transcripts,
     fullTranscript,
@@ -27,6 +31,20 @@ const AudioRecorder = ({ audioRecorder, sessionId: propSessionId }) => {
 
   // Interval options (minutes)
   const intervalOptions = [1, 5, 10, 15, 20, 25, 30];
+
+  const ALL_TYPES = [
+    { value: 'mcq',              label: 'Multiple Choice' },
+    { value: 'true_false',       label: 'True / False' },
+    { value: 'fill_blank',       label: 'Fill in the Blank' },
+    { value: 'numeric',          label: 'Numerical' },
+    { value: 'assertion_reason', label: 'Assertion–Reason' },
+  ];
+
+  const toggleType = (value) => {
+    setMcqTypes(prev =>
+      prev.includes(value) ? prev.filter(t => t !== value) : [...prev, value]
+    );
+  };
 
   // Auto-scroll transcript display
   useEffect(() => {
@@ -115,6 +133,45 @@ const AudioRecorder = ({ audioRecorder, sessionId: propSessionId }) => {
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Transcripts sent every {segmentInterval} min
           </p>
+        </div>
+      </div>
+
+      {/* MCQ Preferences */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Question Types to Generate</h3>
+        <div className="flex flex-wrap gap-2">
+          {ALL_TYPES.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => toggleType(value)}
+              disabled={status !== 'idle'}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                mcqTypes.includes(value)
+                  ? 'bg-primary-600 text-white border-primary-600'
+                  : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:border-primary-400'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {mcqTypes.length === 0 && (
+          <p className="text-xs text-red-500">Select at least one question type.</p>
+        )}
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+            Questions per segment
+          </label>
+          <input
+            type="number"
+            min={1}
+            max={10}
+            value={mcqCount}
+            onChange={(e) => setMcqCount(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
+            disabled={status !== 'idle'}
+            className="w-16 px-2 py-1 border border-slate-300 dark:border-slate-600 rounded-lg text-sm text-center focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed dark:bg-slate-700 dark:text-white"
+          />
         </div>
       </div>
 

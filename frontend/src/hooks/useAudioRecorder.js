@@ -15,6 +15,8 @@ const useAudioRecorder = (initialSessionId = '') => {
   const [sessionId, setSessionId] = useState(initialSessionId);
   const [pdfFile, setPdfFile] = useState(null);
   const [segmentInterval, setSegmentInterval] = useState(10);
+  const [mcqTypes, setMcqTypes] = useState(['mcq', 'true_false', 'fill_blank', 'numeric', 'assertion_reason']);
+  const [mcqCount, setMcqCount] = useState(3);
   const [status, setStatus] = useState('idle'); // idle, recording, paused
   const [transcripts, setTranscripts] = useState([]);
   const [notes, setNotes] = useState('');
@@ -149,6 +151,8 @@ const useAudioRecorder = (initialSessionId = '') => {
       const formData = new FormData();
       formData.append('session_id', sessionId);
       formData.append('segment_interval', segmentInterval);
+      formData.append('mcq_types', JSON.stringify(mcqTypes));
+      formData.append('mcq_count', mcqCount);
       if (pdfFile) formData.append('pdf', pdfFile);
 
       const token = localStorage.getItem('authToken');
@@ -317,6 +321,8 @@ const useAudioRecorder = (initialSessionId = '') => {
     sessionId, setSessionId,
     pdfFile,
     segmentInterval, setSegmentInterval,
+    mcqTypes, setMcqTypes,
+    mcqCount, setMcqCount,
     status,
     transcripts, fullTranscript,
     notes, setNotes,
