@@ -463,6 +463,44 @@ async function runAutoMigrations() {
   `, 'session_notifications');
   await run(`CREATE INDEX IF NOT EXISTS idx_session_notifs_session ON session_notifications(session_id, created_at DESC)`, 'idx_session_notifs_session');
 
+  // Migration 017 – DB Hardening: FK constraints, CHECK constraints, missing indexes
+  // All FK/CHECK constraints use NOT VALID — existing rows are skipped.
+  // New inserts/updates are validated immediately.
+  // Run VALIDATE CONSTRAINT off-peak in Supabase SQL editor after deploy.
+
+  // 1. FK constraints on gamification tables → users (DO $$ guards idempotency)
+  await run(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='fk_student_points_student' AND table_name='student_points') THEN ALTER TABLE student_points ADD CONSTRAINT fk_student_points_student FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE NOT VALID; END IF; END $$`, 'fk_student_points_student');
+  await run(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='fk_student_badges_student' AND table_name='student_badges') THEN ALTER TABLE student_badges ADD CONSTRAINT fk_student_badges_student FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE NOT VALID; END IF; END $$`, 'fk_student_badges_student');
+  await run(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='fk_student_streaks_student' AND table_name='student_streaks') THEN ALTER TABLE student_streaks ADD CONSTRAINT fk_student_streaks_student FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE NOT VALID; END IF; END $$`, 'fk_student_streaks_student');
+  await run(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='fk_student_xp_student' AND table_name='student_xp') THEN ALTER TABLE student_xp ADD CONSTRAINT fk_student_xp_student FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE NOT VALID; END IF; END $$`, 'fk_student_xp_student');
+  await run(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='fk_session_streaks_student' AND table_name='session_streaks') THEN ALTER TABLE session_streaks ADD CONSTRAINT fk_session_streaks_student FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE NOT VALID; END IF; END $$`, 'fk_session_streaks_student');
+  await run(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='fk_session_summaries_student' AND table_name='session_summaries') THEN ALTER TABLE session_summaries ADD CONSTRAINT fk_session_summaries_student FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE NOT VALID; END IF; END $$`, 'fk_session_summaries_student');
+  await run(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='fk_competition_answers_poll' AND table_name='competition_answers') THEN ALTER TABLE competition_answers ADD CONSTRAINT fk_competition_answers_poll FOREIGN KEY (poll_id) REFERENCES polls(id) ON DELETE SET NULL NOT VALID; END IF; END $$`, 'fk_competition_answers_poll');
+
+  // 2. CHECK constraints on value ranges
+  await run(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='chk_polls_difficulty' AND table_name='polls') THEN ALTER TABLE polls ADD CONSTRAINT chk_polls_difficulty CHECK (difficulty IS NULL OR difficulty BETWEEN 1 AND 3) NOT VALID; END IF; END $$`, 'chk_polls_difficulty');
+  await run(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='chk_session_summaries_accuracy' AND table_name='session_summaries') THEN ALTER TABLE session_summaries ADD CONSTRAINT chk_session_summaries_accuracy CHECK (accuracy IS NULL OR (accuracy >= 0 AND accuracy <= 100)) NOT VALID; END IF; END $$`, 'chk_session_summaries_accuracy');
+  await run(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='chk_attendance_duration' AND table_name='session_attendance_windows') THEN ALTER TABLE session_attendance_windows ADD CONSTRAINT chk_attendance_duration CHECK (duration_seconds > 0) NOT VALID; END IF; END $$`, 'chk_attendance_duration');
+  await run(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='chk_competition_response_time' AND table_name='competition_answers') THEN ALTER TABLE competition_answers ADD CONSTRAINT chk_competition_response_time CHECK (response_time_ms IS NULL OR response_time_ms >= 0) NOT VALID; END IF; END $$`, 'chk_competition_response_time');
+  await run(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='chk_student_xp_positive' AND table_name='student_xp') THEN ALTER TABLE student_xp ADD CONSTRAINT chk_student_xp_positive CHECK (xp_amount > 0) NOT VALID; END IF; END $$`, 'chk_student_xp_positive');
+
+  // 3. Enum-like CHECK constraints on open VARCHAR columns
+  await run(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='chk_student_points_type' AND table_name='student_points') THEN ALTER TABLE student_points ADD CONSTRAINT chk_student_points_type CHECK (point_type IN ('correct_answer','fast_response','streak_bonus','first_responder','perfect_session','attendance','all_polls_answered')) NOT VALID; END IF; END $$`, 'chk_student_points_type');
+  await run(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='chk_student_xp_type' AND table_name='student_xp') THEN ALTER TABLE student_xp ADD CONSTRAINT chk_student_xp_type CHECK (xp_type IN ('session_participation','session_top3','perfect_session','weekly_consistency','resource_engagement','knowledge_card')) NOT VALID; END IF; END $$`, 'chk_student_xp_type');
+  await run(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='chk_competition_rooms_status' AND table_name='competition_rooms') THEN ALTER TABLE competition_rooms ADD CONSTRAINT chk_competition_rooms_status CHECK (status IN ('waiting','active','finished')) NOT VALID; END IF; END $$`, 'chk_competition_rooms_status');
+
+  // 4. Unique constraint on student_badges (same badge can't be awarded twice per session)
+  await run(`CREATE UNIQUE INDEX IF NOT EXISTS uq_student_badges_per_session ON student_badges(student_id, badge_type, COALESCE(session_id, -1))`, 'uq_student_badges_per_session');
+
+  // 5. Missing performance indexes
+  await run(`CREATE INDEX IF NOT EXISTS idx_sessions_teacher_created ON sessions(teacher_id, created_at DESC)`, 'idx_sessions_teacher_created');
+  await run(`CREATE INDEX IF NOT EXISTS idx_poll_responses_student_responded ON poll_responses(student_id, responded_at DESC)`, 'idx_poll_responses_student_responded');
+  await run(`CREATE INDEX IF NOT EXISTS idx_tickets_created ON community_tickets(created_at DESC)`, 'idx_tickets_created');
+  await run(`CREATE INDEX IF NOT EXISTS idx_competition_answers_student_room ON competition_answers(student_id, room_id)`, 'idx_competition_answers_student_room');
+  await run(`CREATE INDEX IF NOT EXISTS idx_student_xp_student_session ON student_xp(student_id, session_id)`, 'idx_student_xp_student_session');
+  await run(`CREATE INDEX IF NOT EXISTS idx_query_classifications_created_at ON query_classifications(created_at)`, 'idx_query_classifications_created_at');
+  await run(`CREATE INDEX IF NOT EXISTS idx_student_points_student_session ON student_points(student_id, session_id)`, 'idx_student_points_student_session');
+
   // Initialize cache service
   const cacheService = require('../services/cacheService');
   await cacheService.init().catch(err => logger.warn('Cache service init failed (non-fatal)', { error: err.message }));
