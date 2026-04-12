@@ -379,13 +379,26 @@ const ResourceUpload = () => {
                         </div>
                       </div>
                     </div>
-                    <button
-                      onClick={() => setConfirmDeleteId(resource.id)}
-                      className="text-red-600 hover:text-red-700 ml-2"
-                      title="Delete resource"
-                    >
-                      🗑️
-                    </button>
+                    <div className="flex items-center gap-2 ml-2">
+                      {resource.file_url && (
+                        <a
+                          href={resource.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs px-2 py-1 rounded bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-800/50 transition-colors font-medium"
+                          title="View resource"
+                        >
+                          View
+                        </a>
+                      )}
+                      <button
+                        onClick={() => setConfirmDeleteId(resource.id)}
+                        className="text-red-600 hover:text-red-700"
+                        title="Delete resource"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
