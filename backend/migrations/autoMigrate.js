@@ -502,7 +502,7 @@ async function runAutoMigrations() {
   await run(`CREATE INDEX IF NOT EXISTS idx_student_points_student_session ON student_points(student_id, session_id)`, 'idx_student_points_student_session');
 
   // Initialize cache service
-  const cacheService = require('../services/cacheService');
+  const cacheService = require('../services/infra/cacheService');
   await cacheService.init().catch(err => logger.warn('Cache service init failed (non-fatal)', { error: err.message }));
 
   client.release();
