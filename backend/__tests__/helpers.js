@@ -12,7 +12,7 @@ function generateToken(userId, role = 'teacher') {
   return jwt.sign(
     { userId, role },
     JWT_SECRET,
-    { expiresIn: '1h' }
+    { expiresIn: '1h', issuer: 'sas-edu-ai', audience: 'sas-edu-ai-client' }
   );
 }
 

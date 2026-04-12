@@ -6,6 +6,13 @@ if (process.env.JWT_SECRET.length < 32) throw new Error('FATAL: JWT_SECRET must 
 if (!process.env.SESSION_SECRET) throw new Error('FATAL: SESSION_SECRET environment variable is not set');
 if (process.env.SESSION_SECRET.length < 32) throw new Error('FATAL: SESSION_SECRET must be at least 32 characters');
 
+// Warn on startup for non-fatal but important missing vars
+const REQUIRED_ENV = ['FRONTEND_URL', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'PINECONE_API_KEY', 'HUGGINGFACE_API_KEY', 'GOOGLE_CLIENT_ID_EDU', 'GOOGLE_CLIENT_SECRET_EDU', 'GOOGLE_CLIENT_ID_ACIN', 'GOOGLE_CLIENT_SECRET_ACIN'];
+const missingEnv = REQUIRED_ENV.filter(k => !process.env[k]);
+if (missingEnv.length > 0) {
+  console.warn(`WARN: Missing environment variables: ${missingEnv.join(', ')} — some features may not work`);
+}
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -26,8 +33,20 @@ const PORT = process.env.PORT || 3001;
 // Create HTTP server
 const server = http.createServer(app);
 
-// Create WebSocket server
-const wss = new WebSocket.Server({ server });
+// Create WebSocket server — reject connections from disallowed origins
+const wss = new WebSocket.Server({
+  server,
+  verifyClient: ({ origin }) => {
+    // Allow server-to-server (no Origin header) and known frontend origins
+    if (!origin) return true;
+    const allowedWsOrigins = [
+      process.env.FRONTEND_URL,
+      'https://sas-edu-ai-f.vercel.app',
+      'http://localhost:3000',
+    ].filter(Boolean);
+    return allowedWsOrigins.includes(origin);
+  },
+});
 
 // Make WebSocket server globally available for other modules
 global.wss = wss;
@@ -50,8 +69,20 @@ app.use(helmet({
       objectSrc: ["'none'"],
       frameAncestors: ["'none'"],
     }
-  }
+  },
+  // HSTS: tell browsers to always use HTTPS for 1 year, including subdomains
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true,
+  },
 }));
+
+// Permissions-Policy: disable browser APIs this app never uses
+app.use((_req, res, next) => {
+  res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=()');
+  next();
+});
 
 // CORS — always restrict to an explicit allowlist; never use wildcard
 const allowedOrigins = [
@@ -434,6 +465,10 @@ app.use('*', (req, res) => {
 // Auto-migrate: extracted to migrations/autoMigrate.js
 const { runAutoMigrations } = require('./migrations/autoMigrate');
 const autoMigrate = runAutoMigrations;
+
+// Slowloris protection — abort connections that don't complete headers/request in time
+server.headersTimeout = 20000;  // 20s to receive full headers
+server.requestTimeout = 60000;  // 60s for the full request body
 
 // Start server
 server.listen(PORT, async () => {

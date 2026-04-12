@@ -17,7 +17,7 @@ const authenticate = async (req, res, next) => {
       return res.status(401).json({ message: 'Access denied. No token provided.' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'], issuer: 'sas-edu-ai', audience: 'sas-edu-ai-client' });
 
     // Check JWT revocation list (only when Redis is available)
     if (redis && decoded.jti) {

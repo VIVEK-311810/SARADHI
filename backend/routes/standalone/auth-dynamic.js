@@ -99,7 +99,7 @@ router.get('/google/callback/edu',
           fullName: user.full_name
         },
         process.env.JWT_SECRET,
-        { expiresIn: '24h', algorithm: 'HS256', jwtid: uuidv4() }
+        { expiresIn: '24h', algorithm: 'HS256', jwtid: uuidv4(), issuer: 'sas-edu-ai', audience: 'sas-edu-ai-client' }
       );
       
       // Redirect to frontend with token (user data decoded from JWT — no user= param in URL)
@@ -145,7 +145,7 @@ router.get('/google/callback/acin',
           fullName: user.full_name
         },
         process.env.JWT_SECRET,
-        { expiresIn: '24h', algorithm: 'HS256', jwtid: uuidv4() }
+        { expiresIn: '24h', algorithm: 'HS256', jwtid: uuidv4(), issuer: 'sas-edu-ai', audience: 'sas-edu-ai-client' }
       );
       
       // Redirect to frontend with token (user data decoded from JWT — no user= param in URL)
@@ -178,7 +178,7 @@ router.get('/google/callback',
       const token = jwt.sign(
         { userId: user.id, email: user.email, role: user.role, fullName: user.full_name },
         process.env.JWT_SECRET,
-        { expiresIn: '24h', algorithm: 'HS256', jwtid: uuidv4() }
+        { expiresIn: '24h', algorithm: 'HS256', jwtid: uuidv4(), issuer: 'sas-edu-ai', audience: 'sas-edu-ai-client' }
       );
       // Redirect to frontend with token (user data decoded from JWT — no user= param in URL)
       res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/callback?token=${token}`);
@@ -198,7 +198,7 @@ router.post('/verify', async (req, res) => {
       return res.status(400).json({ error: 'Token is required' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'], issuer: 'sas-edu-ai', audience: 'sas-edu-ai-client' });
 
     // Get fresh user data from database
     const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [decoded.userId]);
@@ -241,7 +241,7 @@ router.get('/me', async (req, res) => {
     }
 
     const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'], issuer: 'sas-edu-ai', audience: 'sas-edu-ai-client' });
 
     // Check revocation list
     if (redis && decoded.jti) {
@@ -315,7 +315,7 @@ router.get('/status', async (req, res) => {
     }
 
     const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'], issuer: 'sas-edu-ai', audience: 'sas-edu-ai-client' });
 
     if (redis && decoded.jti) {
       const isRevoked = await redis.sismember('revoked:tokens', decoded.jti).catch(() => 0);
