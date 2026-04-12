@@ -197,13 +197,17 @@ async function parseAndStore(state) {
     const qType = VALID_TYPES.includes(q.type) ? q.type : 'mcq';
 
     // Backward-compat: derive legacy options[] + correct_answer for MCQ/TF
-    let legacyOptions = null;
+    // Other types use '[]' as fallback — options column is NOT NULL; real data is in options_metadata.
+    let legacyOptions = '[]';
     let legacyCorrect = null;
     if (qType === 'mcq' && Array.isArray(meta.options) && meta.options.length >= 2) {
       legacyOptions = JSON.stringify(meta.options);
       legacyCorrect = meta.correct ?? 0;
     } else if (qType === 'true_false') {
       legacyOptions = JSON.stringify(['True', 'False']);
+      legacyCorrect = meta.correct ?? 0;
+    } else if (qType === 'assertion_reason') {
+      legacyOptions = JSON.stringify(['A', 'B', 'C', 'D']);
       legacyCorrect = meta.correct ?? 0;
     }
 
