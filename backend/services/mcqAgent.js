@@ -113,6 +113,10 @@ function buildMCQSystemPrompt(types, count) {
 
 PRIORITY RULE: Base questions PRIMARILY on the transcript. Use course material context ONLY to add depth or clarify — never shift focus away from what was actually said in the transcript.
 
+FORMATTING RULES (strictly enforced):
+- Write all question text in plain English — NO markdown, NO bold (**), NO italics (*), NO backticks, NO headers.
+- Options and justifications must also be plain text only.
+
 ALLOWED TYPES:
 ${typeLines}
 
@@ -142,6 +146,32 @@ async function generateMCQs(state) {
   });
   console.log(`[MCQAgent] Generated MCQ text (${mcqText.length} chars) for session: ${state.sessionId}`);
   return { mcqText };
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function stripMarkdown(str) {
+  if (!str || typeof str !== 'string') return str;
+  return str
+    .replace(/\*\*(.+?)\*\*/g, '$1')   // **bold**
+    .replace(/\*(.+?)\*/g, '$1')        // *italic*
+    .replace(/__(.+?)__/g, '$1')        // __bold__
+    .replace(/_(.+?)_/g, '$1')          // _italic_
+    .replace(/`(.+?)`/g, '$1')          // `code`
+    .replace(/#{1,6}\s*/g, '')          // ## headings
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1') // [link](url)
+    .trim();
+}
+
+// Recursively strip markdown from all string values in a plain object/array
+function stripMetaStrings(val) {
+  if (typeof val === 'string') return stripMarkdown(val);
+  if (Array.isArray(val)) return val.map(stripMetaStrings);
+  if (val && typeof val === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(val)) out[k] = stripMetaStrings(v);
+    return out;
+  }
+  return val;
 }
 
 // ── Node 3: Parse JSON → objects, store in DB, broadcast ─────────────────────
@@ -201,7 +231,7 @@ async function parseAndStore(state) {
     let legacyOptions = '[]';
     let legacyCorrect = 0;
     if (qType === 'mcq' && Array.isArray(meta.options) && meta.options.length >= 2) {
-      legacyOptions = JSON.stringify(meta.options);
+      legacyOptions = JSON.stringify(meta.options.map(stripMarkdown));
       legacyCorrect = meta.correct ?? 0;
     } else if (qType === 'true_false') {
       legacyOptions = JSON.stringify(['True', 'False']);
@@ -220,13 +250,13 @@ async function parseAndStore(state) {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
         [
           numericSessionId,
-          q.question.trim(),
+          stripMarkdown(q.question.trim()),
           legacyOptions,
           legacyCorrect,
-          q.justification || '',
+          stripMarkdown(q.justification || ''),
           [1, 2, 3].includes(diffNum) ? diffNum : 1,
           qType,
-          JSON.stringify(meta),
+          JSON.stringify(stripMetaStrings(meta)),
           q.blooms_level || null,
         ]
       );
