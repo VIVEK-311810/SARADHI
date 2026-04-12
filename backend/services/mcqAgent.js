@@ -197,9 +197,9 @@ async function parseAndStore(state) {
     const qType = VALID_TYPES.includes(q.type) ? q.type : 'mcq';
 
     // Backward-compat: derive legacy options[] + correct_answer for MCQ/TF
-    // Other types use '[]' as fallback — options column is NOT NULL; real data is in options_metadata.
+    // Both columns are NOT NULL — use safe defaults; real data lives in options_metadata.
     let legacyOptions = '[]';
-    let legacyCorrect = null;
+    let legacyCorrect = 0;
     if (qType === 'mcq' && Array.isArray(meta.options) && meta.options.length >= 2) {
       legacyOptions = JSON.stringify(meta.options);
       legacyCorrect = meta.correct ?? 0;
