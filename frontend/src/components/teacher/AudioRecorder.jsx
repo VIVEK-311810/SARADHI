@@ -257,25 +257,27 @@ const AudioRecorder = ({ audioRecorder, sessionId: propSessionId }) => {
         </button>
       </div>
 
-      {/* Upload PDF mid-session for context (only during active recording) */}
-      {status !== 'idle' && (
+      {/* Upload PDF for context — available before and during recording */}
+      <div>
+        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+          Upload PDF for Context <span className="font-normal text-slate-400">(optional — indexed in memory only)</span>
+        </label>
         <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-          <span className="text-sm text-blue-700 dark:text-blue-300 font-medium whitespace-nowrap">PDF context:</span>
           {contextUploadState === 'done' ? (
-            <span className="text-xs text-green-600 dark:text-green-400 truncate">✓ {contextFilename}</span>
+            <span className="text-xs text-green-600 dark:text-green-400 truncate flex-1">✓ {contextFilename}</span>
           ) : contextUploadState === 'uploading' ? (
-            <span className="text-xs text-blue-500 animate-pulse">Indexing {contextFilename}…</span>
+            <span className="text-xs text-blue-500 animate-pulse flex-1">Indexing {contextFilename}…</span>
           ) : contextUploadState === 'error' ? (
-            <span className="text-xs text-red-500">Failed — try again</span>
+            <span className="text-xs text-red-500 flex-1">Failed — try again</span>
           ) : (
-            <span className="text-xs text-slate-500 dark:text-slate-400">None uploaded</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 flex-1">No PDF uploaded</span>
           )}
-          <label className="ml-auto cursor-pointer text-xs px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-800/50 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-700/50 transition-colors font-medium whitespace-nowrap">
+          <label className="cursor-pointer text-xs px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-800/50 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-700/50 transition-colors font-medium whitespace-nowrap">
             {contextUploadState === 'done' ? 'Replace' : 'Upload PDF'}
             <input type="file" accept="application/pdf" className="hidden" onChange={handleContextUpload} />
           </label>
         </div>
-      )}
+      </div>
 
       {/* Real-time Transcript Display */}
       <div>
