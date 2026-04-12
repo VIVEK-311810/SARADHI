@@ -8,10 +8,19 @@ const pool = require('../../db');
 const logger = require('../../logger');
 const { authenticate, authorize } = require('../../middleware/auth');
 
-// Configure multer for memory storage
+// Configure multer for memory storage — only accept audio MIME types
+const ALLOWED_AUDIO_MIMES = new Set([
+  'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/wave', 'audio/x-wav',
+  'audio/ogg', 'audio/webm', 'audio/mp4', 'audio/aac', 'audio/flac',
+  'audio/x-m4a', 'video/webm', // browsers often send webm with video/ prefix
+]);
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_AUDIO_MIMES.has(file.mimetype)) return cb(null, true);
+    cb(Object.assign(new Error('Only audio files are accepted'), { status: 400 }));
+  },
 });
 
 const { verifySessionOwnership } = require('../helpers/sessionHelpers');
@@ -74,8 +83,9 @@ router.post('/audio-chunk', authenticate, authorize('teacher'), upload.single('a
       return res.status(403).json({ error: 'Session not found or access denied' });
     }
 
+    const safeFilename = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 100);
     const transcriptionResult = await audioProcessor.forwardToGPUServer(
-      req.file.buffer, session_id, req.file.originalname, req.file.mimetype
+      req.file.buffer, session_id, safeFilename, req.file.mimetype
     );
 
     const transcript = transcriptionResult.transcript || transcriptionResult.text || '';
@@ -152,6 +162,10 @@ router.post('/audio-stream', authenticate, authorize('teacher'), async (req, res
     if (!session_id) return res.status(400).json({ error: 'session_id is required' });
     if (!audio_data || !Array.isArray(audio_data) || audio_data.length === 0) {
       return res.status(400).json({ error: 'audio_data must be a non-empty array' });
+    }
+    // Cap at ~30 seconds at 16kHz (480,000 samples) — prevents memory exhaustion
+    if (audio_data.length > 480000) {
+      return res.status(400).json({ error: 'audio_data exceeds maximum length (480,000 samples)' });
     }
     if (!(await verifySessionOwnership(session_id, req.user.id))) {
       return res.status(403).json({ error: 'Session not found or access denied' });

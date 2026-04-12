@@ -303,8 +303,12 @@ router.post('/add-url', authenticate, authorize('teacher'), async (req, res) => 
       return res.status(400).json({ error: 'Session ID, title, and URL are required' });
     }
 
-    // Basic URL validation
-    try { new URL(url); } catch { return res.status(400).json({ error: 'Invalid URL format' }); }
+    // URL validation — parse first, then enforce protocol whitelist
+    let parsedUrl;
+    try { parsedUrl = new URL(url); } catch { return res.status(400).json({ error: 'Invalid URL format' }); }
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      return res.status(400).json({ error: 'Only HTTP and HTTPS URLs are allowed' });
+    }
 
     // Generate unique resource ID
     const resourceId = uuidv4();

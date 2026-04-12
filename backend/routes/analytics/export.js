@@ -10,6 +10,9 @@ const { apiLimiter } = require('../../middleware/rateLimiter');
 // Apply rate limit to all export routes — CSV/PDF generation is DB-heavy
 router.use(apiLimiter);
 
+// Strip any character that could break a Content-Disposition header or filename
+const safeFilePart = (value) => String(value).replace(/[^a-zA-Z0-9_-]/g, '_');
+
 // Helper to convert option index to letter
 const optionToLetter = (index) => {
   const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
@@ -69,7 +72,7 @@ router.get('/poll/:pollId/csv', authenticate, authorize('teacher'), async (req, 
     const csv = parser.parse(data);
 
     res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename=poll_${pollId}_results.csv`);
+    res.setHeader('Content-Disposition', `attachment; filename=poll_${safeFilePart(pollId)}_results.csv`);
     res.send(csv);
   } catch (error) {
     logger.error('Export poll CSV error', { error: error.message });
@@ -130,7 +133,7 @@ router.get('/session/:sessionId/all-responses/csv', authenticate, authorize('tea
     const csv = parser.parse(data);
 
     res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename=session_${sessionId}_responses.csv`);
+    res.setHeader('Content-Disposition', `attachment; filename=session_${safeFilePart(sessionId)}_responses.csv`);
     res.send(csv);
   } catch (error) {
     logger.error('Export session CSV error', { error: error.message });
@@ -210,7 +213,7 @@ router.get('/session/:sessionId/report/pdf', authenticate, authorize('teacher'),
     const doc = new PDFDocument({ margin: 50 });
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=session_${sessionId}_report.pdf`);
+    res.setHeader('Content-Disposition', `attachment; filename=session_${safeFilePart(sessionId)}_report.pdf`);
     doc.pipe(res);
 
     // Title
@@ -409,7 +412,7 @@ router.get('/session/:sessionId/gamification/csv', authenticate, authorize('teac
     const csv = parser.parse(data);
 
     res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename=session_${sessionId}_gamification.csv`);
+    res.setHeader('Content-Disposition', `attachment; filename=session_${safeFilePart(sessionId)}_gamification.csv`);
     res.send(csv);
   } catch (error) {
     logger.error('Export gamification CSV error', { error: error.message });
@@ -491,7 +494,7 @@ router.get('/session/:sessionId/detailed/csv', authenticate, authorize('teacher'
     const csv = parser.parse(data);
 
     res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename=session_${sessionId}_detailed.csv`);
+    res.setHeader('Content-Disposition', `attachment; filename=session_${safeFilePart(sessionId)}_detailed.csv`);
     res.send(csv);
   } catch (error) {
     logger.error('Export detailed CSV error', { error: error.message });
@@ -549,7 +552,7 @@ router.get('/student/:studentId/performance/csv', authenticate, authorize('teach
     const csv = parser.parse(data);
 
     res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename=student_${studentId}_performance.csv`);
+    res.setHeader('Content-Disposition', `attachment; filename=student_${safeFilePart(studentId)}_performance.csv`);
     res.send(csv);
   } catch (error) {
     logger.error('Export student CSV error', { error: error.message });
