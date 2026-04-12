@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const pool = require('../../db');
 const logger = require('../../logger');
 const { authenticate } = require('../../middleware/auth');
@@ -24,14 +25,12 @@ async function isEnrolled(sessionId, userId) {
   return result.rows.length > 0;
 }
 
-// ── Room code generator: 6-char uppercase starting with "C" ──────────────────
+// ── Room code generator: 6-char uppercase starting with "C" (CSPRNG) ────────
+const ROOM_CODE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 function generateRoomCode() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let code = 'C';
-  for (let i = 0; i < 5; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
+  return 'C' + Array.from(crypto.randomBytes(5))
+    .map(b => ROOM_CODE_CHARS[b % ROOM_CODE_CHARS.length])
+    .join('');
 }
 
 // ── Letter-to-index mapping (mirrors generated-mcqs.js) ──────────────────────
@@ -91,7 +90,10 @@ router.post('/rooms', authenticate, async (req, res) => {
         [sessionId.toUpperCase()]
       );
       const maxTeacherPolls = parseInt(pollsCount.rows[0].count);
-      const rawTqc = parseInt(teacherQuestionCount);
+      const rawTqc = parseInt(teacherQuestionCount, 10);
+      if (teacherQuestionCount !== undefined && (isNaN(rawTqc) || rawTqc < 0 || rawTqc > 1000)) {
+        return res.status(400).json({ success: false, error: 'teacherQuestionCount must be a number between 0 and 1000' });
+      }
       tqc = (!rawTqc || rawTqc <= 0) ? 0 : Math.min(rawTqc, maxTeacherPolls);
       effectiveTeacherCount = tqc > 0 ? tqc : maxTeacherPolls;
     }
@@ -115,9 +117,9 @@ router.post('/rooms', authenticate, async (req, res) => {
       });
     }
 
-    // Generate unique room code with collision retry
+    // Generate unique room code with collision retry (100 attempts — collision prob negligible)
     let roomCode;
-    for (let attempt = 0; attempt < 10; attempt++) {
+    for (let attempt = 0; attempt < 100; attempt++) {
       const candidate = generateRoomCode();
       const existing = await pool.query(
         'SELECT 1 FROM competition_rooms WHERE room_code = $1',

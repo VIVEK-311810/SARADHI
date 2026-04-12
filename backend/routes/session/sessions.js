@@ -21,7 +21,7 @@ router.post('/', authenticate, authorize('teacher'), async (req, res) => {
     // Uses CSPRNG (crypto.randomBytes) — Math.random() is not cryptographically secure
     const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let sessionCode;
-    for (let attempt = 0; attempt < 10; attempt++) {
+    for (let attempt = 0; attempt < 100; attempt++) {
       sessionCode = Array.from(crypto.randomBytes(6)).map(b => CHARS[b % 36]).join('');
       const existing = await pool.query('SELECT 1 FROM sessions WHERE session_id = $1', [sessionCode]);
       if (existing.rows.length === 0) break;

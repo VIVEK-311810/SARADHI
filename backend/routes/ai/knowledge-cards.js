@@ -86,10 +86,13 @@ Generate exactly ${count} pairs now:`;
 
 // ─── Distribution Algorithm ───────────────────────────────────────────────────
 
+// Fisher-Yates shuffle using CSPRNG — Math.random() is predictable and not suitable
+// for card distribution where fairness and unpredictability matter.
 function shuffleArray(arr) {
+  const { randomInt } = require('crypto');
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = randomInt(0, i + 1);
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;

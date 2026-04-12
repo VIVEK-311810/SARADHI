@@ -257,7 +257,7 @@ router.post('/upload-complete', authenticate, authorize('teacher'), async (req, 
 
     // Verify ownership and fetch the server-side path — never trust client-supplied filePath
     const { data: resource, error: fetchError } = await supabase
-      .from('resources').select('id, session_id, teacher_id, file_path').eq('id', resourceId).single();
+      .from('resources').select('id, session_id, teacher_id, file_path, mime_type').eq('id', resourceId).single();
 
     if (fetchError || !resource) return res.status(404).json({ error: 'Resource not found' });
     if (resource.teacher_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
@@ -265,6 +265,26 @@ router.post('/upload-complete', authenticate, authorize('teacher'), async (req, 
     // Use the server-side registered path — prevents path traversal / cross-teacher file access
     const serverFilePath = resource.file_path;
     const { data: urlData } = supabase.storage.from('session-resources').getPublicUrl(serverFilePath);
+
+    // Magic byte verification — fetch first 8 bytes from Supabase and confirm they match
+    // the declared MIME type. Catches files where the browser uploaded a different type
+    // than what was declared in /upload-url.
+    try {
+      const rangeRes = await fetch(urlData.publicUrl, { headers: { Range: 'bytes=0-7' } });
+      if (rangeRes.ok || rangeRes.status === 206) {
+        const buf = Buffer.from(await rangeRes.arrayBuffer());
+        if (!validateMagicBytes(buf, resource.mime_type)) {
+          await supabase.storage.from('session-resources').remove([serverFilePath]);
+          await supabase.from('resources').delete().eq('id', resourceId);
+          logger.warn('upload-complete: magic bytes mismatch — file deleted', {
+            resourceId, declaredMime: resource.mime_type, teacherId: req.user.id,
+          });
+          return res.status(400).json({ error: 'File content does not match the declared file type.' });
+        }
+      }
+    } catch (magicErr) {
+      logger.warn('upload-complete: magic byte check skipped (fetch error)', { error: magicErr.message, resourceId });
+    }
 
     await supabase.from('resources').update({
       file_url: urlData.publicUrl,
