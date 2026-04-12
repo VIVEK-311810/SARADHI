@@ -66,42 +66,42 @@ SUPPORTED TYPES (pick appropriate ones based on the content):
 Output ONLY a valid JSON array — no markdown fences, no explanation outside the array.
 
 [
-  {
+  {{
     "type": "mcq",
     "question": "...",
     "question_latex": null,
-    "options_metadata": {
+    "options_metadata": {{
       "options": ["option A", "option B", "option C", "option D"],
       "correct": 0
-    },
+    }},
     "blooms_level": "Remember",
     "difficulty": 1,
     "justification": "..."
-  },
-  {
+  }},
+  {{
     "type": "true_false",
     "question": "...",
-    "options_metadata": { "correct": 0 },
+    "options_metadata": {{ "correct": 0 }},
     "blooms_level": "Understand",
     "difficulty": 1,
     "justification": "..."
-  },
-  {
+  }},
+  {{
     "type": "fill_blank",
     "question": "The ___ law states ...",
-    "options_metadata": { "accepted_answers": ["Newton", "newton's second"] },
+    "options_metadata": {{ "accepted_answers": ["Newton", "newton's second"] }},
     "blooms_level": "Remember",
     "difficulty": 1,
     "justification": "..."
-  },
-  {
+  }},
+  {{
     "type": "numeric",
     "question": "Calculate ...",
-    "options_metadata": { "correct_value": 9.81, "tolerance": 0.1, "unit": "m/s2" },
+    "options_metadata": {{ "correct_value": 9.81, "tolerance": 0.1, "unit": "m/s2" }},
     "blooms_level": "Apply",
     "difficulty": 2,
     "justification": "..."
-  }
+  }}
 ]
 
 blooms_level must be one of: Remember, Understand, Apply, Analyze, Evaluate, Create

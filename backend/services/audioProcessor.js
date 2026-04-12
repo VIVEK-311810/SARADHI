@@ -219,7 +219,7 @@ async function sendTranscriptSegment(sessionId) {
 
     // Get all unsent transcripts for this session
     const query = `
-      SELECT id, segment_text
+      SELECT id, segment_text, timestamp
       FROM transcripts
       WHERE session_db_id = $1
       AND sent_to_webhook = false
@@ -273,6 +273,8 @@ async function sendTranscriptSegment(sessionId) {
         type: 'transcript-segment-sent',
         sessionId: sessionId,
         timestamp: new Date().toISOString(),
+        segmentStartTime: result.rows[0].timestamp,
+        segmentEndTime: result.rows[result.rows.length - 1].timestamp,
         segmentCount: result.rows.length,
         transcriptLength: transcriptSegment.length
       });

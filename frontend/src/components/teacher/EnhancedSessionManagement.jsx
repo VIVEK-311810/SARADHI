@@ -242,13 +242,19 @@ const EnhancedSessionManagement = () => {
           case 'transcript-segment-sent':
             if (isCurrentSession(data.sessionId)) {
               setLastSegmentTime(new Date(data.timestamp));
-              setSegmentCount(prev => prev + 1);
+              setSegmentCount(prev => {
+                const segNum = prev + 1;
+                const fmt = (ts) => ts ? new Date(ts).toLocaleTimeString() : '?';
+                console.log(`[Session] Segment ${segNum} (${fmt(data.segmentStartTime)} to ${fmt(data.segmentEndTime)}) sent.`);
+                return segNum;
+              });
               setActivityPulse(true);
               setTimeout(() => setActivityPulse(false), 2000);
             }
             break;
           case 'mcqs-generated':
             if (isCurrentSession(data.sessionId)) {
+              console.log(`[Session] MCQs received: ${data.count} question${data.count !== 1 ? 's' : ''}.`);
               window.dispatchEvent(new CustomEvent('saradhi:notification', { detail: { type: 'quiz', title: 'MCQs generated', body: `${data.count} question${data.count !== 1 ? 's' : ''} ready to send.` } }));
               setNewMCQsCount(prev => prev + data.count);
               setActivityPulse(true);

@@ -1,16 +1,19 @@
 const axios = require('axios');
 const logger = require('../logger');
 
-// Batch size: HuggingFace inference accepts arrays; 32 texts per call keeps
-// payload size reasonable and avoids 413s on longer chunks.
-const BATCH_SIZE = 32;
-const BATCH_DELAY_MS = 500; // delay between batches, not between individual chunks
+// Mistral embedding API — mistral-embed produces 1024-dim vectors.
+// Matches the Pinecone index dimension and what mcqAgent uses for context retrieval.
+const MISTRAL_EMBED_URL = 'https://api.mistral.ai/v1/embeddings';
+const MISTRAL_MODEL     = 'mistral-embed';
+
+// Mistral allows up to 512 texts per batch; 32 is conservative to avoid payload limits.
+const BATCH_SIZE     = 32;
+const BATCH_DELAY_MS = 200;
 
 class EmbeddingService {
   constructor() {
-    this.apiUrl = 'https://router.huggingface.co/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction';
-    this.apiKey = process.env.HUGGINGFACE_API_KEY;
-    this.maxTokens = 512;
+    this.apiKey        = process.env.MISTRAL_API_KEY;
+    this.maxTokens     = 512;
     this.retryAttempts = 5;
   }
 
@@ -22,36 +25,29 @@ class EmbeddingService {
 
     try {
       const response = await axios.post(
-        this.apiUrl,
-        { inputs: text },
+        MISTRAL_EMBED_URL,
+        { model: MISTRAL_MODEL, input: [text] },
         {
           headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
+            Authorization: `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json'
           },
           timeout: 30000
         }
       );
-      return response.data;
+      return response.data.data[0].embedding;
     } catch (error) {
-      if (error.response?.status === 503 && retryCount < this.retryAttempts) {
-        const waitTime = 5000 + (retryCount * 2000);
-        logger.debug(`HuggingFace model loading, retrying in ${waitTime}ms`, { attempt: retryCount + 1 });
-        await this.sleep(waitTime);
-        return this.generateEmbedding(text, retryCount + 1);
-      }
       if (error.response?.status === 429 && retryCount < this.retryAttempts) {
-        const waitTime = 10000 + (retryCount * 5000);
-        logger.debug(`HuggingFace rate limited, retrying in ${waitTime}ms`, { attempt: retryCount + 1 });
+        const waitTime = 10000 + retryCount * 5000;
+        logger.debug(`Mistral rate limited, retrying in ${waitTime}ms`, { attempt: retryCount + 1 });
         await this.sleep(waitTime);
         return this.generateEmbedding(text, retryCount + 1);
       }
-      throw new Error(`Failed to generate embedding: ${error.response?.data?.error || error.message}`);
+      throw new Error(`Failed to generate embedding: ${error.response?.data?.message || error.message}`);
     }
   }
 
-  // Batch embedding — sends BATCH_SIZE texts per API call instead of one-by-one.
-  // 55 chunks → 2 API calls instead of 55. Reduces vectorization from ~110s to ~3s.
+  // Batch embedding — sends BATCH_SIZE texts per API call.
   async generateBatchEmbeddings(texts) {
     const embeddings = [];
 
@@ -62,7 +58,6 @@ class EmbeddingService {
 
       logger.info(`Generated embeddings: ${Math.min(i + BATCH_SIZE, texts.length)}/${texts.length}`);
 
-      // Polite delay between batches only (not between individual texts)
       if (i + BATCH_SIZE < texts.length) {
         await this.sleep(BATCH_DELAY_MS);
       }
@@ -74,36 +69,31 @@ class EmbeddingService {
   async _embedBatch(texts, retryCount = 0) {
     try {
       const response = await axios.post(
-        this.apiUrl,
-        { inputs: texts, options: { wait_for_model: true } },
+        MISTRAL_EMBED_URL,
+        { model: MISTRAL_MODEL, input: texts },
         {
           headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
+            Authorization: `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json'
           },
-          timeout: 60000 // longer timeout for batch
+          timeout: 60000
         }
       );
 
-      const result = response.data;
+      const result = response.data.data;
       if (!Array.isArray(result)) {
-        throw new Error(`Unexpected HuggingFace response: ${JSON.stringify(result)}`);
+        throw new Error(`Unexpected Mistral response: ${JSON.stringify(response.data)}`);
       }
-      return result;
+      // Response is sorted by index, extract just the vectors
+      return result.map(item => item.embedding);
     } catch (error) {
-      if (error.response?.status === 503 && retryCount < this.retryAttempts) {
-        const waitTime = 5000 + (retryCount * 2000);
-        logger.debug(`HuggingFace model loading (batch), retrying in ${waitTime}ms`, { attempt: retryCount + 1 });
-        await this.sleep(waitTime);
-        return this._embedBatch(texts, retryCount + 1);
-      }
       if (error.response?.status === 429 && retryCount < this.retryAttempts) {
-        const waitTime = 10000 + (retryCount * 5000);
-        logger.debug(`HuggingFace rate limited (batch), retrying in ${waitTime}ms`, { attempt: retryCount + 1 });
+        const waitTime = 10000 + retryCount * 5000;
+        logger.debug(`Mistral rate limited (batch), retrying in ${waitTime}ms`, { attempt: retryCount + 1 });
         await this.sleep(waitTime);
         return this._embedBatch(texts, retryCount + 1);
       }
-      throw new Error(`Batch embed failed: ${error.response?.data?.error || error.message}`);
+      throw new Error(`Batch embed failed: ${error.response?.data?.message || error.message}`);
     }
   }
 
@@ -127,9 +117,9 @@ class EmbeddingService {
       .replace(/```[\s\S]*?```/g, m => { atomics.push(m); return `${ATOM}${atomics.length - 1}${ATOM}`; });
 
     // Step 2: standard word-based chunking on the placeholder text
-    const maxWords = Math.floor(maxTokens * 0.75);
+    const maxWords    = Math.floor(maxTokens * 0.75);
     const overlapWords = Math.floor(overlap * 0.75);
-    const words = safe.split(/\s+/).filter(w => w.length > 0);
+    const words  = safe.split(/\s+/).filter(w => w.length > 0);
     const chunks = [];
 
     let i = 0;
@@ -143,9 +133,9 @@ class EmbeddingService {
 
       if (restored.trim().length > 0) {
         chunks.push({
-          text: restored,
+          text:       restored,
           startIndex: i,
-          endIndex: Math.min(i + maxWords, words.length),
+          endIndex:   Math.min(i + maxWords, words.length),
           tokenCount: this.estimateTokens(restored),
         });
       }
@@ -157,7 +147,6 @@ class EmbeddingService {
   }
 
   estimateTokens(text) {
-    // Rough estimate: 1 token ≈ 4 characters
     return Math.ceil(text.length / 4);
   }
 
