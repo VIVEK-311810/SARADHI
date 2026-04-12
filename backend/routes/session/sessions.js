@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const pool = require('../../db');
 const logger = require('../../logger');
 const { authenticate, authorize } = require('../../middleware/auth');
@@ -17,10 +18,11 @@ router.post('/', authenticate, authorize('teacher'), async (req, res) => {
     }
 
     // Generate a unique 6-character alphanumeric session code (retry on collision)
+    // Uses CSPRNG (crypto.randomBytes) — Math.random() is not cryptographically secure
     const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let sessionCode;
     for (let attempt = 0; attempt < 10; attempt++) {
-      sessionCode = Array.from({ length: 6 }, () => CHARS[Math.floor(Math.random() * CHARS.length)]).join('');
+      sessionCode = Array.from(crypto.randomBytes(6)).map(b => CHARS[b % 36]).join('');
       const existing = await pool.query('SELECT 1 FROM sessions WHERE session_id = $1', [sessionCode]);
       if (existing.rows.length === 0) break;
     }

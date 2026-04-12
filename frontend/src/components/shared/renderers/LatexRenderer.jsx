@@ -30,6 +30,8 @@ const KATEX_CONFIG = {
  */
 function renderLatex(text) {
   if (!text) return [];
+  // Guard against extremely long strings before running regexes
+  if (text.length > 50000) return [{ type: 'text', content: text }];
 
   const parts = [];
   // Split on block first ($$...$$), then inline ($...$)

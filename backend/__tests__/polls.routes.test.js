@@ -64,6 +64,7 @@ describe('Polls Routes - /api/polls', () => {
         correct_answer: 3,
         justification: 'Basic math',
         time_limit: 30,
+        question_type: 'mcq',
       };
 
       mockQuery
@@ -104,7 +105,7 @@ describe('Polls Routes - /api/polls', () => {
       const res = await request(app)
         .post('/api/polls')
         .set('Authorization', `Bearer ${teacherToken}`)
-        .send({ session_id: 'NONEXIST', question: 'Test?', options: ['A', 'B'], correct_answer: 0 });
+        .send({ session_id: 'NONEXIST', question: 'Test?', options: ['A', 'B'], correct_answer: 0, question_type: 'mcq' });
 
       expect(res.status).toBe(404);
     });
@@ -118,7 +119,7 @@ describe('Polls Routes - /api/polls', () => {
       await request(app)
         .post('/api/polls')
         .set('Authorization', `Bearer ${teacherToken}`)
-        .send({ session_id: 'ABC123', question: 'Test?', options: ['A', 'B'], correct_answer: 0 });
+        .send({ session_id: 'ABC123', question: 'Test?', options: ['A', 'B'], correct_answer: 0, question_type: 'mcq' });
 
       // INSERT is now call index 2 (0: getNumericSessionId, 1: ownerCheck, 2: INSERT)
       const insertCall = mockQuery.mock.calls[2];

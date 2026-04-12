@@ -177,7 +177,10 @@ router.post('/', authenticate, authorize('teacher'), async (req, res) => {
       'multi_correct', 'assertion_reason', 'match_following', 'ordering',
       'diagram_labeling', 'truth_table', 'code_trace', 'differentiate',
     ];
-    const qType = VALID_QUESTION_TYPES.includes(question_type) ? question_type : 'mcq';
+    if (!VALID_QUESTION_TYPES.includes(question_type)) {
+      return res.status(400).json({ error: `Invalid question_type. Must be one of: ${VALID_QUESTION_TYPES.join(', ')}` });
+    }
+    const qType = question_type;
 
     // options required for MCQ/true_false/code; optional for others
     const optionsRequired = ['mcq', 'true_false', 'code'].includes(qType);
