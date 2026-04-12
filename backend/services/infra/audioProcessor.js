@@ -2,6 +2,7 @@ const FormData = require('form-data');
 const fetch = require('node-fetch');
 require('dotenv').config();
 const pool = require('../../db');
+const logger = require('../../logger');
 const { runMCQAgent } = require('../agents/mcqAgent');
 const { runKeyPointsAgent } = require('../agents/keyPointsAgent');
 const { runNotesAgent } = require('../agents/notesAgent');
@@ -23,7 +24,7 @@ const sessionTimers = new Map();
 const activeSessions = new Map(); // Store { session_id: { dbId, mcqTypes, mcqCount } }
 
 // Log provider config once at startup (visible in Render boot logs)
-console.log('[AudioProcessor] Config — GPU_ENABLED:', GPU_ENABLED, '| GROQ_API_KEY:', GROQ_API_KEY ? 'set' : 'NOT SET');
+logger.info('[AudioProcessor] Config', { GPU_ENABLED, GROQ_API_KEY: GROQ_API_KEY ? 'set' : 'NOT SET' });
 
 /**
  * Transcribe audio using Groq's Whisper API (fallback provider)
@@ -74,12 +75,12 @@ async function transcribeWithGroq(audioBuffer, filename, mimetype) {
 async function forwardToGPUServer(audioBuffer, sessionId, filename, mimetype) {
   // ── Primary: GPU server (only when configured) ─────────────────────────
   if (!GPU_ENABLED) {
-    console.log(`[AudioProcessor] GPU not configured — using Groq directly for session: ${sessionId}`);
+    logger.info(`[AudioProcessor] GPU not configured — using Groq directly for session: ${sessionId}`);
     return transcribeWithGroq(audioBuffer, filename, mimetype);
   }
 
   try {
-    console.log(`[AudioProcessor] Forwarding audio to GPU server for session: ${sessionId}`);
+    logger.info(`[AudioProcessor] Forwarding audio to GPU server for session: ${sessionId}`);
 
     const formData = new FormData();
     formData.append('audio', audioBuffer, {
@@ -102,19 +103,19 @@ async function forwardToGPUServer(audioBuffer, sessionId, filename, mimetype) {
     }
 
     const result = await response.json();
-    console.log(`[AudioProcessor] ✓ GPU transcript received: ${result.transcript?.substring(0, 50)}...`);
+    logger.info(`[AudioProcessor] ✓ GPU transcript received: ${result.transcript?.substring(0, 50)}...`);
     return { ...result, provider: 'gpu' };
 
   } catch (gpuError) {
     // ── Fallback: Groq Whisper ─────────────────────────────────────────
-    console.warn(`[AudioProcessor] GPU server failed (${gpuError.message}), falling back to Groq...`);
+    logger.warn(`[AudioProcessor] GPU server failed (${gpuError.message}), falling back to Groq...`);
 
     try {
       const result = await transcribeWithGroq(audioBuffer, filename, mimetype);
-      console.log(`[AudioProcessor] ✓ Groq transcript received: ${result.transcript?.substring(0, 50)}...`);
+      logger.info(`[AudioProcessor] ✓ Groq transcript received: ${result.transcript?.substring(0, 50)}...`);
       return result;
     } catch (groqError) {
-      console.error(`[AudioProcessor] Groq fallback also failed: ${groqError.message}`);
+      logger.error(`[AudioProcessor] Groq fallback also failed: ${groqError.message}`);
       throw new Error(`All transcription providers failed. GPU: ${gpuError.message} | Groq: ${groqError.message}`);
     }
   }
@@ -130,7 +131,7 @@ async function forwardToGPUServer(audioBuffer, sessionId, filename, mimetype) {
 async function saveTranscript(sessionId, text, detectedLanguage = null) {
   try {
     if (!text || text.trim().length === 0) {
-      console.log(`[AudioProcessor] Empty transcript, skipping save for session: ${sessionId}`);
+      logger.info(`[AudioProcessor] Empty transcript, skipping save for session: ${sessionId}`);
       return null;
     }
 
@@ -159,11 +160,11 @@ async function saveTranscript(sessionId, text, detectedLanguage = null) {
     `;
 
     const result = await pool.query(query, [dbId, text.trim(), detectedLanguage]);
-    console.log(`[AudioProcessor] Transcript saved for session: ${sessionId} (db_id: ${dbId})`);
+    logger.info(`[AudioProcessor] Transcript saved for session: ${sessionId} (db_id: ${dbId})`);
 
     return result.rows[0];
   } catch (error) {
-    console.error(`[AudioProcessor] Error saving transcript:`, error.message);
+    logger.error(`[AudioProcessor] Error saving transcript:`, error.message);
     throw error;
   }
 }
@@ -178,12 +179,12 @@ function startSegmentTimer(sessionId, intervalMinutes) {
   stopSegmentTimer(sessionId);
 
   const intervalMs = intervalMinutes * 60 * 1000;
-  console.log(`[AudioProcessor] Starting segment timer for session ${sessionId}: ${intervalMinutes} minutes`);
+  logger.info(`[AudioProcessor] Starting segment timer for session ${sessionId}: ${intervalMinutes} minutes`);
 
   const timer = setInterval(() => {
-    console.log(`[AudioProcessor] Timer fired for session: ${sessionId}`);
+    logger.info(`[AudioProcessor] Timer fired for session: ${sessionId}`);
     sendTranscriptSegment(sessionId).catch(err =>
-      console.error(`[AudioProcessor] Segment timer error (non-fatal):`, err.message)
+      logger.error(`[AudioProcessor] Segment timer error (non-fatal):`, err.message)
     );
   }, intervalMs);
 
@@ -197,7 +198,7 @@ function startSegmentTimer(sessionId, intervalMinutes) {
  */
 async function sendTranscriptSegment(sessionId) {
   try {
-    console.log(`[AudioProcessor] ▶ Timer fired — sending segment for session: ${sessionId}`);
+    logger.info(`[AudioProcessor] ▶ Timer fired — sending segment for session: ${sessionId}`);
 
     // Get database ID for most recent session
     const sessionData = activeSessions.get(sessionId);
@@ -205,7 +206,7 @@ async function sendTranscriptSegment(sessionId) {
     const mcqTypes = sessionData?.mcqTypes || null;
     const mcqCount = sessionData?.mcqCount || 3;
     const resourceId = sessionData?.resourceId || null;
-    console.log(`[AudioProcessor]   activeSessions lookup '${sessionId}' → dbId=${dbId}`);
+    logger.info(`[AudioProcessor]   activeSessions lookup '${sessionId}' → dbId=${dbId}`);
     if (!dbId) {
       const sessionQuery = `
         SELECT id FROM transcription_sessions
@@ -215,11 +216,11 @@ async function sendTranscriptSegment(sessionId) {
       `;
       const sessionResult = await pool.query(sessionQuery, [sessionId]);
       if (sessionResult.rows.length === 0) {
-        console.log(`[AudioProcessor]   No transcription_sessions row found for: ${sessionId}`);
+        logger.info(`[AudioProcessor]   No transcription_sessions row found for: ${sessionId}`);
         return false;
       }
       dbId = sessionResult.rows[0].id;
-      console.log(`[AudioProcessor]   DB fallback resolved dbId=${dbId}`);
+      logger.info(`[AudioProcessor]   DB fallback resolved dbId=${dbId}`);
     }
 
     // Get all unsent transcripts for this session
@@ -232,10 +233,10 @@ async function sendTranscriptSegment(sessionId) {
     `;
 
     const result = await pool.query(query, [dbId]);
-    console.log(`[AudioProcessor]   Found ${result.rows.length} unsent transcript(s) for dbId=${dbId}`);
+    logger.info(`[AudioProcessor]   Found ${result.rows.length} unsent transcript(s) for dbId=${dbId}`);
 
     if (result.rows.length === 0) {
-      console.log(`[AudioProcessor]   No unsent transcripts for session: ${sessionId}`);
+      logger.info(`[AudioProcessor]   No unsent transcripts for session: ${sessionId}`);
       return false;
     }
 
@@ -246,7 +247,7 @@ async function sendTranscriptSegment(sessionId) {
       .trim();
 
     if (!transcriptSegment) {
-      console.log(`[AudioProcessor] Empty transcript segment for session: ${sessionId}`);
+      logger.info(`[AudioProcessor] Empty transcript segment for session: ${sessionId}`);
       return false;
     }
 
@@ -260,17 +261,17 @@ async function sendTranscriptSegment(sessionId) {
 
     await pool.query(updateQuery, [transcriptIds]);
 
-    console.log(`[AudioProcessor] ✓ Transcripts marked sent for session: ${sessionId} (${result.rows.length} segments)`);
+    logger.info(`[AudioProcessor] ✓ Transcripts marked sent for session: ${sessionId} (${result.rows.length} segments)`);
 
     // Trigger MCQ generation via LangGraph agent (fire-and-forget — non-blocking)
     runMCQAgent(transcriptSegment, sessionId, { types: mcqTypes, count: mcqCount, resourceId })
-      .then(mcqs => console.log(`[AudioProcessor] MCQ agent completed: ${mcqs?.length || 0} MCQs for session: ${sessionId}`))
-      .catch(err => console.error(`[AudioProcessor] MCQ agent error (non-fatal): ${err.message}`));
+      .then(mcqs => logger.info(`[AudioProcessor] MCQ agent completed: ${mcqs?.length || 0} MCQs for session: ${sessionId}`))
+      .catch(err => logger.error(`[AudioProcessor] MCQ agent error (non-fatal): ${err.message}`));
 
     // Trigger key-points extraction via LangGraph agent (fire-and-forget — non-blocking)
     runKeyPointsAgent(transcriptSegment, sessionId)
-      .then(points => console.log(`[AudioProcessor] Key points agent completed: ${points?.length || 0} for session: ${sessionId}`))
-      .catch(err => console.error(`[AudioProcessor] Key points agent error (non-fatal): ${err.message}`));
+      .then(points => logger.info(`[AudioProcessor] Key points agent completed: ${points?.length || 0} for session: ${sessionId}`))
+      .catch(err => logger.error(`[AudioProcessor] Key points agent error (non-fatal): ${err.message}`));
 
     // Broadcast segment sent notification only to clients in this session
     if (global.broadcastToSession) {
@@ -283,13 +284,13 @@ async function sendTranscriptSegment(sessionId) {
         segmentCount: result.rows.length,
         transcriptLength: transcriptSegment.length
       });
-      console.log(`✓ Broadcasted segment sent notification for session: ${sessionId}`);
+      logger.info(`[AudioProcessor] ✓ Broadcasted segment sent notification for session: ${sessionId}`);
     }
 
     return true;
 
   } catch (error) {
-    console.error(`[AudioProcessor] Error sending transcript segment:`, error.message);
+    logger.error(`[AudioProcessor] Error sending transcript segment:`, error.message);
     return false; // Non-fatal — don't rethrow; setInterval callers have no .catch()
   }
 }
@@ -301,12 +302,12 @@ async function sendTranscriptSegment(sessionId) {
  */
 async function sendFinalNotes(sessionId) {
   try {
-    console.log(`[AudioProcessor] Generating final notes via LangGraph agent for session: ${sessionId}`);
+    logger.info(`[AudioProcessor] Generating final notes via LangGraph agent for session: ${sessionId}`);
     await runNotesAgent(sessionId);
-    console.log(`[AudioProcessor] ✓ Notes agent completed for session: ${sessionId}`);
+    logger.info(`[AudioProcessor] ✓ Notes agent completed for session: ${sessionId}`);
     return true;
   } catch (error) {
-    console.error(`[AudioProcessor] Notes agent error:`, error.message);
+    logger.error(`[AudioProcessor] Notes agent error:`, error.message);
     throw error;
   }
 }
@@ -319,7 +320,7 @@ function stopSegmentTimer(sessionId) {
   if (sessionTimers.has(sessionId)) {
     clearInterval(sessionTimers.get(sessionId));
     sessionTimers.delete(sessionId);
-    console.log(`[AudioProcessor] Stopped segment timer for session: ${sessionId}`);
+    logger.info(`[AudioProcessor] Stopped segment timer for session: ${sessionId}`);
   }
 }
 
@@ -357,11 +358,11 @@ async function createSession(sessionId, segmentInterval, pdfUploaded = false, pd
     // Store session data in memory for quick transcript saves and MCQ preferences
     activeSessions.set(sessionId, { dbId: session.id, mcqTypes, mcqCount, resourceId });
 
-    console.log(`[AudioProcessor] Session created: ${sessionId} (db_id: ${session.id}) at ${session.start_time}`);
+    logger.info(`[AudioProcessor] Session created: ${sessionId} (db_id: ${session.id}) at ${session.start_time}`);
 
     return session;
   } catch (error) {
-    console.error(`[AudioProcessor] Error creating session:`, error.message);
+    logger.error(`[AudioProcessor] Error creating session:`, error.message);
     throw error;
   }
 }
@@ -397,11 +398,11 @@ async function updateSessionStatus(sessionId, status, isPaused = null) {
     }
 
     const result = await pool.query(query, params);
-    console.log(`[AudioProcessor] Session ${sessionId} (db_id: ${dbId}) status updated to: ${status}`);
+    logger.info(`[AudioProcessor] Session ${sessionId} (db_id: ${dbId}) status updated to: ${status}`);
 
     return result.rows[0];
   } catch (error) {
-    console.error(`[AudioProcessor] Error updating session status:`, error.message);
+    logger.error(`[AudioProcessor] Error updating session status:`, error.message);
     throw error;
   }
 }
@@ -413,19 +414,19 @@ async function updateSessionStatus(sessionId, status, isPaused = null) {
  */
 async function endSession(sessionId) {
   try {
-    console.log(`[AudioProcessor] Ending session: ${sessionId}`);
+    logger.info(`[AudioProcessor] Ending session: ${sessionId}`);
 
     // Send any remaining unsent transcripts before stopping (non-fatal if webhook is down)
-    console.log(`[AudioProcessor] Checking for unsent transcripts before session end...`);
+    logger.info(`[AudioProcessor] Checking for unsent transcripts before session end...`);
     try {
       const sent = await sendTranscriptSegment(sessionId);
       if (sent) {
-        console.log(`[AudioProcessor] ✓ Remaining transcripts sent on session stop`);
+        logger.info(`[AudioProcessor] ✓ Remaining transcripts sent on session stop`);
       } else {
-        console.log(`[AudioProcessor] No unsent transcripts found`);
+        logger.info(`[AudioProcessor] No unsent transcripts found`);
       }
     } catch (webhookError) {
-      console.warn(`[AudioProcessor] Webhook flush failed on stop (non-fatal): ${webhookError.message}`);
+      logger.warn(`[AudioProcessor] Webhook flush failed on stop (non-fatal): ${webhookError.message}`);
     }
 
     // Stop timer
@@ -446,18 +447,18 @@ async function endSession(sessionId) {
     sessionContextStore.clearSession(sessionId);
 
     if (!dbId) {
-      console.log(`[AudioProcessor] No database session found to end for: ${sessionId}`);
+      logger.info(`[AudioProcessor] No database session found to end for: ${sessionId}`);
       return null;
     }
 
     // Update the session as completed
     const query = `UPDATE transcription_sessions SET status = 'stopped', end_time = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *`;
     const result = await pool.query(query, [dbId]);
-    console.log(`[AudioProcessor] Session ended: ${sessionId} (db_id: ${dbId})`);
+    logger.info(`[AudioProcessor] Session ended: ${sessionId} (db_id: ${dbId})`);
 
     return result.rows[0];
   } catch (error) {
-    console.error(`[AudioProcessor] Error ending session:`, error.message);
+    logger.error(`[AudioProcessor] Error ending session:`, error.message);
     throw error;
   }
 }

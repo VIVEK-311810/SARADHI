@@ -384,7 +384,7 @@ router.post('/:sessionId/generate-notes', authenticate, authorize('teacher'), as
     res.json({ success: true, status: 'generating' });
   } catch (error) {
     logger.error('Error starting notes generation', { error: error.message });
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

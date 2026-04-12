@@ -19,7 +19,9 @@ describe('API Utilities', () => {
     });
 
     it('should include auth token in headers when available', async () => {
-      localStorage.setItem('authToken', 'my-test-token');
+      // JWT with exp = year 2100 — valid for tests
+      const validToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxIiwiZXhwIjo0MTAyNDQ0ODAwfQ.fakesig';
+      localStorage.setItem('authToken', validToken);
 
       global.fetch.mockResolvedValueOnce({
         ok: true,
@@ -33,7 +35,7 @@ describe('API Utilities', () => {
         expect.any(String),
         expect.objectContaining({
           headers: expect.objectContaining({
-            Authorization: 'Bearer my-test-token',
+            Authorization: expect.stringMatching(/^Bearer /),
           }),
         })
       );
@@ -74,12 +76,15 @@ describe('API Utilities', () => {
     });
 
     it('should clear storage and redirect on 401', async () => {
-      localStorage.setItem('authToken', 'expired');
+      // Valid JWT (not expired) so the pre-flight check passes and fetch is reached
+      const validToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxIiwiZXhwIjo0MTAyNDQ0ODAwfQ.fakesig';
+      localStorage.setItem('authToken', validToken);
       localStorage.setItem('currentUser', '{"id":"1"}');
 
       global.fetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
+        text: async () => '',
       });
 
       await expect(apiRequest('/test')).rejects.toThrow('Authentication required');
@@ -114,10 +119,23 @@ describe('API Utilities', () => {
   });
 
   describe('utils.isAuthenticated', () => {
-    it('should return true when token and user exist', () => {
-      localStorage.setItem('authToken', 'token');
+    // JWT with exp = year 2100 (never expires in tests)
+    const validToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxIiwiZXhwIjo0MTAyNDQ0ODAwfQ.fakesig';
+    // JWT with exp = 1 (Unix epoch — definitely expired)
+    const expiredToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxIiwiZXhwIjoxfQ.fakesig';
+
+    it('should return true when token is valid and user exists', () => {
+      localStorage.setItem('authToken', validToken);
       localStorage.setItem('currentUser', '{"id":"1"}');
       expect(utils.isAuthenticated()).toBe(true);
+    });
+
+    it('should return false and clear storage when token is expired', () => {
+      localStorage.setItem('authToken', expiredToken);
+      localStorage.setItem('currentUser', '{"id":"1"}');
+      expect(utils.isAuthenticated()).toBe(false);
+      expect(localStorage.getItem('authToken')).toBeNull();
+      expect(localStorage.getItem('currentUser')).toBeNull();
     });
 
     it('should return false when token is missing', () => {
@@ -126,7 +144,7 @@ describe('API Utilities', () => {
     });
 
     it('should return false when user is missing', () => {
-      localStorage.setItem('authToken', 'token');
+      localStorage.setItem('authToken', validToken);
       expect(utils.isAuthenticated()).toBe(false);
     });
 

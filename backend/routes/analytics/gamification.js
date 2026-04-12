@@ -511,7 +511,7 @@ async function generateSessionSummaries(sessionId) {
 
     // Award session champion badges after summaries are stored
     for (const entry of leaderboard) {
-      checkTieredBadges(entry.studentId).catch(() => {});
+      checkTieredBadges(entry.studentId).catch(err => logger.warn('checkTieredBadges failed (non-fatal)', { error: err.message, studentId: entry.studentId }));
     }
   } catch (error) {
     logger.error('Error generating session summaries', { error: error.message, sessionId });

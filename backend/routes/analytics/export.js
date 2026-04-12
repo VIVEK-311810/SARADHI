@@ -5,6 +5,10 @@ const logger = require('../../logger');
 const PDFDocument = require('pdfkit');
 const { Parser } = require('json2csv');
 const { authenticate, authorize } = require('../../middleware/auth');
+const { apiLimiter } = require('../../middleware/rateLimiter');
+
+// Apply rate limit to all export routes — CSV/PDF generation is DB-heavy
+router.use(apiLimiter);
 
 // Helper to convert option index to letter
 const optionToLetter = (index) => {

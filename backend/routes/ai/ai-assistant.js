@@ -177,7 +177,7 @@ router.post('/session/:sessionId/chat', authenticate, async (req, res) => {
       .single();
 
     // 7. Update study analytics (async, don't block)
-    updateStudyAnalytics(studentId, sessionId, classification.topic).catch(() => {});
+    updateStudyAnalytics(studentId, sessionId, classification.topic).catch(err => logger.warn('updateStudyAnalytics failed (non-fatal)', { error: err.message }));
 
     // 8. Send done event
     sendSSE('done', {
@@ -727,7 +727,7 @@ router.post('/session/:sessionId/generate-quiz', authenticate, async (req, res) 
     res.json({ questions, topic, count: questions.length });
   } catch (error) {
     logger.error('Error generating quiz', { error: error.message });
-    res.status(500).json({ error: error.message || 'Failed to generate quiz' });
+    res.status(500).json({ error: 'Failed to generate quiz' });
   }
 });
 

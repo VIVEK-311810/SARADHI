@@ -106,6 +106,9 @@ router.post('/tickets', authenticate, async (req, res) => {
     if (content.length > 10000) {
       return res.status(400).json({ error: 'Content too long (max 10000 characters)' });
     }
+    if (subject && subject.length > 255) {
+      return res.status(400).json({ error: 'Subject too long (max 255 characters)' });
+    }
     if (session_id && subject) {
       return res.status(400).json({ error: 'Ticket must be either session-specific or global, not both' });
     }
@@ -188,6 +191,9 @@ router.post('/tickets/:ticketId/replies', authenticate, async (req, res) => {
 
     if (!content || !content.trim()) {
       return res.status(400).json({ error: 'Reply content is required' });
+    }
+    if (content.length > 10000) {
+      return res.status(400).json({ error: 'Reply too long (max 10000 characters)' });
     }
 
     const ticketCheck = await pool.query(

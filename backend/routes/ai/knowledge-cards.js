@@ -223,7 +223,7 @@ router.post('/generate', authenticate, authorize('teacher'), async (req, res) =>
   } catch (error) {
     logger.error('Knowledge cards generate error', { error: error.message });
     if (error.message.includes('No session material')) {
-      return res.status(422).json({ error: error.message });
+      return res.status(422).json({ error: 'No session material available to generate cards from.' });
     }
     res.status(500).json({ error: 'Failed to generate knowledge cards' });
   }
@@ -472,7 +472,7 @@ router.post('/rounds/:roundId/distribute', authenticate, authorize('teacher'), a
     });
   } catch (error) {
     logger.error('Distribute cards error', { error: error.message });
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -574,10 +574,10 @@ router.patch('/pairs/:pairId/complete', authenticate, authorize('teacher'), asyn
     // Award XP to question holder and answer holder
     const xpPromises = [];
     if (pair.question_holder_id) {
-      xpPromises.push(awardXP(pair.question_holder_id, pair.session_id, 'knowledge_card', 5).catch(() => {}));
+      xpPromises.push(awardXP(pair.question_holder_id, pair.session_id, 'knowledge_card', 5).catch(err => logger.warn('awardXP failed for question holder', { error: err.message })));
     }
     if (pair.answer_holder_id && pair.answer_holder_id !== pair.question_holder_id) {
-      xpPromises.push(awardXP(pair.answer_holder_id, pair.session_id, 'knowledge_card', 5).catch(() => {}));
+      xpPromises.push(awardXP(pair.answer_holder_id, pair.session_id, 'knowledge_card', 5).catch(err => logger.warn('awardXP failed for answer holder', { error: err.message })));
     }
     await Promise.all(xpPromises);
 

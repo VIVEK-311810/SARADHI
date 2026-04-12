@@ -55,8 +55,26 @@ const TicketDetail   = lazy(() => import('./components/community/TicketDetail'))
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function getAuth() {
   const token  = localStorage.getItem('authToken');
-  const isDemo = localStorage.getItem('isDemo') === 'true';
-  const authenticated = !!(token || isDemo);
+  const isDemo = process.env.NODE_ENV !== 'production' && localStorage.getItem('isDemo') === 'true';
+
+  // Evict expired token before deciding authenticated state — prevents skeleton flash
+  let validToken = false;
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      if (!payload.exp || payload.exp >= Math.floor(Date.now() / 1000)) {
+        validToken = true;
+      } else {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('currentUser');
+      }
+    } catch {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('currentUser');
+    }
+  }
+
+  const authenticated = validToken || isDemo;
 
   let role = null;
   try {

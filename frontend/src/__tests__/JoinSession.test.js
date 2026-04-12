@@ -27,7 +27,8 @@ describe('JoinSession', () => {
       full_name: 'Test Student',
       email: '123456@sastra.ac.in',
     }));
-    localStorage.setItem('authToken', 'valid-token');
+    // JWT with exp = year 2100 — valid for tests
+    localStorage.setItem('authToken', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxIiwiZXhwIjo0MTAyNDQ0ODAwfQ.fakesig');
   });
 
   it('should render the join session form', () => {

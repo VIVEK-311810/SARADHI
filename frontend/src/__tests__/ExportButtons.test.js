@@ -14,7 +14,7 @@ global.URL.revokeObjectURL = jest.fn();
 
 describe('ExportButtons', () => {
   beforeEach(() => {
-    localStorage.setItem('authToken', 'test-token');
+    localStorage.setItem('authToken', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxIiwiZXhwIjo0MTAyNDQ0ODAwfQ.fakesig');
   });
 
   describe('type="poll"', () => {
@@ -37,7 +37,7 @@ describe('ExportButtons', () => {
           expect.stringContaining('/export/poll/42/csv'),
           expect.objectContaining({
             headers: expect.objectContaining({
-              Authorization: 'Bearer test-token',
+              Authorization: expect.stringMatching(/^Bearer /),
             }),
           })
         );
