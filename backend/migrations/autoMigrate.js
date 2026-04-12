@@ -267,6 +267,64 @@ async function runAutoMigrations() {
   // Migration: add difficulty column to generated_mcqs (1=easy, 2=medium, 3=hard)
   await run(`ALTER TABLE generated_mcqs ADD COLUMN IF NOT EXISTS difficulty SMALLINT DEFAULT 1`, 'generated_mcqs.difficulty');
 
+  // Migration 011 – Rich Question Types
+  await run(`ALTER TABLE polls ADD COLUMN IF NOT EXISTS question_type VARCHAR(30) DEFAULT 'mcq'`, 'polls.question_type');
+  await run(`ALTER TABLE polls ADD COLUMN IF NOT EXISTS question_image_url TEXT`, 'polls.question_image_url');
+  await run(`ALTER TABLE polls ADD COLUMN IF NOT EXISTS question_latex TEXT`, 'polls.question_latex');
+  await run(`ALTER TABLE polls ADD COLUMN IF NOT EXISTS options_metadata JSONB`, 'polls.options_metadata');
+  await run(`ALTER TABLE polls ADD COLUMN IF NOT EXISTS solution_steps JSONB`, 'polls.solution_steps');
+  await run(`ALTER TABLE polls ADD COLUMN IF NOT EXISTS subject_tag VARCHAR(50)`, 'polls.subject_tag');
+  await run(`ALTER TABLE polls ADD COLUMN IF NOT EXISTS difficulty_level VARCHAR(20) DEFAULT 'medium'`, 'polls.difficulty_level');
+  await run(`ALTER TABLE polls ADD COLUMN IF NOT EXISTS marks INTEGER DEFAULT 1`, 'polls.marks');
+  await run(`ALTER TABLE polls ADD COLUMN IF NOT EXISTS blooms_level VARCHAR(20)`, 'polls.blooms_level');
+  await run(`ALTER TABLE polls ADD COLUMN IF NOT EXISTS topic VARCHAR(100)`, 'polls.topic');
+  await run(`ALTER TABLE polls ADD COLUMN IF NOT EXISTS sub_topic VARCHAR(100)`, 'polls.sub_topic');
+  await run(`ALTER TABLE polls ADD COLUMN IF NOT EXISTS cluster_id INTEGER`, 'polls.cluster_id');
+  await run(`ALTER TABLE poll_responses ADD COLUMN IF NOT EXISTS answer_data JSONB`, 'poll_responses.answer_data');
+  await run(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS subject VARCHAR(50)`, 'sessions.subject');
+  await run(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS subject_tags VARCHAR(50)[]`, 'sessions.subject_tags');
+  await run(`ALTER TABLE generated_mcqs ADD COLUMN IF NOT EXISTS question_type VARCHAR(30) DEFAULT 'mcq'`, 'generated_mcqs.question_type');
+  await run(`ALTER TABLE generated_mcqs ADD COLUMN IF NOT EXISTS question_image_url TEXT`, 'generated_mcqs.question_image_url');
+  await run(`ALTER TABLE generated_mcqs ADD COLUMN IF NOT EXISTS question_latex TEXT`, 'generated_mcqs.question_latex');
+  await run(`ALTER TABLE generated_mcqs ADD COLUMN IF NOT EXISTS options_metadata JSONB`, 'generated_mcqs.options_metadata');
+  await run(`ALTER TABLE generated_mcqs ADD COLUMN IF NOT EXISTS solution_steps JSONB`, 'generated_mcqs.solution_steps');
+  await run(`ALTER TABLE generated_mcqs ADD COLUMN IF NOT EXISTS subject_tag VARCHAR(50)`, 'generated_mcqs.subject_tag');
+  await run(`ALTER TABLE generated_mcqs ADD COLUMN IF NOT EXISTS difficulty_level VARCHAR(20) DEFAULT 'medium'`, 'generated_mcqs.difficulty_level');
+  await run(`ALTER TABLE generated_mcqs ADD COLUMN IF NOT EXISTS blooms_level VARCHAR(20)`, 'generated_mcqs.blooms_level');
+  await run(`ALTER TABLE generated_mcqs ADD COLUMN IF NOT EXISTS topic VARCHAR(100)`, 'generated_mcqs.topic');
+  await run(`ALTER TABLE generated_mcqs ADD COLUMN IF NOT EXISTS exam_tags VARCHAR(50)[]`, 'generated_mcqs.exam_tags');
+  await run(`CREATE TABLE IF NOT EXISTS poll_clusters (
+    id SERIAL PRIMARY KEY, session_id VARCHAR(10), title VARCHAR(255),
+    passage TEXT, passage_image_url TEXT, passage_latex TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+  )`, 'poll_clusters');
+  await run(`CREATE INDEX IF NOT EXISTS idx_polls_question_type ON polls(question_type)`, 'idx_polls_question_type');
+  await run(`CREATE INDEX IF NOT EXISTS idx_polls_subject_tag ON polls(subject_tag)`, 'idx_polls_subject_tag');
+  await run(`CREATE INDEX IF NOT EXISTS idx_sessions_subject ON sessions(subject)`, 'idx_sessions_subject');
+
+  // Migration 012 – content_type on resource_chunks
+  await run(`ALTER TABLE resource_chunks ADD COLUMN IF NOT EXISTS content_type VARCHAR(20) DEFAULT 'text'`, 'resource_chunks.content_type');
+  await run(`CREATE INDEX IF NOT EXISTS idx_resource_chunks_content_type ON resource_chunks(content_type)`, 'idx_resource_chunks_content_type');
+
+  // Migration 013 – Manual grading columns on poll_responses
+  await run(`ALTER TABLE poll_responses ADD COLUMN IF NOT EXISTS teacher_feedback TEXT`, 'poll_responses.teacher_feedback');
+  await run(`ALTER TABLE poll_responses ADD COLUMN IF NOT EXISTS graded_at TIMESTAMPTZ`, 'poll_responses.graded_at');
+  await run(`ALTER TABLE poll_responses ADD COLUMN IF NOT EXISTS graded_by VARCHAR REFERENCES users(id) ON DELETE SET NULL`, 'poll_responses.graded_by');
+  await run(`CREATE INDEX IF NOT EXISTS idx_poll_responses_ungraded ON poll_responses(poll_id) WHERE is_correct IS NULL`, 'idx_poll_responses_ungraded');
+
+  // Migration 014 – Student confidence rating
+  await run(`ALTER TABLE poll_responses ADD COLUMN IF NOT EXISTS confidence VARCHAR(10) CHECK (confidence IN ('low', 'medium', 'high'))`, 'poll_responses.confidence');
+  await run(`CREATE INDEX IF NOT EXISTS idx_poll_responses_confidence ON poll_responses(poll_id, confidence) WHERE confidence IS NOT NULL`, 'idx_poll_responses_confidence');
+
+  // Migration 015 – Session lock, proctoring, AI session summary
+  await run(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS locked_at TIMESTAMPTZ`, 'sessions.locked_at');
+  await run(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS lock_after_minutes INTEGER`, 'sessions.lock_after_minutes');
+  await run(`ALTER TABLE poll_responses ADD COLUMN IF NOT EXISTS tab_switches INTEGER DEFAULT 0`, 'poll_responses.tab_switches');
+  await run(`ALTER TABLE poll_responses ADD COLUMN IF NOT EXISTS time_focused_ms INTEGER`, 'poll_responses.time_focused_ms');
+  await run(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS summary_text TEXT`, 'sessions.summary_text');
+  await run(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS summary_status VARCHAR(20) DEFAULT 'none'`, 'sessions.summary_status');
+  await run(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS summary_generated_at TIMESTAMPTZ`, 'sessions.summary_generated_at');
+
   // Migration 016 – competition schema
   await run(`
     CREATE TABLE IF NOT EXISTS competition_rooms (
