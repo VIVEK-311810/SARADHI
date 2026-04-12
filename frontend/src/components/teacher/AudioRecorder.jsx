@@ -118,33 +118,6 @@ const AudioRecorder = ({ audioRecorder, sessionId: propSessionId }) => {
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5 sm:mb-2">
-            PDF File (Optional)
-          </label>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <input
-              id="pdf-input"
-              type="file"
-              accept="application/pdf"
-              onChange={handlePdfChange}
-              disabled={status !== 'idle'}
-              className="flex-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400 file:mr-2 sm:file:mr-4 file:py-2 file:px-3 sm:file:px-4 file:rounded-lg file:border-0 file:text-xs sm:file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 disabled:opacity-50 disabled:cursor-not-allowed"
-            />
-            {pdfFile && (
-              <button
-                onClick={clearPdf}
-                disabled={status !== 'idle'}
-                className="w-full sm:w-auto px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 active:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-          {pdfFile && (
-            <p className="text-xs sm:text-sm text-green-600 mt-1 truncate">✓ {pdfFile.name}</p>
-          )}
-        </div>
 
         <div>
           <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5 sm:mb-2">
