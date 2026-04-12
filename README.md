@@ -18,6 +18,128 @@
 
 ---
 
+## Features
+
+### Teacher Features
+
+#### Session Management
+- **Create Session** — Create a classroom session with a unique 6-char code, title, course, and subject
+- **Start/End Live Class** — Toggle session live so students can join; synced timestamps for all participants
+- **Lock Session** — Prevent new students from joining mid-class
+- **Delete Session** — Remove a session and its associated data
+
+#### Real-time Polling & Quizzes
+- **Create Polls** — Build polls with 16+ question types: MCQ, True/False, Fill Blank, Numeric, Short Answer, Code, Multi-Correct, One Word, Assertion-Reason, Match Following, Ordering, Essay, Differentiate, Diagram Labeling, Truth Table, Code Trace
+- **Configure Poll Settings** — Set time limits, correct answers, tolerances, and marker positions per question type
+- **Activate/Deactivate Polls** — Push polls live with server-synchronized countdown timers
+- **Reveal Answers** — Show correct answer and response breakdown after poll ends
+- **Edit Polls** — Modify questions/options before activation
+
+#### AI Content Generation
+- **Generate MCQs from Material** — AI auto-creates MCQs from uploaded resources (Mistral-7B + Pinecone RAG)
+- **Review & Send Generated MCQs** — Teacher reviews AI-generated MCQs before distributing to students
+- **Generate Knowledge Cards** — Auto-generate Q&A pairs for distributed classroom learning activity
+- **Generate Project Suggestions** — AI recommends capstone projects based on curriculum
+- **Generate Session Summary** — Post-class AI summary of key concepts covered
+- **Generate Session Notes** — Compile interactive notes from transcription, polls, and resources
+
+#### Resource Management
+- **Upload Resources** — PDF, DOCX, PPTX files up to 50MB per session
+- **Add Resource URLs** — Link external web resources to the session
+- **Vectorization Status Tracking** — Monitor embedding/vector processing for AI search readiness
+- **Batch Vectorization** — Retry vectorization for failed resources
+
+#### Student Engagement
+- **Knowledge Card Activities** — Distribute AI-generated Q&A cards; control reveal timing; collect peer votes
+- **View Attendance** — Real-time participant list with join times and engagement metrics
+- **Tab Switch Detection** — Flags students going off-task during a live session
+- **View Doubts Dashboard** — Monitor and resolve confusion flagged via AI chat
+- **Manual Grading Panel** — Grade essay/short-answer responses with rubrics
+
+#### Competition Mode
+- **Create Competition Rooms** — Set up multiplayer quiz battles with configurable time and question count
+- **Live Leaderboard (Spectator)** — Watch real-time rankings during active competitions
+
+#### Analytics & Reporting
+- **Teacher Analytics Dashboard** — Totals: sessions, students, polls, response and accuracy rates
+- **Per-Session Analytics** — Per-student accuracy, response time, correct count
+- **Engagement Trends** — Time-series of sessions, polls, responses over configurable date ranges
+- **Export Data** — Download poll results as CSV
+- **Export Transcriptions** — Download session transcriptions as TXT/PDF
+
+#### Transcription
+- **Start/Pause/Resume Transcription** — Real-time audio-to-text during class via GPU server
+- **Segment-based MCQ Generation** — Auto-generate MCQs every N minutes from transcribed content
+
+#### Community & Support
+- **View & Reply to Student Tickets** — Monitor doubts, post answers, mark solutions, resolve tickets
+
+---
+
+### Student Features
+
+#### Session Participation
+- **Join Session** — Enter live class via 6-character session code
+- **Answer Live Polls** — Respond to active polls with server-synced countdown timer
+- **View Results** — See accuracy distribution and whether answer was correct after each poll
+- **Knowledge Cards Activity** — Receive assigned cards, reveal answers, vote on peer answers
+
+#### Competition Mode
+- **Browse & Join Competition Rooms** — Play real-time quizzes against classmates
+- **Create Competition Room** — Start your own multiplayer quiz room
+- **Live Leaderboard** — Track rankings during an active competition
+
+#### AI Assistant
+- **Chat with AI** — Ask questions about session material; receive streamed responses with source citations
+- **Resource-Specific Search** — Query within a specific uploaded document
+- **Quiz Mode** — Request a self-quiz on any topic from session material
+- **Mark Confusing Responses** — Flag bad AI answers (creates a teacher-side doubt entry)
+
+#### Resources & Learning
+- **Browse & Download Resources** — View and download session materials
+- **Post-Session Quiz Review** — Replay all polls after class at your own pace
+- **View Solution Steps** — See step-by-step explanations for questions
+
+#### Gamification
+- **Earn XP & Level Up** — 7 levels from Newcomer to Master based on participation and accuracy
+- **Earn Badges** — Bronze/Silver/Gold badges for Attendance, Accuracy, Participation, and Improvement
+- **Leaderboard** — Session-level and global rankings
+
+#### Community
+- **Create Doubt Tickets** — Post questions for peers or teachers
+- **Browse & Filter Tickets** — Find answers filtered by subject
+- **Reply & Vote** — Upvote helpful answers, reply to tickets, mark best solution
+
+---
+
+### Shared / Platform Features
+
+| Feature | Description |
+|---|---|
+| **OAuth2 Login** | Google SSO — `@sastra.edu` for teachers, numeric ID `@sastra.ac.in` for students |
+| **Role-Based Access** | Strict teacher/student enforcement on every API route |
+| **WebSocket** | Live push for poll activation, class start/end, and results reveal |
+| **Dark/Light Theme** | Toggleable theme persisted to localStorage |
+| **Demo Mode** | Full walkthrough of teacher and student features without a real backend |
+| **Landing Page** | Marketing site with feature showcase and onboarding |
+
+---
+
+### Backend AI/ML Pipeline
+
+| Service | Description |
+|---|---|
+| **Document Processor** | Parses PDF/DOCX/PPTX into semantic chunks |
+| **Embedding Service** | Converts text chunks to vectors via HuggingFace |
+| **Vector Store (Pinecone)** | Stores and retrieves chunks by semantic similarity |
+| **Query Classifier** | Routes queries to Answer / Summary / Quiz mode |
+| **RAG Service** | Mistral-7B generates answers grounded in retrieved document chunks |
+| **Key Points Agent** | Extracts key concepts from transcription and documents |
+| **Gamification Engine** | Calculates XP, badge thresholds, level progression, and leaderboard ranking |
+| **Webhook Integration** | Receives AI-generated content from n8n workflows |
+
+---
+
 ## Quick Start
 
 ### Backend

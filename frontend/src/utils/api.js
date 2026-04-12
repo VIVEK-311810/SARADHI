@@ -26,10 +26,29 @@ export const safeParseUser = () => {
   }
 };
 
+// Decode JWT exp claim without verifying the signature (verification happens on backend).
+// Returns true if the token is expired or malformed.
+export const isTokenExpired = (token) => {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    if (!payload.exp) return false; // no expiry claim — treat as valid
+    return payload.exp < Math.floor(Date.now() / 1000);
+  } catch {
+    return true; // malformed token → treat as expired
+  }
+};
+
+// Clear auth state and redirect to login
+const clearAuthAndRedirect = () => {
+  localStorage.removeItem('authToken');
+  localStorage.removeItem('currentUser');
+  window.location.href = '/auth';
+};
+
 // Generic API request function with error handling and authentication
 export const apiRequest = async (endpoint, options = {}) => {
-  // Demo mode: only available outside production to prevent auth bypass in live deployments
-  if (localStorage.getItem('isDemo') === 'true') {
+  // Demo mode: only honoured in non-production builds to prevent auth bypass on live deployments
+  if (process.env.NODE_ENV !== 'production' && localStorage.getItem('isDemo') === 'true') {
     const { handleDemoRequest } = await import('./demoData');
     return handleDemoRequest(endpoint, options);
   }
@@ -42,9 +61,13 @@ export const apiRequest = async (endpoint, options = {}) => {
     },
   };
 
-  // Add authentication token if available
+  // Add authentication token if available; evict it immediately if expired
   const token = localStorage.getItem('authToken');
   if (token) {
+    if (isTokenExpired(token)) {
+      clearAuthAndRedirect();
+      throw new Error('Session expired. Please log in again.');
+    }
     defaultOptions.headers['Authorization'] = `Bearer ${token}`;
   }
 
@@ -68,9 +91,7 @@ export const apiRequest = async (endpoint, options = {}) => {
 
     // Handle authentication errors
     if (response.status === 401) {
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('currentUser');
-      window.location.href = '/auth';
+      clearAuthAndRedirect();
       throw new Error('Authentication required');
     }
 
@@ -355,22 +376,28 @@ export const aiAssistantAPI = {
 
 // Utility functions
 export const utils = {
-  // Check if user is authenticated
+  // Check if user is authenticated and token is not expired
   isAuthenticated: () => {
     const token = localStorage.getItem('authToken');
-    const user = localStorage.getItem('currentUser');
-    return !!(token && user);
+    const user  = localStorage.getItem('currentUser');
+    if (!token || !user) return false;
+    if (isTokenExpired(token)) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('currentUser');
+      return false;
+    }
+    return true;
   },
 
   // Get current user from localStorage (safe — never throws on corrupt data)
   getCurrentUser: () => safeParseUser(),
 
-  // Validate SASTRA domain
+  // Validate SASTRA domain — allow @sastra.edu and *.sastra.edu subdomains (faculty)
   validateSastraEmail: (email, role) => {
     if (role === 'teacher') {
       return email.endsWith('@sastra.edu') || email.endsWith('.sastra.edu');
     } else if (role === 'student') {
-      return email.endsWith('@sastra.ac.in') && /^\d+@sastra\.ac\.in$/.test(email);
+      return /^\d+@sastra\.ac\.in$/.test(email);
     }
     return false;
   },

@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
-import LoadingSpinner from '../shared/LoadingSpinner';
+import LoadingSpinner from '../shared/feedback/LoadingSpinner';
 import { apiRequest, studentAPI, safeParseUser } from '../../utils/api';
 import { Badge } from '../ui/badge';
 import { isDemoMode, DemoWebSocket } from '../../utils/demoData';
 import KnowledgeCard from './KnowledgeCard';
-import RichQuestionRenderer from '../shared/RichQuestionRenderer';
+import RichQuestionRenderer from '../shared/renderers/RichQuestionRenderer';
 import SolutionStepsViewer from './SolutionStepsViewer';
 import PassageView from './PassageView';
 

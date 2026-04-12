@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { apiRequest, safeParseUser } from '../../utils/api';
 import TicketCard from './TicketCard';
 import CreateTicketModal from './CreateTicketModal';
-import LoadingSpinner from '../shared/LoadingSpinner';
+import LoadingSpinner from '../shared/feedback/LoadingSpinner';
 
 const SUBJECTS = ['All', 'Data Structures', 'OS', 'DBMS', 'Networks', 'Algorithms', 'OOP', 'Other'];
 

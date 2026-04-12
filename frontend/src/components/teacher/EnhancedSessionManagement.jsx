@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { apiRequest, sessionAPI, pollAPI, resourceAPI, safeParseUser } from '../../utils/api';
 import { Badge } from '../ui/badge';
-import LoadingSpinner from '../shared/LoadingSpinner';
+import LoadingSpinner from '../shared/feedback/LoadingSpinner';
 import GeneratedMCQs from './GeneratedMCQs';
 import DoubtsDashboard from './DoubtsDashboard';
 import AudioRecorder from './AudioRecorder';

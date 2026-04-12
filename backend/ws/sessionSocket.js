@@ -993,14 +993,49 @@ function initWebSocket(wss, { pool, redis, redisPub, redisSub, logger }) {
 
     logger.info('New WebSocket connection established', { userId: ws.userId, role: ws.userRole });
 
+    // ── Idle timeout — terminate zombie connections after 10 min of silence ──
+    const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+    let idleTimer = setTimeout(() => {
+      logger.info('WebSocket idle timeout — terminating', { userId: ws.userId });
+      ws.terminate();
+    }, IDLE_TIMEOUT_MS);
+
+    const resetIdleTimer = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        logger.info('WebSocket idle timeout — terminating', { userId: ws.userId });
+        ws.terminate();
+      }, IDLE_TIMEOUT_MS);
+    };
+
+    // ── Inbound message allowlist ─────────────────────────────────────────────
+    const ALLOWED_WS_TYPES = new Set([
+      'join-session', 'join-dashboard', 'poll-response', 'activate-poll',
+      'heartbeat', 'mark-attendance', 'close-attendance', 'open-attendance',
+      'student-stuck', 'stuck-reset', 'toggle-leaderboard',
+      'join-competition', 'start-competition', 'competition-answer', 'leave-competition',
+    ]);
+
     ws.on('message', async (message) => {
+      resetIdleTimer();
       try {
         if (ws.tokenExp && Math.floor(Date.now() / 1000) > ws.tokenExp) {
           ws.close(4001, 'Unauthorized: Token expired');
           return;
         }
 
+        // Reject oversized messages (64 KB) before parsing
+        if (message.length > 65536) {
+          logger.warn('WebSocket message exceeds size limit', { userId: ws.userId, size: message.length });
+          return;
+        }
+
         const data = JSON.parse(message);
+
+        if (typeof data.type !== 'string' || !ALLOWED_WS_TYPES.has(data.type)) {
+          logger.debug('WebSocket message type rejected', { type: data.type, userId: ws.userId });
+          return;
+        }
 
         switch (data.type) {
           case 'join-session':
@@ -1122,6 +1157,7 @@ function initWebSocket(wss, { pool, redis, redisPub, redisSub, logger }) {
     });
 
     ws.on('close', () => {
+      clearTimeout(idleTimer);
       logger.info('WebSocket connection closed', { userId: ws.userId });
 
       if (ws.studentId && ws.sessionId) {

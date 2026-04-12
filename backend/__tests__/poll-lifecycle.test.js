@@ -37,7 +37,7 @@ const { generateToken, mockTeacher, mockStudent, mockPoll } = require('./helpers
 
 const request = require('supertest');
 
-const pollsRouter = require('../routes/polls');
+const pollsRouter = require('../routes/session/polls');
 const app = createTestApp({ path: '/api/polls', router: pollsRouter });
 
 describe('Poll Lifecycle - Complete Flow', () => {
@@ -76,7 +76,7 @@ describe('Poll Lifecycle - Complete Flow', () => {
       .set('Authorization', `Bearer ${teacherToken}`)
       .send({
         session_id: 'ABC123', question: 'What is the capital of France?',
-        options: ['London', 'Berlin', 'Paris', 'Madrid'], correct_answer: 2,
+        options: ['London', 'Berlin', 'Paris', 'Madrid'], correct_answer: 2, question_type: 'mcq',
       });
 
     expect(createRes.status).toBe(201);

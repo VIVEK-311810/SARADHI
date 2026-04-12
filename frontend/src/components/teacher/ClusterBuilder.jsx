@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { clusterAPI, pollAPI } from '../../utils/api';
-import LatexRenderer from '../shared/LatexRenderer';
+import LatexRenderer from '../shared/renderers/LatexRenderer';
 
 /**
  * ClusterBuilder — Teacher UI to create a passage/case-study cluster.

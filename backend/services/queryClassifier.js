@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const { supabase } = require('../config/supabase');
-const mistralClient = require('./mistralClient');
+const mistralClient = require('./infra/mistralClient');
 const logger = require('../logger');
 
 class QueryClassifier {

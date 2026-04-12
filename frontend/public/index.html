@@ -12,6 +12,26 @@
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
 
+    <!-- Content Security Policy
+         • script-src 'unsafe-inline' is required by CRA's runtime chunk injection.
+         • connect-src uses https://* to cover all environments (dev/staging/prod).
+         • object-src 'none' blocks legacy plugins (Flash, Java applets).
+         • base-uri 'self' prevents <base> tag hijacking.
+         Note: frame-ancestors must be set via the X-Frame-Options HTTP header
+         (not supported in meta CSP) — configure this on the Vercel edge.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self' 'unsafe-inline';
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.fontshare.com;
+      font-src 'self' data: https://fonts.gstatic.com https://api.fontshare.com;
+      img-src 'self' data: blob: https:;
+      connect-src 'self' https: wss:;
+      object-src 'none';
+      base-uri 'self';
+      form-action 'self';
+    " />
+
     <!-- Font preconnects for performance -->
     <link rel="preconnect" href="https://api.fontshare.com" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />

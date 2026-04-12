@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import Header from '../components/shared/Header';
+import Header from '../components/shared/layout/Header';
 
 const mockNavigate = jest.fn();
 
@@ -66,7 +66,7 @@ describe('Header', () => {
       role: 'teacher',
       full_name: 'Prof Smith',
     }));
-    localStorage.setItem('authToken', 'some-token');
+    localStorage.setItem('authToken', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxIiwiZXhwIjo0MTAyNDQ0ODAwfQ.fakesig');
 
     renderHeader('/teacher/dashboard');
 

@@ -4,7 +4,13 @@ const crypto = require('crypto');
 require('dotenv').config();
 const pool = require('../db');
 
-const STATE_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET;
+// Use a dedicated secret for OAuth state so a compromise of JWT_SECRET
+// does not also break CSRF protection on the OAuth flow.
+const STATE_SECRET = process.env.OAUTH_STATE_SECRET || process.env.SESSION_SECRET || process.env.JWT_SECRET;
+if (!process.env.OAUTH_STATE_SECRET) {
+  const logger = require('../logger');
+  logger.warn('OAUTH_STATE_SECRET not set — falling back to SESSION_SECRET/JWT_SECRET. Set a dedicated OAUTH_STATE_SECRET in .env for defence-in-depth.');
+}
 const STATE_TTL_MS  = 10 * 60 * 1000; // 10 minutes — enough for any OAuth round-trip
 
 /**

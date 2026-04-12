@@ -64,7 +64,7 @@ jest.mock('../config/supabase', () => ({
 jest.mock('../config/pinecone', () => ({ pinecone: {}, index: {} }));
 
 // Mock notesGeneratorService
-jest.mock('../services/notesGeneratorService', () => ({
+jest.mock('../services/content/notesGeneratorService', () => ({
   generateNotesAsync: jest.fn().mockResolvedValue(undefined),
   _fetchTranscript: jest.fn().mockResolvedValue('test transcript'),
   _fetchResourceTexts: jest.fn().mockResolvedValue([]),
@@ -90,7 +90,7 @@ describe('KeyPointsAgent', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.isolateModules(() => {
-      ({ runKeyPointsAgent } = require('../services/keyPointsAgent'));
+      ({ runKeyPointsAgent } = require('../services/agents/keyPointsAgent'));
     });
   });
 
@@ -155,7 +155,7 @@ describe('NotesAgent', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.isolateModules(() => {
-      ({ runNotesAgent } = require('../services/notesAgent'));
+      ({ runNotesAgent } = require('../services/agents/notesAgent'));
     });
   });
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import LatexRenderer from '../shared/LatexRenderer';
+import LatexRenderer from '../shared/renderers/LatexRenderer';
 
 /**
  * PassageView — shown to students when a poll belongs to a cluster.

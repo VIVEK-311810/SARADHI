@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiRequest, safeParseUser } from '../../utils/api';
-import LoadingSpinner from '../shared/LoadingSpinner';
+import LoadingSpinner from '../shared/feedback/LoadingSpinner';
 
 const timeAgo = (dateStr) => {
   const diff = Date.now() - new Date(dateStr).getTime();

@@ -36,7 +36,7 @@ jest.mock('../middleware/auth', () => ({
 }));
 
 // Mock sessionSummaryService so generate-summary doesn't actually call AI
-jest.mock('../services/sessionSummaryService', () => ({
+jest.mock('../services/content/sessionSummaryService', () => ({
   generateSessionSummary: jest.fn().mockResolvedValue('mocked summary'),
 }));
 
@@ -51,7 +51,7 @@ const { mockQuery, mockClient, mockConnect, createTestApp } = require('./setup')
 const { generateToken, mockTeacher, mockStudent, mockSession } = require('./helpers');
 const request = require('supertest');
 
-const sessionsRouter = require('../routes/sessions');
+const sessionsRouter = require('../routes/session/sessions');
 const app = createTestApp({ path: '/api/sessions', router: sessionsRouter });
 
 describe('Session Lock — PATCH /:sessionId/lock', () => {

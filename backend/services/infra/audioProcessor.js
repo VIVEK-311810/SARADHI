@@ -1,0 +1,479 @@
+const FormData = require('form-data');
+const fetch = require('node-fetch');
+require('dotenv').config();
+const pool = require('../../db');
+const logger = require('../../logger');
+const { runMCQAgent } = require('../agents/mcqAgent');
+const { runKeyPointsAgent } = require('../agents/keyPointsAgent');
+const { runNotesAgent } = require('../agents/notesAgent');
+const sessionContextStore = require('./sessionContextStore');
+
+// Configuration
+const GPU_TRANSCRIPTION_URL = process.env.GPU_TRANSCRIPTION_URL || 'http://localhost:5000';
+// Skip GPU when the URL is still the default (localhost) — avoids pointless ECONNREFUSED on Render
+const GPU_ENABLED = !!(process.env.GPU_TRANSCRIPTION_URL && !process.env.GPU_TRANSCRIPTION_URL.includes('localhost'));
+// Groq fallback configuration
+const GROQ_API_KEY   = process.env.GROQ_API_KEY;
+const GROQ_API_URL   = 'https://api.groq.com/openai/v1/audio/transcriptions';
+const GROQ_MODEL     = 'whisper-large-v3';
+const GPU_TIMEOUT_MS = 30000;
+const GROQ_TIMEOUT_MS = 30000;
+
+// Store active session timers and metadata
+const sessionTimers = new Map();
+const activeSessions = new Map(); // Store { session_id: { dbId, mcqTypes, mcqCount } }
+
+// Log provider config once at startup (visible in Render boot logs)
+logger.info('[AudioProcessor] Config', { GPU_ENABLED, GROQ_API_KEY: GROQ_API_KEY ? 'set' : 'NOT SET' });
+
+/**
+ * Transcribe audio using Groq's Whisper API (fallback provider)
+ * @param {Buffer} audioBuffer - Audio file buffer
+ * @param {string} filename - Original filename with extension
+ * @param {string} mimetype - Audio MIME type
+ * @returns {Promise<Object>} Transcription result normalised to { transcript, provider }
+ */
+async function transcribeWithGroq(audioBuffer, filename, mimetype) {
+  if (!GROQ_API_KEY) throw new Error('GROQ_API_KEY not configured');
+
+  const formData = new FormData();
+  formData.append('file', audioBuffer, {
+    filename: filename || 'audio.webm',
+    contentType: mimetype || 'audio/webm'
+  });
+  formData.append('model', GROQ_MODEL);
+  formData.append('language', 'en');
+  formData.append('response_format', 'json');
+
+  const response = await fetch(GROQ_API_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${GROQ_API_KEY}`,
+      ...formData.getHeaders()
+    },
+    body: formData,
+    timeout: GROQ_TIMEOUT_MS
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Groq API error (${response.status}): ${errText}`);
+  }
+
+  const data = await response.json();
+  return { transcript: data.text, provider: 'groq' };
+}
+
+/**
+ * Forward audio chunk to GPU transcription server, with Groq as automatic fallback
+ * @param {Buffer} audioBuffer - Audio file buffer
+ * @param {string} sessionId - Session identifier
+ * @param {string} filename - Original filename with extension
+ * @param {string} mimetype - Audio MIME type
+ * @returns {Promise<Object>} Transcription result
+ */
+async function forwardToGPUServer(audioBuffer, sessionId, filename, mimetype) {
+  // ── Primary: GPU server (only when configured) ─────────────────────────
+  if (!GPU_ENABLED) {
+    logger.info(`[AudioProcessor] GPU not configured — using Groq directly for session: ${sessionId}`);
+    return transcribeWithGroq(audioBuffer, filename, mimetype);
+  }
+
+  try {
+    logger.info(`[AudioProcessor] Forwarding audio to GPU server for session: ${sessionId}`);
+
+    const formData = new FormData();
+    formData.append('audio', audioBuffer, {
+      filename: filename || 'audio.webm',
+      contentType: mimetype || 'audio/webm'
+    });
+    formData.append('session_id', sessionId);
+    formData.append('language', 'en');
+
+    const response = await fetch(`${GPU_TRANSCRIPTION_URL}/transcribe`, {
+      method: 'POST',
+      body: formData,
+      headers: formData.getHeaders(),
+      timeout: GPU_TIMEOUT_MS
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`GPU server error (${response.status}): ${errorText}`);
+    }
+
+    const result = await response.json();
+    logger.info(`[AudioProcessor] ✓ GPU transcript received: ${result.transcript?.substring(0, 50)}...`);
+    return { ...result, provider: 'gpu' };
+
+  } catch (gpuError) {
+    // ── Fallback: Groq Whisper ─────────────────────────────────────────
+    logger.warn(`[AudioProcessor] GPU server failed (${gpuError.message}), falling back to Groq...`);
+
+    try {
+      const result = await transcribeWithGroq(audioBuffer, filename, mimetype);
+      logger.info(`[AudioProcessor] ✓ Groq transcript received: ${result.transcript?.substring(0, 50)}...`);
+      return result;
+    } catch (groqError) {
+      logger.error(`[AudioProcessor] Groq fallback also failed: ${groqError.message}`);
+      throw new Error(`All transcription providers failed. GPU: ${gpuError.message} | Groq: ${groqError.message}`);
+    }
+  }
+}
+
+/**
+ * Save transcript to database
+ * @param {string} sessionId - Session identifier
+ * @param {string} text - Transcript text
+ * @param {string} detectedLanguage - Language detected by Whisper
+ * @returns {Promise<Object>} Inserted transcript record
+ */
+async function saveTranscript(sessionId, text, detectedLanguage = null) {
+  try {
+    if (!text || text.trim().length === 0) {
+      logger.info(`[AudioProcessor] Empty transcript, skipping save for session: ${sessionId}`);
+      return null;
+    }
+
+    // Get database ID from active sessions in memory
+    let dbId = activeSessions.get(sessionId)?.dbId;
+
+    if (!dbId) {
+      // Fallback to database query if not in memory - get most recent session
+      const sessionQuery = `
+        SELECT id FROM transcription_sessions
+        WHERE session_id = $1
+        ORDER BY start_time DESC
+        LIMIT 1
+      `;
+      const sessionResult = await pool.query(sessionQuery, [sessionId]);
+      if (sessionResult.rows.length === 0) {
+        throw new Error(`No session found for session_id: ${sessionId}`);
+      }
+      dbId = sessionResult.rows[0].id;
+    }
+
+    const query = `
+      INSERT INTO transcripts (session_db_id, segment_text, detected_language, sent_to_webhook)
+      VALUES ($1, $2, $3, false)
+      RETURNING *
+    `;
+
+    const result = await pool.query(query, [dbId, text.trim(), detectedLanguage]);
+    logger.info(`[AudioProcessor] Transcript saved for session: ${sessionId} (db_id: ${dbId})`);
+
+    return result.rows[0];
+  } catch (error) {
+    logger.error(`[AudioProcessor] Error saving transcript:`, error.message);
+    throw error;
+  }
+}
+
+/**
+ * Start interval timer for periodic webhook sends
+ * @param {string} sessionId - Session identifier
+ * @param {number} intervalMinutes - Interval in minutes
+ */
+function startSegmentTimer(sessionId, intervalMinutes) {
+  // Clear any existing timer
+  stopSegmentTimer(sessionId);
+
+  const intervalMs = intervalMinutes * 60 * 1000;
+  logger.info(`[AudioProcessor] Starting segment timer for session ${sessionId}: ${intervalMinutes} minutes`);
+
+  const timer = setInterval(() => {
+    logger.info(`[AudioProcessor] Timer fired for session: ${sessionId}`);
+    sendTranscriptSegment(sessionId).catch(err =>
+      logger.error(`[AudioProcessor] Segment timer error (non-fatal):`, err.message)
+    );
+  }, intervalMs);
+
+  sessionTimers.set(sessionId, timer);
+}
+
+/**
+ * Send accumulated transcript segment to webhook
+ * @param {string} sessionId - Session identifier
+ * @returns {Promise<boolean>} Success status
+ */
+async function sendTranscriptSegment(sessionId) {
+  try {
+    logger.info(`[AudioProcessor] ▶ Timer fired — sending segment for session: ${sessionId}`);
+
+    // Get database ID for most recent session
+    const sessionData = activeSessions.get(sessionId);
+    let dbId = sessionData?.dbId;
+    const mcqTypes = sessionData?.mcqTypes || null;
+    const mcqCount = sessionData?.mcqCount || 3;
+    const resourceId = sessionData?.resourceId || null;
+    logger.info(`[AudioProcessor]   activeSessions lookup '${sessionId}' → dbId=${dbId}`);
+    if (!dbId) {
+      const sessionQuery = `
+        SELECT id FROM transcription_sessions
+        WHERE session_id = $1
+        ORDER BY start_time DESC
+        LIMIT 1
+      `;
+      const sessionResult = await pool.query(sessionQuery, [sessionId]);
+      if (sessionResult.rows.length === 0) {
+        logger.info(`[AudioProcessor]   No transcription_sessions row found for: ${sessionId}`);
+        return false;
+      }
+      dbId = sessionResult.rows[0].id;
+      logger.info(`[AudioProcessor]   DB fallback resolved dbId=${dbId}`);
+    }
+
+    // Get all unsent transcripts for this session
+    const query = `
+      SELECT id, segment_text, timestamp
+      FROM transcripts
+      WHERE session_db_id = $1
+      AND sent_to_webhook = false
+      ORDER BY id ASC
+    `;
+
+    const result = await pool.query(query, [dbId]);
+    logger.info(`[AudioProcessor]   Found ${result.rows.length} unsent transcript(s) for dbId=${dbId}`);
+
+    if (result.rows.length === 0) {
+      logger.info(`[AudioProcessor]   No unsent transcripts for session: ${sessionId}`);
+      return false;
+    }
+
+    // Join all transcript segments
+    const transcriptSegment = result.rows
+      .map(row => row.segment_text)
+      .join(' ')
+      .trim();
+
+    if (!transcriptSegment) {
+      logger.info(`[AudioProcessor] Empty transcript segment for session: ${sessionId}`);
+      return false;
+    }
+
+    // Mark transcripts as sent
+    const transcriptIds = result.rows.map(row => row.id);
+    const updateQuery = `
+      UPDATE transcripts
+      SET sent_to_webhook = true
+      WHERE id = ANY($1)
+    `;
+
+    await pool.query(updateQuery, [transcriptIds]);
+
+    logger.info(`[AudioProcessor] ✓ Transcripts marked sent for session: ${sessionId} (${result.rows.length} segments)`);
+
+    // Trigger MCQ generation via LangGraph agent (fire-and-forget — non-blocking)
+    runMCQAgent(transcriptSegment, sessionId, { types: mcqTypes, count: mcqCount, resourceId })
+      .then(mcqs => logger.info(`[AudioProcessor] MCQ agent completed: ${mcqs?.length || 0} MCQs for session: ${sessionId}`))
+      .catch(err => logger.error(`[AudioProcessor] MCQ agent error (non-fatal): ${err.message}`));
+
+    // Trigger key-points extraction via LangGraph agent (fire-and-forget — non-blocking)
+    runKeyPointsAgent(transcriptSegment, sessionId)
+      .then(points => logger.info(`[AudioProcessor] Key points agent completed: ${points?.length || 0} for session: ${sessionId}`))
+      .catch(err => logger.error(`[AudioProcessor] Key points agent error (non-fatal): ${err.message}`));
+
+    // Broadcast segment sent notification only to clients in this session
+    if (global.broadcastToSession) {
+      global.broadcastToSession(sessionId.toUpperCase(), {
+        type: 'transcript-segment-sent',
+        sessionId: sessionId,
+        timestamp: new Date().toISOString(),
+        segmentStartTime: result.rows[0].timestamp,
+        segmentEndTime: result.rows[result.rows.length - 1].timestamp,
+        segmentCount: result.rows.length,
+        transcriptLength: transcriptSegment.length
+      });
+      logger.info(`[AudioProcessor] ✓ Broadcasted segment sent notification for session: ${sessionId}`);
+    }
+
+    return true;
+
+  } catch (error) {
+    logger.error(`[AudioProcessor] Error sending transcript segment:`, error.message);
+    return false; // Non-fatal — don't rethrow; setInterval callers have no .catch()
+  }
+}
+
+/**
+ * Send complete session transcript (final notes) to webhook
+ * @param {string} sessionId - Session identifier
+ * @returns {Promise<boolean>} Success status
+ */
+async function sendFinalNotes(sessionId) {
+  try {
+    logger.info(`[AudioProcessor] Generating final notes via LangGraph agent for session: ${sessionId}`);
+    await runNotesAgent(sessionId);
+    logger.info(`[AudioProcessor] ✓ Notes agent completed for session: ${sessionId}`);
+    return true;
+  } catch (error) {
+    logger.error(`[AudioProcessor] Notes agent error:`, error.message);
+    throw error;
+  }
+}
+
+/**
+ * Stop interval timer for a session
+ * @param {string} sessionId - Session identifier
+ */
+function stopSegmentTimer(sessionId) {
+  if (sessionTimers.has(sessionId)) {
+    clearInterval(sessionTimers.get(sessionId));
+    sessionTimers.delete(sessionId);
+    logger.info(`[AudioProcessor] Stopped segment timer for session: ${sessionId}`);
+  }
+}
+
+function hasSegmentTimer(sessionId) {
+  return sessionTimers.has(sessionId);
+}
+
+function getDebugState() {
+  return {
+    timerKeys: Array.from(sessionTimers.keys()),
+    activeSessionKeys: Array.from(activeSessions.keys())
+  };
+}
+
+
+/**
+ * Create new transcription session in database
+ * @param {string} sessionId - Session identifier
+ * @param {number} segmentInterval - Interval in minutes
+ * @param {boolean} pdfUploaded - Whether PDF was uploaded
+ * @param {string} pdfFilename - PDF filename if uploaded
+ * @returns {Promise<Object>} Created session record
+ */
+async function createSession(sessionId, segmentInterval, pdfUploaded = false, pdfFilename = null, mcqTypes = null, mcqCount = 3, resourceId = null) {
+  try {
+    const query = `
+      INSERT INTO transcription_sessions (session_id, segment_interval, pdf_uploaded, pdf_filename, status)
+      VALUES ($1, $2, $3, $4, 'active')
+      RETURNING *
+    `;
+
+    const result = await pool.query(query, [sessionId, segmentInterval, pdfUploaded, pdfFilename]);
+    const session = result.rows[0];
+
+    // Store session data in memory for quick transcript saves and MCQ preferences
+    activeSessions.set(sessionId, { dbId: session.id, mcqTypes, mcqCount, resourceId });
+
+    logger.info(`[AudioProcessor] Session created: ${sessionId} (db_id: ${session.id}) at ${session.start_time}`);
+
+    return session;
+  } catch (error) {
+    logger.error(`[AudioProcessor] Error creating session:`, error.message);
+    throw error;
+  }
+}
+
+/**
+ * Update session status
+ * @param {string} sessionId - Session identifier
+ * @param {string} status - New status (active, paused, stopped)
+ * @param {boolean} isPaused - Pause state
+ * @returns {Promise<Object>} Updated session record
+ */
+async function updateSessionStatus(sessionId, status, isPaused = null) {
+  try {
+    // Get database ID for most recent session
+    let dbId = activeSessions.get(sessionId)?.dbId;
+    if (!dbId) {
+      const sessionQuery = `SELECT id FROM transcription_sessions WHERE session_id = $1 ORDER BY start_time DESC LIMIT 1`;
+      const sessionResult = await pool.query(sessionQuery, [sessionId]);
+      if (sessionResult.rows.length === 0) {
+        throw new Error(`No session found for session_id: ${sessionId}`);
+      }
+      dbId = sessionResult.rows[0].id;
+    }
+
+    let query, params;
+
+    if (isPaused !== null) {
+      query = `UPDATE transcription_sessions SET status = $1, is_paused = $2 WHERE id = $3 RETURNING *`;
+      params = [status, isPaused, dbId];
+    } else {
+      query = `UPDATE transcription_sessions SET status = $1 WHERE id = $2 RETURNING *`;
+      params = [status, dbId];
+    }
+
+    const result = await pool.query(query, params);
+    logger.info(`[AudioProcessor] Session ${sessionId} (db_id: ${dbId}) status updated to: ${status}`);
+
+    return result.rows[0];
+  } catch (error) {
+    logger.error(`[AudioProcessor] Error updating session status:`, error.message);
+    throw error;
+  }
+}
+
+/**
+ * End session and cleanup
+ * @param {string} sessionId - Session identifier
+ * @returns {Promise<Object>} Updated session record
+ */
+async function endSession(sessionId) {
+  try {
+    logger.info(`[AudioProcessor] Ending session: ${sessionId}`);
+
+    // Send any remaining unsent transcripts before stopping (non-fatal if webhook is down)
+    logger.info(`[AudioProcessor] Checking for unsent transcripts before session end...`);
+    try {
+      const sent = await sendTranscriptSegment(sessionId);
+      if (sent) {
+        logger.info(`[AudioProcessor] ✓ Remaining transcripts sent on session stop`);
+      } else {
+        logger.info(`[AudioProcessor] No unsent transcripts found`);
+      }
+    } catch (webhookError) {
+      logger.warn(`[AudioProcessor] Webhook flush failed on stop (non-fatal): ${webhookError.message}`);
+    }
+
+    // Stop timer
+    stopSegmentTimer(sessionId);
+
+    // Get database ID before removing from memory
+    let dbId = activeSessions.get(sessionId)?.dbId;
+    if (!dbId) {
+      const sessionQuery = `SELECT id FROM transcription_sessions WHERE session_id = $1 ORDER BY start_time DESC LIMIT 1`;
+      const sessionResult = await pool.query(sessionQuery, [sessionId]);
+      if (sessionResult.rows.length > 0) {
+        dbId = sessionResult.rows[0].id;
+      }
+    }
+
+    // Remove from active sessions and clear in-memory PDF context
+    activeSessions.delete(sessionId);
+    sessionContextStore.clearSession(sessionId);
+
+    if (!dbId) {
+      logger.info(`[AudioProcessor] No database session found to end for: ${sessionId}`);
+      return null;
+    }
+
+    // Update the session as completed
+    const query = `UPDATE transcription_sessions SET status = 'stopped', end_time = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *`;
+    const result = await pool.query(query, [dbId]);
+    logger.info(`[AudioProcessor] Session ended: ${sessionId} (db_id: ${dbId})`);
+
+    return result.rows[0];
+  } catch (error) {
+    logger.error(`[AudioProcessor] Error ending session:`, error.message);
+    throw error;
+  }
+}
+
+module.exports = {
+  forwardToGPUServer,
+  transcribeWithGroq,
+  saveTranscript,
+  startSegmentTimer,
+  stopSegmentTimer,
+  hasSegmentTimer,
+  getDebugState,
+  sendTranscriptSegment,
+  sendFinalNotes,
+  createSession,
+  updateSessionStatus,
+  endSession
+};

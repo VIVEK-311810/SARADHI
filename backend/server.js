@@ -1,8 +1,10 @@
 require('dotenv').config();
 
-// Crash immediately if critical env vars are missing
+// Crash immediately if critical env vars are missing or too weak
 if (!process.env.JWT_SECRET) throw new Error('FATAL: JWT_SECRET environment variable is not set');
+if (process.env.JWT_SECRET.length < 32) throw new Error('FATAL: JWT_SECRET must be at least 32 characters (256-bit minimum)');
 if (!process.env.SESSION_SECRET) throw new Error('FATAL: SESSION_SECRET environment variable is not set');
+if (process.env.SESSION_SECRET.length < 32) throw new Error('FATAL: SESSION_SECRET must be at least 32 characters');
 
 const express = require('express');
 const cors = require('cors');
@@ -90,6 +92,7 @@ app.use(session({
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
+    sameSite: 'strict',
     maxAge: 24 * 60 * 60 * 1000
   }
 }));
@@ -102,26 +105,27 @@ app.use('/auth/', authLimiter);
 app.use('/api/', apiLimiter);
 app.use('/api/ai-search', aiLimiter);
 app.use('/api/ai-assistant', aiStudentLimiter);
+app.use('/api/knowledge-cards', aiLimiter);
 
 // Import route modules
-const authRouter = require('./routes/auth-dynamic');
-const sessionsRouter = require('./routes/sessions');
-const pollsRouter = require('./routes/polls');
-const newResourcesRouter = require('./routes/resources');
-const aiSearchRouter = require('./routes/ai-search');
-const generatedMCQsRoutes = require('./routes/generated-mcqs');
-const studentsRouter = require('./routes/students');
-const transcriptionRouter = require('./routes/transcription');
-const analyticsRouter = require('./routes/analytics');
-const exportRouter = require('./routes/export');
-const gamificationRouter = require('./routes/gamification');
-const communityRouter = require('./routes/community');
-const aiAssistantRouter = require('./routes/ai-assistant');
-const knowledgeCardsRouter = require('./routes/knowledge-cards');
-const salesAgentRouter = require('./routes/sales-agent');
-const healthRouter = require('./routes/health');
-const competitionRouter = require('./routes/competition');
-const projectSuggestionsRouter = require('./routes/project-suggestions');
+const authRouter = require('./routes/standalone/auth-dynamic');
+const sessionsRouter = require('./routes/session/sessions');
+const pollsRouter = require('./routes/session/polls');
+const newResourcesRouter = require('./routes/session/resources');
+const aiSearchRouter = require('./routes/ai/ai-search');
+const generatedMCQsRoutes = require('./routes/ai/generated-mcqs');
+const studentsRouter = require('./routes/session/students');
+const transcriptionRouter = require('./routes/session/transcription');
+const analyticsRouter = require('./routes/analytics/analytics');
+const exportRouter = require('./routes/analytics/export');
+const gamificationRouter = require('./routes/analytics/gamification');
+const communityRouter = require('./routes/engagement/community');
+const aiAssistantRouter = require('./routes/ai/ai-assistant');
+const knowledgeCardsRouter = require('./routes/ai/knowledge-cards');
+const salesAgentRouter = require('./routes/standalone/sales-agent');
+const healthRouter = require('./routes/standalone/health');
+const competitionRouter = require('./routes/engagement/competition');
+const projectSuggestionsRouter = require('./routes/engagement/project-suggestions');
 const { startWorkers, stopWorkers } = require('./workers/aiWorker');
 const { setupBullBoard } = require('./workers/setup');
 

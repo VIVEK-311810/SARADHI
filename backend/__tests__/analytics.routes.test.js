@@ -6,7 +6,7 @@ const { generateToken, mockTeacher, mockStudent } = require('./helpers');
 
 const request = require('supertest');
 
-const analyticsRouter = require('../routes/analytics');
+const analyticsRouter = require('../routes/analytics/analytics');
 const app = createTestApp({ path: '/api/analytics', router: analyticsRouter });
 
 describe('Analytics Routes - /api/analytics', () => {

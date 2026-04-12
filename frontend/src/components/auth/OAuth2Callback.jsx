@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import LoadingSpinner from '../shared/LoadingSpinner';
+import LoadingSpinner from '../shared/feedback/LoadingSpinner';
 
 const ALLOWED_ROLES = ['teacher', 'student'];
 
@@ -14,7 +14,6 @@ const OAuth2Callback = () => {
     const processCallback = async () => {
       try {
         const token = searchParams.get('token');
-        const userParam = searchParams.get('user');
         const errorParam = searchParams.get('error');
 
         if (errorParam) {
@@ -34,18 +33,24 @@ const OAuth2Callback = () => {
           return;
         }
 
-        if (!token || !userParam) {
+        if (!token) {
           setError('Missing authentication data. Please try logging in again.');
           setStatus('error');
           return;
         }
 
-        // Parse user data — guard against malformed URL param
+        // Decode user data from JWT payload (avoids redundant user= URL param)
         let user;
         try {
-          user = JSON.parse(decodeURIComponent(userParam));
+          const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+          user = {
+            id: payload.userId,
+            email: payload.email,
+            role: payload.role,
+            fullName: payload.fullName,
+          };
         } catch {
-          setError('Invalid authentication data. Please try logging in again.');
+          setError('Invalid authentication token. Please try logging in again.');
           setStatus('error');
           return;
         }
@@ -63,7 +68,7 @@ const OAuth2Callback = () => {
           return;
         }
 
-        // Validate SASTRA domain (allow exact @sastra.edu and dept subdomains)
+        // Validate SASTRA domain — allow @sastra.edu and *.sastra.edu subdomains (faculty)
         const isValidTeacher = user.role === 'teacher' && (user.email.endsWith('@sastra.edu') || user.email.endsWith('.sastra.edu'));
         const isValidStudent = user.role === 'student' && /^\d+@sastra\.ac\.in$/.test(user.email);
         
@@ -76,6 +81,9 @@ const OAuth2Callback = () => {
         // Store authentication data
         localStorage.setItem('authToken', token);
         localStorage.setItem('currentUser', JSON.stringify(user));
+
+        // Remove token from URL — prevents it leaking into browser history or server logs
+        window.history.replaceState({}, document.title, window.location.pathname);
 
         setStatus('success');
 

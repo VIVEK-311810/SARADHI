@@ -88,30 +88,30 @@ jest.mock('../config/pinecone', () => ({
 }));
 
 // Mock services
-jest.mock('../services/documentProcessor', () => ({
+jest.mock('../services/rag/documentProcessor', () => ({
   extractText: jest.fn().mockResolvedValue({ text: 'test text', pageCount: 1, pages: ['test text'] }),
 }));
 
-jest.mock('../services/embeddingService', () => ({
+jest.mock('../services/rag/embeddingService', () => ({
   generateEmbedding: jest.fn().mockResolvedValue(new Array(384).fill(0)),
   generateBatchEmbeddings: jest.fn().mockResolvedValue([new Array(384).fill(0)]),
   chunkText: jest.fn().mockReturnValue([{ text: 'test chunk', startIndex: 0, endIndex: 10, tokenCount: 5 }]),
 }));
 
-jest.mock('../services/vectorStore', () => ({
+jest.mock('../services/rag/vectorStore', () => ({
   upsertVectors: jest.fn().mockResolvedValue(1),
   searchSimilar: jest.fn().mockResolvedValue([]),
   deleteResource: jest.fn().mockResolvedValue(),
 }));
 
 // Set environment variables for testing
-process.env.JWT_SECRET = 'test-jwt-secret';
+process.env.JWT_SECRET = 'test-jwt-secret-for-testing-purposes-only-32+';
 process.env.DB_USER = 'test';
 process.env.DB_HOST = 'localhost';
 process.env.DB_NAME = 'test_db';
 process.env.DB_PASSWORD = 'test';
 process.env.DB_PORT = '5432';
-process.env.SESSION_SECRET = 'test-session-secret';
+process.env.SESSION_SECRET = 'test-session-secret-for-testing-purposes-only-32+';
 process.env.FRONTEND_URL = 'http://localhost:3000';
 
 // Initialize global state that server.js sets up

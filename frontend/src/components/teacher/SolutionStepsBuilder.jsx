@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import LatexRenderer from '../shared/LatexRenderer';
-import CodeBlock from '../shared/CodeBlock';
+import LatexRenderer from '../shared/renderers/LatexRenderer';
+import CodeBlock from '../shared/renderers/CodeBlock';
 
 /**
  * Teacher UI for building step-by-step solution steps.

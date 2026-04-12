@@ -202,6 +202,15 @@ describe('Auth Middleware', () => {
       expect(res.status).not.toHaveBeenCalled();
     });
 
+    it('should allow faculty subdomain (*.sastra.edu)', () => {
+      req.user = mockTeacher({ email: 'prof@cse.sastra.edu' });
+
+      validateSastraDomain(req, res, next);
+
+      expect(next).toHaveBeenCalled();
+      expect(res.status).not.toHaveBeenCalled();
+    });
+
     it('should allow valid student domain (@sastra.ac.in)', () => {
       req.user = mockStudent({ email: '123456@sastra.ac.in' });
 

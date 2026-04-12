@@ -8,9 +8,9 @@ import { ThemeProvider } from './context/ThemeContext';
 import { NotificationProvider } from './context/NotificationContext';
 
 // Eager shared components
-import ErrorBoundary from './components/shared/ErrorBoundary';
-import LoadingSpinner from './components/shared/LoadingSpinner';
-import DemoBanner from './components/shared/DemoBanner';
+import ErrorBoundary from './components/shared/error/ErrorBoundary';
+import LoadingSpinner from './components/shared/feedback/LoadingSpinner';
+import DemoBanner from './components/shared/layout/DemoBanner';
 
 // Layout
 import AppLayout from './components/layout/AppLayout';
@@ -44,9 +44,9 @@ const VisitSession             = lazy(() => import('./components/student/VisitSe
 const AIResourceSearch         = lazy(() => import('./components/student/AIResourceSearch'));
 const Leaderboard              = lazy(() => import('./components/student/Leaderboard'));
 const Quiz                     = lazy(() => import('./components/student/Quiz'));
-const CompetitionLobby         = lazy(() => import('./components/student/CompetitionLobby'));
-const CompetitionRoom          = lazy(() => import('./components/student/CompetitionRoom'));
-const FacultyCompetitionLobby  = lazy(() => import('./components/teacher/FacultyCompetitionLobby'));
+const CompetitionLobby         = lazy(() => import('./components/competition/CompetitionLobby'));
+const CompetitionRoom          = lazy(() => import('./components/competition/CompetitionRoom'));
+const FacultyCompetitionLobby  = lazy(() => import('./components/competition/FacultyCompetitionLobby'));
 
 // Community Components
 const CommunityBoard = lazy(() => import('./components/community/CommunityBoard'));
@@ -55,8 +55,26 @@ const TicketDetail   = lazy(() => import('./components/community/TicketDetail'))
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function getAuth() {
   const token  = localStorage.getItem('authToken');
-  const isDemo = localStorage.getItem('isDemo') === 'true';
-  const authenticated = !!(token || isDemo);
+  const isDemo = process.env.NODE_ENV !== 'production' && localStorage.getItem('isDemo') === 'true';
+
+  // Evict expired token before deciding authenticated state — prevents skeleton flash
+  let validToken = false;
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      if (!payload.exp || payload.exp >= Math.floor(Date.now() / 1000)) {
+        validToken = true;
+      } else {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('currentUser');
+      }
+    } catch {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('currentUser');
+    }
+  }
+
+  const authenticated = validToken || isDemo;
 
   let role = null;
   try {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { utils, apiRequest } from '../../utils/api';
 import { isDemoMode, DEMO_LEADERBOARD, DEMO_SESSION_LEADERBOARD, DEMO_GAMIFICATION, DEMO_GAMIFICATION_XP } from '../../utils/demoData';
-import { StatCardsSkeleton, LeaderboardSkeleton } from '../shared/SkeletonLoader';
+import { StatCardsSkeleton, LeaderboardSkeleton } from '../shared/feedback/SkeletonLoader';
 
 // ─── Level Thresholds (mirrors backend) ──────────────────────────────────────
 const LEVELS = [
