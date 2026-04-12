@@ -392,10 +392,10 @@ export const utils = {
   // Get current user from localStorage (safe — never throws on corrupt data)
   getCurrentUser: () => safeParseUser(),
 
-  // Validate SASTRA domain — exact domain match only (no subdomain bypass)
+  // Validate SASTRA domain — allow @sastra.edu and *.sastra.edu subdomains (faculty)
   validateSastraEmail: (email, role) => {
     if (role === 'teacher') {
-      return email.endsWith('@sastra.edu');
+      return email.endsWith('@sastra.edu') || email.endsWith('.sastra.edu');
     } else if (role === 'student') {
       return /^\d+@sastra\.ac\.in$/.test(email);
     }

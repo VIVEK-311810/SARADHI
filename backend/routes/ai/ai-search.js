@@ -524,7 +524,8 @@ router.get('/job/:jobId', authenticate, async (req, res) => {
       return res.json({ status: 'completed', result: job.returnvalue });
     }
     if (state === 'failed') {
-      return res.status(500).json({ status: 'failed', error: job.failedReason });
+      logger.warn('AI search job failed', { jobId: req.params.jobId, reason: job.failedReason });
+      return res.status(500).json({ status: 'failed', error: 'Search failed. Please try again.' });
     }
 
     // active, waiting, delayed

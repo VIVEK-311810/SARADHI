@@ -14,7 +14,6 @@ const OAuth2Callback = () => {
     const processCallback = async () => {
       try {
         const token = searchParams.get('token');
-        const userParam = searchParams.get('user');
         const errorParam = searchParams.get('error');
 
         if (errorParam) {
@@ -34,18 +33,24 @@ const OAuth2Callback = () => {
           return;
         }
 
-        if (!token || !userParam) {
+        if (!token) {
           setError('Missing authentication data. Please try logging in again.');
           setStatus('error');
           return;
         }
 
-        // Parse user data — guard against malformed URL param
+        // Decode user data from JWT payload (avoids redundant user= URL param)
         let user;
         try {
-          user = JSON.parse(decodeURIComponent(userParam));
+          const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+          user = {
+            id: payload.userId,
+            email: payload.email,
+            role: payload.role,
+            fullName: payload.fullName,
+          };
         } catch {
-          setError('Invalid authentication data. Please try logging in again.');
+          setError('Invalid authentication token. Please try logging in again.');
           setStatus('error');
           return;
         }
@@ -63,8 +68,8 @@ const OAuth2Callback = () => {
           return;
         }
 
-        // Validate SASTRA domain — exact domain match only (no subdomain bypass)
-        const isValidTeacher = user.role === 'teacher' && user.email.endsWith('@sastra.edu');
+        // Validate SASTRA domain — allow @sastra.edu and *.sastra.edu subdomains (faculty)
+        const isValidTeacher = user.role === 'teacher' && (user.email.endsWith('@sastra.edu') || user.email.endsWith('.sastra.edu'));
         const isValidStudent = user.role === 'student' && /^\d+@sastra\.ac\.in$/.test(user.email);
         
         if (!isValidTeacher && !isValidStudent) {

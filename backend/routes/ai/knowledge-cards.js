@@ -188,6 +188,7 @@ router.post('/generate', authenticate, authorize('teacher'), async (req, res) =>
   try {
     const { sessionId, count = 10, topic = '' } = req.body;
     if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
+    if (topic && topic.length > 200) return res.status(400).json({ error: 'Topic too long (max 200 characters)' });
 
     const session = await resolveSession(sessionId);
     if (!session) return res.status(404).json({ error: 'Session not found' });

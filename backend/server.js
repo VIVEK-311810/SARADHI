@@ -105,6 +105,7 @@ app.use('/auth/', authLimiter);
 app.use('/api/', apiLimiter);
 app.use('/api/ai-search', aiLimiter);
 app.use('/api/ai-assistant', aiStudentLimiter);
+app.use('/api/knowledge-cards', aiLimiter);
 
 // Import route modules
 const authRouter = require('./routes/standalone/auth-dynamic');

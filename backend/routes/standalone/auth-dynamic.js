@@ -102,13 +102,8 @@ router.get('/google/callback/edu',
         { expiresIn: '24h', algorithm: 'HS256', jwtid: uuidv4() }
       );
       
-      // Redirect to frontend with token
-      res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/callback?token=${token}&user=${encodeURIComponent(JSON.stringify({
-        id: user.id,
-        email: user.email,
-        fullName: user.full_name,
-        role: user.role
-      }))}`);
+      // Redirect to frontend with token (user data decoded from JWT — no user= param in URL)
+      res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/callback?token=${token}`);
     } catch (error) {
       logger.error('OAuth callback error (EDU)', { error: error.message });
       res.redirect('/auth?error=callback_failed');
@@ -153,13 +148,8 @@ router.get('/google/callback/acin',
         { expiresIn: '24h', algorithm: 'HS256', jwtid: uuidv4() }
       );
       
-      // Redirect to frontend with token
-      res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/callback?token=${token}&user=${encodeURIComponent(JSON.stringify({
-        id: user.id,
-        email: user.email,
-        fullName: user.full_name,
-        role: user.role
-      }))}`);
+      // Redirect to frontend with token (user data decoded from JWT — no user= param in URL)
+      res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/callback?token=${token}`);
     } catch (error) {
       logger.error('OAuth callback error (ACIN)', { error: error.message });
       res.redirect('/auth?error=callback_failed');
@@ -190,14 +180,8 @@ router.get('/google/callback',
         process.env.JWT_SECRET,
         { expiresIn: '24h', algorithm: 'HS256', jwtid: uuidv4() }
       );
-      res.redirect(
-        `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/callback?token=${token}&user=${encodeURIComponent(JSON.stringify({
-          id: user.id,
-          email: user.email,
-          fullName: user.full_name,
-          role: user.role
-        }))}`
-      );
+      // Redirect to frontend with token (user data decoded from JWT — no user= param in URL)
+      res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/callback?token=${token}`);
     } catch (error) {
       logger.error('SSO callback error', { error: error.message });
       res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth?error=server_error`);

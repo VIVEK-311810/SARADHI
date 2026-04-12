@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../../db');
 const logger = require('../../logger');
 const { authenticate } = require('../../middleware/auth');
+const { aiLimiter } = require('../../middleware/rateLimiter');
 const mistralClient = require('../../services/infra/mistralClient');
 const vectorStore = require('../../services/rag/vectorStore');
 const embeddingService = require('../../services/rag/embeddingService');
@@ -484,7 +485,7 @@ router.delete('/sessions/:sessionId/questions/:questionId', authenticate, async 
 // AI MCQ generation using session resources via Mistral + Pinecone (same
 // pattern as knowledge-cards.js — no n8n dependency)
 // ─────────────────────────────────────────────────────────────────────────────
-router.post('/sessions/:sessionId/generate-questions', authenticate, async (req, res) => {
+router.post('/sessions/:sessionId/generate-questions', authenticate, aiLimiter, async (req, res) => {
   try {
     const { sessionId } = req.params;
     const count = Math.min(10, Math.max(1, parseInt(req.body.count) || 5));

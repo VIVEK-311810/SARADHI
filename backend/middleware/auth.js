@@ -56,8 +56,8 @@ const authenticate = async (req, res, next) => {
       }
     }
 
-    // Enforce SASTRA domain restrictions — exact domain match only (no subdomain bypass)
-    const isValidTeacher = user.role === 'teacher' && user.email.endsWith('@sastra.edu');
+    // Enforce SASTRA domain restrictions — allow @sastra.edu and *.sastra.edu subdomains (faculty)
+    const isValidTeacher = user.role === 'teacher' && (user.email.endsWith('@sastra.edu') || user.email.endsWith('.sastra.edu'));
     const isValidStudent = user.role === 'student' && /^\d+@sastra\.ac\.in$/.test(user.email);
 
     if (!isValidTeacher && !isValidStudent) {
@@ -95,7 +95,7 @@ const validateSastraDomain = (req, res, next) => {
   }
 
   const { email, role } = req.user;
-  const isValidTeacher = role === 'teacher' && email.endsWith('@sastra.edu');
+  const isValidTeacher = role === 'teacher' && (email.endsWith('@sastra.edu') || email.endsWith('.sastra.edu'));
   const isValidStudent = role === 'student' && /^\d+@sastra\.ac\.in$/.test(email);
 
   if (!isValidTeacher && !isValidStudent) {
