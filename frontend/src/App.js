@@ -8,9 +8,9 @@ import { ThemeProvider } from './context/ThemeContext';
 import { NotificationProvider } from './context/NotificationContext';
 
 // Eager shared components
-import ErrorBoundary from './components/shared/ErrorBoundary';
-import LoadingSpinner from './components/shared/LoadingSpinner';
-import DemoBanner from './components/shared/DemoBanner';
+import ErrorBoundary from './components/shared/error/ErrorBoundary';
+import LoadingSpinner from './components/shared/feedback/LoadingSpinner';
+import DemoBanner from './components/shared/layout/DemoBanner';
 
 // Layout
 import AppLayout from './components/layout/AppLayout';
@@ -44,9 +44,9 @@ const VisitSession             = lazy(() => import('./components/student/VisitSe
 const AIResourceSearch         = lazy(() => import('./components/student/AIResourceSearch'));
 const Leaderboard              = lazy(() => import('./components/student/Leaderboard'));
 const Quiz                     = lazy(() => import('./components/student/Quiz'));
-const CompetitionLobby         = lazy(() => import('./components/student/CompetitionLobby'));
-const CompetitionRoom          = lazy(() => import('./components/student/CompetitionRoom'));
-const FacultyCompetitionLobby  = lazy(() => import('./components/teacher/FacultyCompetitionLobby'));
+const CompetitionLobby         = lazy(() => import('./components/competition/CompetitionLobby'));
+const CompetitionRoom          = lazy(() => import('./components/competition/CompetitionRoom'));
+const FacultyCompetitionLobby  = lazy(() => import('./components/competition/FacultyCompetitionLobby'));
 
 // Community Components
 const CommunityBoard = lazy(() => import('./components/community/CommunityBoard'));

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { apiRequest } from '../../utils/api';
-import ErrorCard from '../shared/ErrorCard';
+import ErrorCard from '../shared/error/ErrorCard';
 
 const AIResourceSearch = () => {
   const { sessionId } = useParams();

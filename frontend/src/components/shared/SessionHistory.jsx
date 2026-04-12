@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { utils } from '../../utils/api';
-import LoadingSpinner from './LoadingSpinner';
+import LoadingSpinner from './feedback/LoadingSpinner';
 
 const SessionHistory = () => {
   const navigate = useNavigate();

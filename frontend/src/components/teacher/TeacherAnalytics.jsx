@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { utils } from '../../utils/api';
 import { isDemoMode, DEMO_ANALYTICS } from '../../utils/demoData';
-import { StatCardsSkeleton, ChartAreaSkeleton } from '../shared/SkeletonLoader';
+import { StatCardsSkeleton, ChartAreaSkeleton } from '../shared/feedback/SkeletonLoader';
 
 const TeacherAnalytics = () => {
   const navigate = useNavigate();

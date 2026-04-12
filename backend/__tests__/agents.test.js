@@ -90,7 +90,7 @@ describe('KeyPointsAgent', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.isolateModules(() => {
-      ({ runKeyPointsAgent } = require('../services/keyPointsAgent'));
+      ({ runKeyPointsAgent } = require('../services/agents/keyPointsAgent'));
     });
   });
 
@@ -155,7 +155,7 @@ describe('NotesAgent', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.isolateModules(() => {
-      ({ runNotesAgent } = require('../services/notesAgent'));
+      ({ runNotesAgent } = require('../services/agents/notesAgent'));
     });
   });
 

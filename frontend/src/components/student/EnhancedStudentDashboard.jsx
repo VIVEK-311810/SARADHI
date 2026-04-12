@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { StatCardsSkeleton, SessionListSkeleton } from '../shared/SkeletonLoader';
-import ErrorScreen from '../shared/ErrorScreen';
-import ErrorCard from '../shared/ErrorCard';
+import { StatCardsSkeleton, SessionListSkeleton } from '../shared/feedback/SkeletonLoader';
+import ErrorScreen from '../shared/error/ErrorScreen';
+import ErrorCard from '../shared/error/ErrorCard';
 import { studentAPI, apiRequest, safeParseUser } from '../../utils/api';
 import { isDemoMode, DEMO_GAMIFICATION } from '../../utils/demoData';
 import { Button } from '../ui/button';

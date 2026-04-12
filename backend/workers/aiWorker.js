@@ -21,7 +21,7 @@ function getAiSearchFn() {
 
 function getProjectSuggestionsFn() {
   if (!_generateProjectSuggestions) {
-    ({ generateProjectSuggestions: _generateProjectSuggestions } = require('../services/projectSuggestionService'));
+    ({ generateProjectSuggestions: _generateProjectSuggestions } = require('../services/content/projectSuggestionService'));
   }
   return _generateProjectSuggestions;
 }

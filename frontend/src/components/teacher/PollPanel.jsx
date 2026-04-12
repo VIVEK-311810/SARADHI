@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { pollAPI } from '../../utils/api';
-import LatexRenderer from '../shared/LatexRenderer';
-import RichQuestionRenderer from '../shared/RichQuestionRenderer';
+import LatexRenderer from '../shared/renderers/LatexRenderer';
+import RichQuestionRenderer from '../shared/renderers/RichQuestionRenderer';
 import SolutionStepsBuilder from './SolutionStepsBuilder';
 import RubricBuilder from './RubricBuilder';
 import DiagramMarkerEditor from './DiagramMarkerEditor';

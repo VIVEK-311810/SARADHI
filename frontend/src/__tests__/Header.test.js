@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import Header from '../components/shared/Header';
+import Header from '../components/shared/layout/Header';
 
 const mockNavigate = jest.fn();
 
