@@ -95,6 +95,7 @@ const AIAssistant = () => {
   ] : ['What topics are covered?', 'List all resources', 'Explain the main concepts', 'Generate a practice quiz'];
 
   return (
+    <>
     <div className="flex h-[calc(100vh-56px)] bg-slate-50 dark:bg-slate-950">
 
       {/* ── Conversation sidebar ── */}
@@ -348,6 +349,7 @@ const AIAssistant = () => {
     {viewerResource && (
       <ResourceViewerModal resource={viewerResource} onClose={() => setViewerResource(null)} />
     )}
+    </>
   );
 };
 
