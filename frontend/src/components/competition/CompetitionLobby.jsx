@@ -170,7 +170,7 @@ function QuestionBankPanel({ sessionId, currentUserId, onQuestionsChange,
     // 5th arg passes poll objects so parent can manage stepper
     onQuestionsChange(polls.length, allAiIds.length, allAiIds, pollIds, polls);
     setLoaded(true);
-  }, []); // eslint-disable-line
+  }, [onQuestionsChange]);
 
   // Fetch summary counts on mount so the header shows correct numbers
   useEffect(() => {
@@ -228,6 +228,7 @@ function QuestionBankPanel({ sessionId, currentUserId, onQuestionsChange,
   };
 
   const handleDelete = async (qId) => {
+    if (!window.confirm('Permanently delete this question?')) return;
     try {
       await apiRequest(`/competition/sessions/${sessionId}/questions/${qId}`, { method: 'DELETE' });
       const updated = questions.filter(q => q.id !== qId);
@@ -237,6 +238,7 @@ function QuestionBankPanel({ sessionId, currentUserId, onQuestionsChange,
       onQuestionsChange(selectedTeacherPollIds.length, updatedSelectedIds.length, updatedSelectedIds, selectedTeacherPollIds, teacherPolls);
     } catch (err) {
       console.error('Delete failed', err);
+      toast.error('Failed to delete question. Please try again.');
     }
   };
 

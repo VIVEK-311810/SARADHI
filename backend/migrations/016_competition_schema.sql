@@ -9,6 +9,9 @@ CREATE TABLE IF NOT EXISTS competition_rooms (
   question_start_time    BIGINT,
   time_per_question      INTEGER DEFAULT 20,
   total_questions        INTEGER DEFAULT 0,
+  teacher_question_count INTEGER DEFAULT 0,
+  student_question_ids   INTEGER[],
+  teacher_poll_ids       INTEGER[],
   started_at             TIMESTAMP,
   ended_at               TIMESTAMP,
   created_at             TIMESTAMP DEFAULT NOW()

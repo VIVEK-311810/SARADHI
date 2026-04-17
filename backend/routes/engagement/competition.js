@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const pool = require('../../db');
 const logger = require('../../logger');
 const { authenticate } = require('../../middleware/auth');
-const { aiLimiter } = require('../../middleware/rateLimiter');
+const { aiLimiter, apiLimiter } = require('../../middleware/rateLimiter');
 const mistralClient = require('../../services/infra/mistralClient');
 const vectorStore = require('../../services/rag/vectorStore');
 const embeddingService = require('../../services/rag/embeddingService');
@@ -45,7 +45,7 @@ function letterToIndex(letter) {
 // POST /api/competition/rooms
 // Create a new competition room
 // ─────────────────────────────────────────────────────────────────────────────
-router.post('/rooms', authenticate, async (req, res) => {
+router.post('/rooms', authenticate, apiLimiter, async (req, res) => {
   try {
     const { sessionId, timePerQuestion, teacherQuestionCount, studentQuestionIds, teacherPollIds } = req.body;
     if (!sessionId) {
@@ -213,7 +213,15 @@ router.get('/rooms/active', authenticate, async (req, res) => {
        JOIN sessions s ON cr.session_id = s.session_id
        JOIN users u ON cr.created_by = u.id
        WHERE cr.status IN ('waiting', 'active')
-       ORDER BY cr.created_at DESC`
+         AND (
+           s.teacher_id = $1
+           OR EXISTS (
+             SELECT 1 FROM session_participants sp
+             WHERE sp.session_id = s.id AND sp.student_id = $1
+           )
+         )
+       ORDER BY cr.created_at DESC`,
+      [req.user.id]
     );
     res.json({ success: true, data: result.rows });
   } catch (error) {
@@ -500,10 +508,25 @@ router.post('/sessions/:sessionId/generate-questions', authenticate, aiLimiter, 
       return res.status(403).json({ success: false, error: 'Access denied' });
     }
 
+    // Restrict fileIds to only resources that belong to this session (prevents cross-session extraction)
+    let safeFileIds = null;
+    if (fileIds) {
+      const ownedFiles = await pool.query(
+        `SELECT r.id FROM resources r
+         JOIN sessions s ON r.session_id = s.id
+         WHERE s.session_id = $1 AND r.id = ANY($2)`,
+        [sessionId.toUpperCase(), fileIds]
+      );
+      safeFileIds = ownedFiles.rows.map(r => r.id);
+      if (safeFileIds.length === 0) {
+        return res.status(400).json({ success: false, error: 'None of the selected files belong to this session.' });
+      }
+    }
+
     // Retrieve relevant chunks from vector store for this session (optionally filtered by file IDs)
     const queryText = 'key concepts, definitions, and important facts from the session material';
     const queryEmbedding = await embeddingService.generateEmbedding(queryText);
-    const chunks = await vectorStore.searchSimilar(queryEmbedding, sessionId.toUpperCase(), Math.min(count * 3, 20), fileIds);
+    const chunks = await vectorStore.searchSimilar(queryEmbedding, sessionId.toUpperCase(), Math.min(count * 3, 20), safeFileIds);
 
     if (!chunks || chunks.length === 0) {
       return res.status(400).json({

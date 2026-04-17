@@ -511,33 +511,6 @@ function FinishedPhase({ leaderboard, currentUser, roomInfo, onPlayAgain, myRole
               </div>
             );
           })}
-          {rest.length > 0 && top3.length >= 3 && (
-            <div className="divide-y divide-slate-100 dark:divide-slate-700/60">
-              {rest.map((p, i) => {
-                const isMe = String(p.student_id) === String(currentUser?.id);
-                return (
-                  <div key={p.student_id}
-                    className={`flex items-center gap-3 px-5 py-3 text-sm
-                      ${isMe ? 'bg-primary-50/60 dark:bg-primary-900/20' : ''}`}>
-                    <div className="w-8 flex items-center justify-center flex-shrink-0">
-                      <MedalIcon rank={i + 4} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={`font-semibold truncate ${isMe ? 'text-primary-700 dark:text-primary-300' : 'text-slate-800 dark:text-slate-200'}`}>
-                        {p.display_name || `Student ${p.student_id}`}
-                        {isMe && <span className="ml-1.5 text-xs font-normal text-primary-400">(you)</span>}
-                      </p>
-                      <p className="text-xs text-slate-400">{p.answers_correct ?? 0} correct</p>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="font-black text-primary-600 dark:text-primary-400 text-base">{p.score}</p>
-                      <p className="text-xs text-slate-400">pts</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
       </div>
 
@@ -599,6 +572,9 @@ const CompetitionRoom = ({ isTeacherSpectator = false }) => {
   const wsRef = useRef(null);
   const timerRef = useRef(null);
   const questionEndTimeRef = useRef(null);
+  const reconnectAttemptRef = useRef(0);
+  const reconnectTimerRef = useRef(null);
+  const destroyedRef = useRef(false);
 
   // Auth + demo guard
   useEffect(() => {
@@ -670,79 +646,100 @@ const CompetitionRoom = ({ isTeacherSpectator = false }) => {
     timerRef.current = setInterval(tick, 500);
   }, []);
 
-  // WebSocket setup
+  // WebSocket setup with exponential-backoff reconnect
   useEffect(() => {
     if (!currentUser || isDemoMode()) return;
 
-    const token = localStorage.getItem('authToken');
-    const ws = new WebSocket(`${WS_BASE_URL}?token=${token}`);
-    wsRef.current = ws;
+    destroyedRef.current = false;
+    reconnectAttemptRef.current = 0;
 
-    ws.onopen = () => {
-      setConnStatus('connected');
-      ws.send(JSON.stringify({ type: 'join-competition', roomCode }));
-    };
+    function connect() {
+      if (destroyedRef.current) return;
 
-    ws.onmessage = (event) => {
-      let data;
-      try { data = JSON.parse(event.data); } catch (_) { return; }
+      const token = localStorage.getItem('authToken');
+      setConnStatus('connecting');
+      const ws = new WebSocket(`${WS_BASE_URL}?token=${token}`);
+      wsRef.current = ws;
 
-      switch (data.type) {
-        case 'competition-player-joined':
-        case 'competition-player-left':
-          fetchParticipants();
-          break;
+      ws.onopen = () => {
+        reconnectAttemptRef.current = 0;
+        setConnStatus('connected');
+        ws.send(JSON.stringify({ type: 'join-competition', roomCode }));
+      };
 
-        case 'competition-started':
-          setPhase('ACTIVE');
-          setStarting(false);
-          toast.success('Competition started!');
-          break;
+      ws.onmessage = (event) => {
+        let data;
+        try { data = JSON.parse(event.data); } catch (_) { return; }
 
-        case 'competition-question': {
-          setCurrentQuestion(data);
-          setSelectedOption(null);
-          setHasAnswered(false);
-          setRevealData(null);
-          setAnsweredCount({ answered: 0, total: 0 });
-          setPhase('ACTIVE');
-          startClientTimer(data.endTime, data.timePerQuestion || 20);
-          break;
+        switch (data.type) {
+          case 'competition-player-joined':
+          case 'competition-player-left':
+            fetchParticipants();
+            break;
+
+          case 'competition-started':
+            setPhase('ACTIVE');
+            setStarting(false);
+            toast.success('Competition started!');
+            break;
+
+          case 'competition-question': {
+            setCurrentQuestion(data);
+            setSelectedOption(null);
+            setHasAnswered(false);
+            setRevealData(null);
+            setAnsweredCount({ answered: 0, total: 0 });
+            setPhase('ACTIVE');
+            startClientTimer(data.endTime, data.timePerQuestion || 20);
+            break;
+          }
+
+          case 'competition-answer-received':
+            setAnsweredCount({ answered: data.answeredCount || 0, total: data.totalPlayers || 0 });
+            break;
+
+          case 'competition-answer-reveal': {
+            setRevealData(data);
+            setPhase('REVEAL');
+            if (timerRef.current) clearInterval(timerRef.current);
+            if (data.scores) setScores(data.scores);
+            break;
+          }
+
+          case 'competition-finished': {
+            setPhase('FINISHED');
+            if (timerRef.current) clearInterval(timerRef.current);
+            if (data.leaderboard) setLeaderboard(data.leaderboard);
+            destroyedRef.current = true; // game over — no reconnect needed
+            break;
+          }
+
+          case 'error':
+            toast.error(data.message || 'Something went wrong');
+            break;
+
+          default:
+            break;
         }
+      };
 
-        case 'competition-answer-received':
-          setAnsweredCount({ answered: data.answeredCount || 0, total: data.totalPlayers || 0 });
-          break;
+      ws.onerror = () => { setConnStatus('disconnected'); };
 
-        case 'competition-answer-reveal': {
-          setRevealData(data);
-          setPhase('REVEAL');
-          if (timerRef.current) clearInterval(timerRef.current);
-          if (data.scores) setScores(data.scores);
-          break;
-        }
+      ws.onclose = () => {
+        setConnStatus('disconnected');
+        if (destroyedRef.current) return;
+        // Exponential backoff: 1s, 2s, 4s, 8s, cap at 16s
+        const delay = Math.min(16000, 1000 * 2 ** reconnectAttemptRef.current);
+        reconnectAttemptRef.current += 1;
+        reconnectTimerRef.current = setTimeout(connect, delay);
+      };
+    }
 
-        case 'competition-finished': {
-          // { type, leaderboard }
-          setPhase('FINISHED');
-          if (timerRef.current) clearInterval(timerRef.current);
-          if (data.leaderboard) setLeaderboard(data.leaderboard);
-          break;
-        }
-
-        case 'error':
-          toast.error(data.message || 'Something went wrong');
-          break;
-
-        default:
-          break;
-      }
-    };
-
-    ws.onerror = () => { setConnStatus('disconnected'); };
-    ws.onclose = () => { setConnStatus('disconnected'); };
+    connect();
 
     return () => {
+      destroyedRef.current = true;
+      clearTimeout(reconnectTimerRef.current);
       if (timerRef.current) clearInterval(timerRef.current);
       if (wsRef.current) {
         try { wsRef.current.send(JSON.stringify({ type: 'leave-competition', roomCode })); } catch (_) {}

@@ -628,7 +628,42 @@ function initWebSocket(wss, { pool, redis, redisPub, redisSub, logger }) {
 
   async function handleJoinCompetition(ws, data) {
     const { roomCode } = data;
-    const role = data.role || 'player';
+
+    // Verify the room exists and user is enrolled in its session
+    const roomResult = await pool.query(
+      `SELECT cr.id, cr.session_id
+       FROM competition_rooms cr
+       WHERE cr.room_code = $1`,
+      [roomCode]
+    );
+    if (roomResult.rows.length === 0) {
+      ws.send(JSON.stringify({ type: 'error', message: 'Room not found' }));
+      return;
+    }
+    const { id: roomId, session_id: sessionId } = roomResult.rows[0];
+
+    const enrolledResult = await pool.query(
+      `SELECT 1 FROM sessions s
+       WHERE s.session_id = $1
+         AND (s.teacher_id = $2
+              OR EXISTS (
+                SELECT 1 FROM session_participants sp
+                WHERE sp.session_id = s.id AND sp.student_id = $2
+              ))`,
+      [sessionId, ws.userId]
+    );
+    if (enrolledResult.rows.length === 0) {
+      ws.send(JSON.stringify({ type: 'error', message: 'Access denied: you are not enrolled in this session' }));
+      return;
+    }
+
+    // Resolve role from the participant record (source of truth set by REST join endpoint)
+    const participantResult = await pool.query(
+      'SELECT role FROM competition_participants WHERE room_id = $1 AND student_id = $2',
+      [roomId, ws.userId]
+    );
+    const role = participantResult.rows[0]?.role || 'spectator';
+
     if (!competitionConnections.has(roomCode)) {
       competitionConnections.set(roomCode, new Map());
     }
@@ -636,18 +671,13 @@ function initWebSocket(wss, { pool, redis, redisPub, redisSub, logger }) {
     ws.competitionRoomCode = roomCode;
     ws.competitionRole = role;
 
-    const roomResult = await pool.query(
-      'SELECT id FROM competition_rooms WHERE room_code = $1',
-      [roomCode]
-    );
-    if (roomResult.rows.length === 0) return;
     const participants = await pool.query(
       `SELECT cp.student_id, u.full_name AS display_name, cp.role, cp.score, cp.correct_count, cp.questions_answered
        FROM competition_participants cp
        JOIN users u ON cp.student_id = u.id
        WHERE cp.room_id = $1
        ORDER BY cp.score DESC`,
-      [roomResult.rows[0].id]
+      [roomId]
     );
     broadcastToCompetitionRoom(roomCode, {
       type: 'competition-player-joined',
@@ -658,23 +688,29 @@ function initWebSocket(wss, { pool, redis, redisPub, redisSub, logger }) {
   async function handleStartCompetition(ws, data) {
     const { roomCode } = data;
 
-    const roomResult = await pool.query(
-      'SELECT * FROM competition_rooms WHERE room_code = $1',
-      [roomCode]
+    // Atomic transition waiting→active — prevents race condition from concurrent start messages
+    const atomicResult = await pool.query(
+      `UPDATE competition_rooms SET status = 'active', started_at = NOW()
+       WHERE room_code = $1 AND status = 'waiting' AND created_by = $2
+       RETURNING *`,
+      [roomCode, ws.userId]
     );
-    if (roomResult.rows.length === 0) {
-      ws.send(JSON.stringify({ type: 'error', message: 'Room not found' }));
+    if (atomicResult.rows.length === 0) {
+      // Could be: not found, wrong creator, or already started
+      const check = await pool.query(
+        'SELECT status, created_by FROM competition_rooms WHERE room_code = $1',
+        [roomCode]
+      );
+      if (check.rows.length === 0) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Room not found' }));
+      } else if (String(check.rows[0].created_by) !== String(ws.userId)) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Only the room creator can start the competition' }));
+      } else {
+        ws.send(JSON.stringify({ type: 'error', message: 'Competition already started or finished' }));
+      }
       return;
     }
-    const room = roomResult.rows[0];
-    if (String(room.created_by) !== String(ws.userId)) {
-      ws.send(JSON.stringify({ type: 'error', message: 'Only the room creator can start the competition' }));
-      return;
-    }
-    if (room.status !== 'waiting') {
-      ws.send(JSON.stringify({ type: 'error', message: 'Competition already started or finished' }));
-      return;
-    }
+    const room = atomicResult.rows[0];
 
     // Fetch teacher polls — use specific IDs if stored, else fall back to count limit
     let pollsResult;
@@ -743,7 +779,14 @@ function initWebSocket(wss, { pool, redis, redisPub, redisSub, logger }) {
     const selectedPolls = normalizedPolls.slice(0, teacherLimit);
     const totalCap = room.total_questions > 0 ? room.total_questions : selectedPolls.length + studentQs.length;
     const aiSlots = Math.max(0, totalCap - selectedPolls.length);
-    const allQuestions = [...selectedPolls, ...studentQs.slice(0, aiSlots)];
+    const combined = [...selectedPolls, ...studentQs.slice(0, aiSlots)];
+
+    // Fisher-Yates shuffle so every player sees a unique question order
+    for (let i = combined.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [combined[i], combined[j]] = [combined[j], combined[i]];
+    }
+    const allQuestions = combined;
 
     competitionRoomState.set(roomCode, {
       status: 'active',
@@ -755,10 +798,9 @@ function initWebSocket(wss, { pool, redis, redisPub, redisSub, logger }) {
       timerHandles: []
     });
 
+    // Update total_questions count now that we know the exact question set
     await pool.query(
-      `UPDATE competition_rooms
-       SET status = 'active', total_questions = $1, started_at = NOW()
-       WHERE room_code = $2`,
+      `UPDATE competition_rooms SET total_questions = $1 WHERE room_code = $2`,
       [allQuestions.length, roomCode]
     );
 
@@ -771,9 +813,12 @@ function initWebSocket(wss, { pool, redis, redisPub, redisSub, logger }) {
   }
 
   async function handleCompetitionAnswer(ws, data) {
+    if (ws.competitionRole !== 'player') return;
     const { roomCode, answerIndex, questionIndex } = data;
     const state = competitionRoomState.get(roomCode);
     if (!state || state.status !== 'active') return;
+    // Reject answers for any question other than the current live one
+    if (questionIndex !== state.currentQuestionIndex) return;
 
     const responseTimeMs = Math.min(
       Date.now() - (state.questionStartTime || Date.now()),
