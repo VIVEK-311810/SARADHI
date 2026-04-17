@@ -536,6 +536,7 @@ function formatContent(text) {
   const inline = (s) =>
     s
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
       .replace(/`([^`]+)`/g, '<code class="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 px-1 py-0.5 rounded text-xs font-mono">$1</code>');
 
   const lines = text.split('\n');

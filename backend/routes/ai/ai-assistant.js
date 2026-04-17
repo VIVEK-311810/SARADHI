@@ -230,8 +230,8 @@ async function handleRAGQuery(sendSSE, res, sessionId, query, classification, co
       };
     }
 
-    // Enrich chunks with resource metadata for those missing denormalized fields
-    const chunksNeedingMeta = chunks.filter(c => !c.resource_title);
+    // Enrich chunks missing title OR file_url (file_url may be absent even when title is present)
+    const chunksNeedingMeta = chunks.filter(c => !c.resource_title || !c.resource_url);
     if (chunksNeedingMeta.length > 0) {
       const resourceIds = [...new Set(chunksNeedingMeta.map(c => c.resourceId))];
       const { data: resources } = await supabase
@@ -242,14 +242,14 @@ async function handleRAGQuery(sendSSE, res, sessionId, query, classification, co
       const resourceMap = Object.fromEntries((resources || []).map(r => [r.id, r]));
 
       chunks = chunks.map(chunk => {
-        if (!chunk.resource_title) {
+        if (!chunk.resource_title || !chunk.resource_url) {
           const resource = resourceMap[chunk.resourceId];
           return {
             ...chunk,
-            resource_title: resource?.title,
-            resource_url: resource?.file_url,
-            resource_type: resource?.resource_type,
-            file_name: resource?.file_name,
+            resource_title: chunk.resource_title || resource?.title,
+            resource_url: chunk.resource_url || resource?.file_url,
+            resource_type: chunk.resource_type || resource?.resource_type,
+            file_name: chunk.file_name || resource?.file_name,
           };
         }
         return chunk;

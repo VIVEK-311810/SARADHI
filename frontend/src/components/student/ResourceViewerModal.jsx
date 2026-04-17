@@ -1,21 +1,51 @@
 import React, { useEffect, useState } from 'react';
 
-const getViewerUrl = (fileUrl, resourceType) => {
-  if (!fileUrl) return null;
-  const enc = encodeURIComponent(fileUrl);
-  if (resourceType === 'pdf') return fileUrl;
-  if (resourceType === 'presentation') return `https://view.officeapps.live.com/op/embed.aspx?src=${enc}`;
-  // document / doc / docx — Google Docs viewer
-  return `https://docs.google.com/viewer?url=${enc}&embedded=true`;
-};
-
 export default function ResourceViewerModal({ resource, onClose }) {
   const [loaded, setLoaded] = useState(false);
+  const [blobUrl, setBlobUrl] = useState(null);
+  const [fetchError, setFetchError] = useState(false);
   const { resourceTitle, fileName, fileUrl, resourceType } = resource;
   const label = resourceTitle || fileName || 'Document';
-  const viewerUrl = getViewerUrl(fileUrl, resourceType);
 
-  useEffect(() => { setLoaded(false); }, [viewerUrl]);
+  const isPdf = resourceType === 'pdf';
+  const isOffice = resourceType === 'document' || resourceType === 'presentation';
+  const officeViewerUrl = isOffice && fileUrl
+    ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`
+    : null;
+
+  // For PDFs: fetch as blob to bypass X-Frame-Options on Supabase storage URLs
+  useEffect(() => {
+    if (!isPdf || !fileUrl) return;
+    setBlobUrl(null);
+    setFetchError(false);
+    setLoaded(false);
+
+    let objectUrl = null;
+    const controller = new AbortController();
+
+    fetch(fileUrl, { signal: controller.signal })
+      .then(r => {
+        if (!r.ok) throw new Error('fetch failed');
+        return r.blob();
+      })
+      .then(blob => {
+        objectUrl = URL.createObjectURL(blob);
+        setBlobUrl(objectUrl);
+      })
+      .catch(err => {
+        if (err.name !== 'AbortError') setFetchError(true);
+      });
+
+    return () => {
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [fileUrl, isPdf]);
+
+  // Reset state when switching to a non-PDF resource
+  useEffect(() => {
+    if (!isPdf) { setLoaded(false); setFetchError(false); }
+  }, [officeViewerUrl, isPdf]);
 
   useEffect(() => {
     const handleKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -34,6 +64,9 @@ export default function ResourceViewerModal({ resource, onClose }) {
     a.click();
     document.body.removeChild(a);
   };
+
+  const canPreview = isPdf ? (blobUrl && !fetchError) : (isOffice && officeViewerUrl);
+  const isLoading = isPdf ? (!blobUrl && !fetchError) : !loaded;
 
   return (
     <div
@@ -81,30 +114,58 @@ export default function ResourceViewerModal({ resource, onClose }) {
 
         {/* Content */}
         <div className="flex-1 relative overflow-hidden bg-slate-100 dark:bg-slate-950">
-          {!viewerUrl ? (
-            <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400">
+          {isLoading && !fetchError && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-100 dark:bg-slate-950 z-10">
+              <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs text-slate-400">
+                {isPdf ? 'Fetching document...' : 'Loading document...'}
+              </p>
+            </div>
+          )}
+
+          {/* Fallback: no preview possible */}
+          {!canPreview && !isLoading && (
+            <div className="flex flex-col items-center justify-center h-full gap-4 text-slate-400 px-8 text-center">
               <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <p className="text-sm font-medium">No preview available</p>
-              <p className="text-xs text-slate-400">This file cannot be previewed inline.</p>
-            </div>
-          ) : (
-            <>
-              {!loaded && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-100 dark:bg-slate-950 z-10">
-                  <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-                  <p className="text-xs text-slate-400">Loading document...</p>
-                </div>
+              <div>
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Preview not available</p>
+                <p className="text-xs text-slate-400">This file cannot be previewed in the browser.</p>
+              </div>
+              {fileUrl && (
+                <button
+                  onClick={handleDownload}
+                  className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium rounded-xl transition-colors cursor-pointer"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download to view
+                </button>
               )}
-              <iframe
-                src={viewerUrl}
-                title={label}
-                className="w-full h-full border-0"
-                onLoad={() => setLoaded(true)}
-                allow="fullscreen"
-              />
-            </>
+            </div>
+          )}
+
+          {/* PDF: rendered from blob URL (bypasses X-Frame-Options) */}
+          {isPdf && blobUrl && (
+            <embed
+              src={blobUrl}
+              type="application/pdf"
+              className="w-full h-full"
+            />
+          )}
+
+          {/* DOCX / PPTX: Office Live viewer */}
+          {isOffice && officeViewerUrl && (
+            <iframe
+              src={officeViewerUrl}
+              title={label}
+              className="w-full h-full border-0"
+              onLoad={() => setLoaded(true)}
+              onError={() => { setLoaded(true); setFetchError(true); }}
+              allow="fullscreen"
+            />
           )}
         </div>
 
