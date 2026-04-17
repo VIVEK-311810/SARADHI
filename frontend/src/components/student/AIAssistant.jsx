@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { utils, apiRequest } from '../../utils/api';
 import { useAIChat } from '../../hooks/useAIChat';
-import SourceCard from './SourceCard';
 import QuizCard from './QuizCard';
 import DOMPurify from 'dompurify';
 
@@ -411,12 +410,50 @@ function MessageBubble({ msg, currentStatus, statusMessages, confidenceColors, d
         )}
 
         {/* Sources */}
-        {!isUser && !msg.isStreaming && msg.metadata?.sources?.length > 0 && (
-          <div className="mt-3">
-            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Sources</div>
-            {msg.metadata.sources.slice(0, 3).map((s, i) => <SourceCard key={i} source={s} />)}
-          </div>
-        )}
+        {!isUser && !msg.isStreaming && msg.metadata?.sources?.length > 0 && (() => {
+          const seen = new Set();
+          const unique = msg.metadata.sources.filter(s => {
+            const key = s.resourceId || s.resourceTitle || s.fileName;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+          return (
+            <div className="mt-3">
+              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Sources</div>
+              <div className="flex flex-wrap gap-1.5">
+                {unique.map((s, i) => {
+                  const label = s.resourceTitle || s.fileName || 'Document';
+                  const cls = "flex items-center gap-1 px-2.5 py-1 border rounded-full text-xs transition-colors";
+                  return s.fileUrl ? (
+                    <a
+                      key={i}
+                      href={s.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`${cls} bg-slate-100 dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:border-primary-300 hover:text-primary-700 dark:hover:text-primary-300`}
+                    >
+                      <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      {label}
+                    </a>
+                  ) : (
+                    <span
+                      key={i}
+                      className={`${cls} bg-slate-100 dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400`}
+                    >
+                      <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      {label}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Confidence */}
         {!isUser && !msg.isStreaming && msg.metadata?.confidenceLabel && (
@@ -494,11 +531,78 @@ function MessageBubble({ msg, currentStatus, statusMessages, confidenceColors, d
 
 function formatContent(text) {
   if (!text) return '';
-  return text
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/`([^`]+)`/g, '<code class="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 px-1 py-0.5 rounded text-xs font-mono">$1</code>')
-    .replace(/\n/g, '<br/>');
+
+  // Strip suggestions tags that may leak through from the stream
+  text = text.replace(/<suggestions>[\s\S]*?<\/suggestions>/g, '').trim();
+
+  const escape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const inline = (s) =>
+    s
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/`([^`]+)`/g, '<code class="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 px-1 py-0.5 rounded text-xs font-mono">$1</code>');
+
+  const lines = text.split('\n');
+  const output = [];
+  let inUL = false;
+  let inOL = false;
+
+  const closeList = () => {
+    if (inUL) { output.push('</ul>'); inUL = false; }
+    if (inOL) { output.push('</ol>'); inOL = false; }
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (/^-{3,}$/.test(trimmed)) {
+      closeList();
+      output.push('<hr class="border-slate-200 dark:border-slate-700 my-2"/>');
+      continue;
+    }
+
+    if (trimmed === '') {
+      closeList();
+      output.push('<div class="h-1.5"></div>');
+      continue;
+    }
+
+    if (trimmed.startsWith('### ')) {
+      closeList();
+      output.push(`<h3 class="text-sm font-semibold mt-3 mb-0.5">${inline(escape(trimmed.slice(4)))}</h3>`);
+      continue;
+    }
+    if (trimmed.startsWith('## ')) {
+      closeList();
+      output.push(`<h2 class="text-sm font-bold mt-3 mb-0.5">${inline(escape(trimmed.slice(3)))}</h2>`);
+      continue;
+    }
+    if (trimmed.startsWith('# ')) {
+      closeList();
+      output.push(`<h1 class="text-base font-bold mt-3 mb-1">${inline(escape(trimmed.slice(2)))}</h1>`);
+      continue;
+    }
+
+    if (/^[-*•] /.test(trimmed)) {
+      if (inOL) { output.push('</ol>'); inOL = false; }
+      if (!inUL) { output.push('<ul class="list-disc pl-4 space-y-0.5 my-1">'); inUL = true; }
+      output.push(`<li>${inline(escape(trimmed.replace(/^[-*•] /, '')))}</li>`);
+      continue;
+    }
+
+    if (/^\d+\. /.test(trimmed)) {
+      if (inUL) { output.push('</ul>'); inUL = false; }
+      if (!inOL) { output.push('<ol class="list-decimal pl-4 space-y-0.5 my-1">'); inOL = true; }
+      output.push(`<li>${inline(escape(trimmed.replace(/^\d+\. /, '')))}</li>`);
+      continue;
+    }
+
+    closeList();
+    output.push(`<p class="leading-relaxed">${inline(escape(line))}</p>`);
+  }
+
+  closeList();
+  return output.join('');
 }
 
 export default AIAssistant;
