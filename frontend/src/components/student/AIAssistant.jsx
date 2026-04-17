@@ -389,7 +389,7 @@ function MessageBubble({ msg, currentStatus, statusMessages, confidenceColors, d
         {/* Content */}
         {msg.content && (
           <div
-            className="whitespace-pre-wrap break-words"
+            className="break-words"
             dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formatContent(msg.content)) }}
           />
         )}
