@@ -12,11 +12,10 @@ const getViewerUrl = (fileUrl, resourceType) => {
 export default function ResourceViewerModal({ resource, onClose }) {
   const [loaded, setLoaded] = useState(false);
   const { resourceTitle, fileName, fileUrl, resourceType } = resource;
+  const label = resourceTitle || fileName || 'Document';
   const viewerUrl = getViewerUrl(fileUrl, resourceType);
 
-  // Reset spinner whenever the document being viewed changes
   useEffect(() => { setLoaded(false); }, [viewerUrl]);
-  const label = resourceTitle || fileName || 'Document';
 
   useEffect(() => {
     const handleKey = (e) => { if (e.key === 'Escape') onClose(); };

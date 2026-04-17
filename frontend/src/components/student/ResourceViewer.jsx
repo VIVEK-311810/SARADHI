@@ -170,6 +170,7 @@ const ResourceViewer = () => {
   }
 
   return (
+    <>
     <div className="max-w-7xl mx-auto p-6">
       {/* Header */}
       <div className="mb-6">
@@ -473,6 +474,7 @@ const ResourceViewer = () => {
     {viewerResource && (
       <ResourceViewerModal resource={viewerResource} onClose={() => setViewerResource(null)} />
     )}
+    </>
   );
 };
 
