@@ -46,7 +46,6 @@ const ROUTE_TITLES = [
   ['/teacher/session',        'Session'],       // prefix match
   ['/student/dashboard',      'Dashboard'],
   ['/student/join',           'Join Session'],
-  ['/student/leaderboard',    'Leaderboard'],
   ['/student/ai-assistant',   'AI Assistant'],  // prefix match
   ['/student/session',        'Session'],       // prefix match
   ['/community',              'Community'],

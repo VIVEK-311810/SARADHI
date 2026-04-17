@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { utils, apiRequest } from '../../utils/api';
-import { isDemoMode, DEMO_LEADERBOARD, DEMO_SESSION_LEADERBOARD, DEMO_GAMIFICATION, DEMO_GAMIFICATION_XP } from '../../utils/demoData';
+import { isDemoMode, DEMO_SESSION_LEADERBOARD, DEMO_GAMIFICATION, DEMO_GAMIFICATION_XP } from '../../utils/demoData';
 import { StatCardsSkeleton, LeaderboardSkeleton } from '../shared/feedback/SkeletonLoader';
 
 // ─── Level Thresholds (mirrors backend) ──────────────────────────────────────
@@ -97,7 +97,6 @@ const Leaderboard = ({ embedded = false, sessionId: sessionIdProp } = {}) => {
   const currentUser = utils.getCurrentUser();
 
   const [leaderboard, setLeaderboard] = useState([]);
-  const [viewType, setViewType] = useState(sessionId ? 'session' : 'allTime');
   const [loading, setLoading] = useState(true);
   const [myStats, setMyStats] = useState(null);
   const [myXP, setMyXP] = useState(null);
@@ -108,8 +107,13 @@ const Leaderboard = ({ embedded = false, sessionId: sessionIdProp } = {}) => {
       navigate('/auth');
       return;
     }
+    // No sessionId — this page is only meaningful in session context
+    if (!sessionId) {
+      navigate('/student/dashboard');
+      return;
+    }
     fetchData();
-  }, [viewType, sessionId]); // eslint-disable-line
+  }, [sessionId]); // eslint-disable-line
 
   const fetchData = async () => {
     try {
@@ -117,18 +121,14 @@ const Leaderboard = ({ embedded = false, sessionId: sessionIdProp } = {}) => {
       setError(null);
 
       if (isDemoMode()) {
-        setLeaderboard(viewType === 'session' && sessionId ? DEMO_SESSION_LEADERBOARD : DEMO_LEADERBOARD);
+        setLeaderboard(DEMO_SESSION_LEADERBOARD);
         setMyStats(DEMO_GAMIFICATION);
         setMyXP(DEMO_GAMIFICATION_XP);
         return;
       }
 
-      const leaderboardPath = viewType === 'session' && sessionId
-        ? `/gamification/leaderboard/session/${sessionId}`
-        : `/gamification/leaderboard/all-time`;
-
       const [leaderboardData, statsData, xpData] = await Promise.all([
-        apiRequest(leaderboardPath),
+        apiRequest(`/gamification/leaderboard/session/${sessionId}`),
         apiRequest(`/gamification/student/${currentUser.id}/stats`),
         apiRequest(`/gamification/student/${currentUser.id}/xp`)
       ]);
@@ -143,6 +143,9 @@ const Leaderboard = ({ embedded = false, sessionId: sessionIdProp } = {}) => {
       setLoading(false);
     }
   };
+
+  // Derive session rank from the leaderboard data (not global XP rank)
+  const mySessionRank = leaderboard.find(e => String(e.studentId) === String(currentUser?.id))?.rank ?? '—';
 
   if (loading) {
     return (
@@ -171,7 +174,7 @@ const Leaderboard = ({ embedded = false, sessionId: sessionIdProp } = {}) => {
                 <p className="text-xs text-slate-600 dark:text-slate-400">Total XP</p>
               </div>
               <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                <p className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400">#{myStats.rank}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400">#{mySessionRank}</p>
                 <p className="text-xs text-slate-600 dark:text-slate-400">Your Rank</p>
               </div>
               <div className="text-center p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
@@ -278,7 +281,7 @@ const Leaderboard = ({ embedded = false, sessionId: sessionIdProp } = {}) => {
                 <p className="text-xs text-slate-600 dark:text-slate-400">Total XP</p>
               </div>
               <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                <p className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400">#{myStats.rank}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400">#{mySessionRank}</p>
                 <p className="text-xs text-slate-600 dark:text-slate-400">Your Rank</p>
               </div>
               <div className="text-center p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
@@ -313,34 +316,6 @@ const Leaderboard = ({ embedded = false, sessionId: sessionIdProp } = {}) => {
           </div>
         )}
 
-        {/* View Toggle */}
-        <div className="flex justify-center">
-          <div className="inline-flex rounded-xl border border-slate-200/60 dark:border-slate-700/60 bg-white/75 dark:bg-slate-800/75 backdrop-blur-sm p-1 shadow-sm">
-            {sessionId && (
-              <button
-                onClick={() => setViewType('session')}
-                className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md transition-colors ${
-                  viewType === 'session'
-                    ? 'bg-primary-600 text-white'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-                }`}
-              >
-                This Session
-              </button>
-            )}
-            <button
-              onClick={() => setViewType('allTime')}
-              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md transition-colors ${
-                viewType === 'allTime'
-                  ? 'bg-primary-600 text-white'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-              }`}
-            >
-              XP Rankings
-            </button>
-          </div>
-        </div>
-
         {/* Error Banner */}
         {error && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm text-center">
@@ -351,9 +326,7 @@ const Leaderboard = ({ embedded = false, sessionId: sessionIdProp } = {}) => {
         {/* Leaderboard Table */}
         <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-glass overflow-hidden">
           <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-              {viewType === 'session' ? 'Session Rankings' : 'XP Rankings (All Time)'}
-            </h3>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Session Rankings</h3>
           </div>
           {leaderboard.length > 0 ? (
             <div className="divide-y divide-slate-100 dark:divide-slate-700">
@@ -386,15 +359,12 @@ const Leaderboard = ({ embedded = false, sessionId: sessionIdProp } = {}) => {
                         )}
                       </div>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {viewType === 'allTime'
-                          ? `${entry.sessionsParticipated || 0} sessions · ${entry.avgAccuracy || 0}% accuracy`
-                          : `${entry.correctAnswers || 0}/${entry.totalAnswers || 0} correct`
-                        }
+                        {entry.correctAnswers || 0}/{entry.totalAnswers || 0} correct
                       </p>
                     </div>
 
                     {/* Streak */}
-                    {viewType === 'session' && (entry.currentStreak > 0 || entry.maxStreak > 0) && (
+                    {(entry.currentStreak > 0 || entry.maxStreak > 0) && (
                       <div className="hidden sm:flex items-center gap-1 text-orange-500 mr-3 text-sm">
                         <span>&#128293;</span>
                         <span className="font-semibold">{entry.currentStreak || entry.maxStreak}</span>
@@ -404,11 +374,9 @@ const Leaderboard = ({ embedded = false, sessionId: sessionIdProp } = {}) => {
                     {/* Score */}
                     <div className="text-right flex-shrink-0 ml-2">
                       <p className="text-lg sm:text-xl font-bold text-primary-600 dark:text-primary-400">
-                        {viewType === 'allTime' ? (entry.totalXP || 0) : (entry.points || 0)}
+                        {entry.points || 0}
                       </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {viewType === 'allTime' ? 'XP' : 'pts'}
-                      </p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">pts</p>
                     </div>
                   </div>
                 );

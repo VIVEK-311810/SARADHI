@@ -7,7 +7,6 @@ import {
   FolderOpen,
   BarChart2,
   MessageSquare,
-  Trophy,
   Swords,
   LogOut,
   ChevronLeft,
@@ -31,7 +30,6 @@ const TEACHER_NAV = [
 const STUDENT_NAV = [
   { label: 'Dashboard',    href: '/student/dashboard',   icon: LayoutDashboard },
   { label: 'Join Session', href: '/student/join',         icon: Zap },
-  { label: 'Leaderboard',  href: '/student/leaderboard', icon: Trophy },
   { label: 'Community',    href: '/community',            icon: MessageSquare },
 ];
 

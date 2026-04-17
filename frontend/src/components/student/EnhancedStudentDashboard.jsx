@@ -288,15 +288,6 @@ const EnhancedStudentDashboard = () => {
                 </div>
               )}
             </div>
-            <Button
-              variant="outline"
-              onClick={() => {
-                navigate(liveSession ? `/student/leaderboard/${liveSession.session_id}` : '/student/leaderboard');
-              }}
-              className="w-full sm:w-auto"
-            >
-              View Leaderboard
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -363,6 +354,9 @@ const EnhancedStudentDashboard = () => {
                     )}
                     <Button size="sm" variant="secondary" onClick={() => navigate(`/student/session/${session.session_id}/history`)}>
                       View
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => navigate(`/student/leaderboard/${session.session_id}`)}>
+                      🏆 Leaderboard
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => navigate(`/session/${session.session_id}/resources`)}>
                       Resources
