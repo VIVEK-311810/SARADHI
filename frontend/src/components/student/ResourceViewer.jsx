@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { resourceAPI, utils } from '../../utils/api';
+import ResourceViewerModal from './ResourceViewerModal';
 
 const ResourceViewer = () => {
   const { sessionId } = useParams();
@@ -14,6 +15,7 @@ const ResourceViewer = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [viewerResource, setViewerResource] = useState(null);
 
   useEffect(() => {
     if (!currentUser || currentUser.role !== 'student') {
@@ -58,20 +60,24 @@ const ResourceViewer = () => {
 
   const handleView = async (resource) => {
     try {
-      // Track view
       await resourceAPI.trackAccess(resource.id, currentUser.id, 'view');
-
-      // Open resource in new tab
-      window.open(resource.file_url, '_blank');
-
-      // Update local count
-      setResources(prevResources =>
-        prevResources.map(r =>
-          r.id === resource.id ? { ...r, view_count: r.view_count + 1 } : r
-        )
-      );
+      setResources(prev => prev.map(r =>
+        r.id === resource.id ? { ...r, view_count: r.view_count + 1 } : r
+      ));
     } catch (error) {
       console.error('Error tracking view:', error);
+    }
+
+    // URLs open externally; all other types open in the inline viewer
+    if (resource.resource_type === 'url') {
+      window.open(resource.file_url, '_blank');
+    } else {
+      setViewerResource({
+        resourceTitle: resource.title,
+        fileName: resource.file_name,
+        fileUrl: resource.file_url,
+        resourceType: resource.resource_type,
+      });
     }
   };
 
@@ -463,6 +469,10 @@ const ResourceViewer = () => {
         </div>
       )}
     </div>
+
+    {viewerResource && (
+      <ResourceViewerModal resource={viewerResource} onClose={() => setViewerResource(null)} />
+    )}
   );
 };
 
