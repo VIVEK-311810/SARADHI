@@ -147,12 +147,13 @@ export default function ResourceViewerModal({ resource, onClose }) {
             </div>
           )}
 
-          {/* PDF: rendered from blob URL (bypasses X-Frame-Options) */}
+          {/* PDF: rendered via blob URL in iframe (bypasses X-Frame-Options; blob: allowed by CSP) */}
           {isPdf && blobUrl && (
-            <embed
+            <iframe
               src={blobUrl}
-              type="application/pdf"
-              className="w-full h-full"
+              title={label}
+              className="w-full h-full border-0"
+              allow="fullscreen"
             />
           )}
 

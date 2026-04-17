@@ -60,7 +60,7 @@ const ResourceViewer = () => {
 
   const handleView = async (resource) => {
     try {
-      await resourceAPI.trackAccess(resource.id, currentUser.id, 'view');
+      await resourceAPI.trackAccess(resource.id, 'view');
       setResources(prev => prev.map(r =>
         r.id === resource.id ? { ...r, view_count: r.view_count + 1 } : r
       ));
@@ -89,7 +89,7 @@ const ResourceViewer = () => {
 
     try {
       // Track download
-      await resourceAPI.trackAccess(resource.id, currentUser.id, 'download');
+      await resourceAPI.trackAccess(resource.id, 'download');
 
       // Trigger download
       const link = document.createElement('a');
